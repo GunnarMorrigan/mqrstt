@@ -1,4 +1,7 @@
-use super::errors::PacketError;
+use bytes::{Buf, BufMut};
+
+use super::mqtt_traits::{MqttRead, MqttWrite};
+use super::errors::DeserializeError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConAckReasonCode {
@@ -26,11 +29,13 @@ pub enum ConAckReasonCode {
     ConnectionRateExceeded,
 }
 
-impl TryFrom<u8> for ConAckReasonCode {
-    type Error = PacketError;
+impl MqttRead for ConAckReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(reason_code: u8) -> Result<Self, Self::Error> {
-        match reason_code {
+        match buf.get_u8() {
             0x00 => Ok(ConAckReasonCode::Success),
             0x80 => Ok(ConAckReasonCode::UnspecifiedError),
             0x81 => Ok(ConAckReasonCode::MalformedPacket),
@@ -53,14 +58,14 @@ impl TryFrom<u8> for ConAckReasonCode {
             0x9C => Ok(ConAckReasonCode::UseAnotherServer),
             0x9D => Ok(ConAckReasonCode::ServerMoved),
             0x9F => Ok(ConAckReasonCode::ConnectionRateExceeded),
-            r => Err(PacketError::UnexpectedReasonCode(r, super::PacketType::ConnAck)),
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for ConAckReasonCode {
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for ConAckReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             ConAckReasonCode::Success => 0x00,
             ConAckReasonCode::UnspecifiedError => 0x80,
             ConAckReasonCode::MalformedPacket => 0x81,
@@ -83,40 +88,51 @@ impl Into<u8> for ConAckReasonCode {
             ConAckReasonCode::UseAnotherServer => 0x9C,
             ConAckReasonCode::ServerMoved => 0x9D,
             ConAckReasonCode::ConnectionRateExceeded => 0x9F,
-        }
+        };
+
+        buf.put_u8(val);
+
+        Ok(())
     }
 }
 
-
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum AuthReasonCode {
     Success,
     ContinueAuthentication,
     ReAuthenticate,
 }
 
-impl TryFrom<u8> for AuthReasonCode {
-    type Error = String;
+impl MqttRead for AuthReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(AuthReasonCode::Success),
             0x18 => Ok(AuthReasonCode::ContinueAuthentication),
             0x19 => Ok(AuthReasonCode::ReAuthenticate),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for AuthReasonCode {
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for AuthReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             AuthReasonCode::Success => 0x00,
             AuthReasonCode::ContinueAuthentication => 0x18,
             AuthReasonCode::ReAuthenticate => 0x19,
-        }
+        };
+
+        buf.put_u8(val);
+
+        Ok(())
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum DisconnectReasonCode {
     NormalDisconnection, 
     DisconnectWithWillMessage, 
@@ -149,11 +165,13 @@ pub enum DisconnectReasonCode {
     WildcardSubscriptionsNotSupported, 
 }
 
-impl TryFrom<u8> for DisconnectReasonCode {
-    type Error = String;
+impl MqttRead for DisconnectReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(DisconnectReasonCode::NormalDisconnection), 
             0x04 => Ok(DisconnectReasonCode::DisconnectWithWillMessage), 
             0x80 => Ok(DisconnectReasonCode::UnspecifiedError), 
@@ -183,12 +201,52 @@ impl TryFrom<u8> for DisconnectReasonCode {
             0xA0 => Ok(DisconnectReasonCode::MaximumConnectTime), 
             0xA1 => Ok(DisconnectReasonCode::SubscriptionIdentifiersNotSupported), 
             0xA2 => Ok(DisconnectReasonCode::WildcardSubscriptionsNotSupported),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
+impl MqttWrite for DisconnectReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
+            DisconnectReasonCode::NormalDisconnection => 0x00,
+            DisconnectReasonCode::DisconnectWithWillMessage => 0x04,
+            DisconnectReasonCode::UnspecifiedError => 0x80,
+            DisconnectReasonCode::MalformedPacket => 0x81,
+            DisconnectReasonCode::ProtocolError => 0x82,
+            DisconnectReasonCode::ImplementationSpecificError => 0x83,
+            DisconnectReasonCode::NotAuthorized => 0x87,
+            DisconnectReasonCode::ServerBusy => 0x89,
+            DisconnectReasonCode::ServerShuttingDown => 0x8B,
+            DisconnectReasonCode::KeepAliveTimeout => 0x8D,
+            DisconnectReasonCode::SessionTakenOver => 0x8E,
+            DisconnectReasonCode::TopicFilterInvalid => 0x8F,
+            DisconnectReasonCode::TopicNameInvalid => 0x90,
+            DisconnectReasonCode::ReceiveMaximumExceeded => 0x93,
+            DisconnectReasonCode::TopicAliasInvalid => 0x94,
+            DisconnectReasonCode::PacketTooLarge => 0x95,
+            DisconnectReasonCode::MessageRateTooHigh => 0x96,
+            DisconnectReasonCode::QuotaExceeded => 0x97,
+            DisconnectReasonCode::AdministrativeAction => 0x98,
+            DisconnectReasonCode::PayloadFormatInvalid => 0x99,
+            DisconnectReasonCode::RetainNotSupported => 0x9A,
+            DisconnectReasonCode::QosNotSupported => 0x9B,
+            DisconnectReasonCode::UseAnotherServer => 0x9C,
+            DisconnectReasonCode::ServerMoved => 0x9D,
+            DisconnectReasonCode::SharedSubscriptionsNotSupported => 0x9E,
+            DisconnectReasonCode::ConnectionRateExceeded => 0x9F,
+            DisconnectReasonCode::MaximumConnectTime => 0xA0,
+            DisconnectReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
+            DisconnectReasonCode::WildcardSubscriptionsNotSupported => 0xA2,
+        };
 
+        buf.put_u8(val);
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum PubAckReasonCode {
     Success,
     NoMatchingSubscribers,
@@ -201,11 +259,13 @@ pub enum PubAckReasonCode {
     PayloadFormatInvalid,
 }
 
-impl TryFrom<u8> for PubAckReasonCode{
-    type Error = String;
+impl MqttRead for PubAckReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(PubAckReasonCode::Success),
             0x10 => Ok(PubAckReasonCode::NoMatchingSubscribers),
             0x80 => Ok(PubAckReasonCode::UnspecifiedError),
@@ -215,37 +275,64 @@ impl TryFrom<u8> for PubAckReasonCode{
             0x91 => Ok(PubAckReasonCode::PacketIdentifierInUse),
             0x97 => Ok(PubAckReasonCode::QuotaExceeded),
             0x99 => Ok(PubAckReasonCode::PayloadFormatInvalid),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
+impl MqttWrite for PubAckReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
+            PubAckReasonCode::Success => 0x00,
+            PubAckReasonCode::NoMatchingSubscribers => 0x10,
+            PubAckReasonCode::UnspecifiedError => 0x80,
+            PubAckReasonCode::ImplementationSpecificError => 0x83,
+            PubAckReasonCode::NotAuthorized => 0x87,
+            PubAckReasonCode::TopicNameInvalid => 0x90,
+            PubAckReasonCode::PacketIdentifierInUse => 0x91,
+            PubAckReasonCode::QuotaExceeded => 0x97,
+            PubAckReasonCode::PayloadFormatInvalid => 0x99,
+        };
+
+        buf.put_u8(val);
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum PubCompReasonCode{
         Success,
         PacketIdentifierNotFound,
 }
 
-impl TryFrom<u8> for PubCompReasonCode{
-    type Error = String;
+impl MqttRead for PubCompReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(PubCompReasonCode::Success),
             0x92 => Ok(PubCompReasonCode::PacketIdentifierNotFound),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for PubCompReasonCode {
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for PubCompReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             PubCompReasonCode::Success => 0x00,
             PubCompReasonCode::PacketIdentifierNotFound => 0x92,
-        }
+        };
+
+        buf.put_u8(val);
+        Ok(())
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum PubRecReasonCode{
         Success,
         NoMatchingSubscribers,
@@ -258,11 +345,13 @@ pub enum PubRecReasonCode{
         PayloadFormatInvalid,
 }
 
-impl TryFrom<u8> for PubRecReasonCode{
-    type Error = String;
+impl MqttRead for PubRecReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(PubRecReasonCode::Success),
             0x10 => Ok(PubRecReasonCode::NoMatchingSubscribers),
             0x80 => Ok(PubRecReasonCode::UnspecifiedError),
@@ -272,14 +361,14 @@ impl TryFrom<u8> for PubRecReasonCode{
             0x91 => Ok(PubRecReasonCode::PacketIdentifierInUse),
             0x97 => Ok(PubRecReasonCode::QuotaExceeded),
             0x99 => Ok(PubRecReasonCode::PayloadFormatInvalid),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string()),
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for PubRecReasonCode{
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for PubRecReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             PubRecReasonCode::Success => 0x00,
             PubRecReasonCode::NoMatchingSubscribers => 0x10,
             PubRecReasonCode::UnspecifiedError => 0x80,
@@ -289,36 +378,46 @@ impl Into<u8> for PubRecReasonCode{
             PubRecReasonCode::PacketIdentifierInUse => 0x91,
             PubRecReasonCode::QuotaExceeded => 0x97,
             PubRecReasonCode::PayloadFormatInvalid => 0x99,
-        }
+        };
+
+        buf.put_u8(val);
+        Ok(())
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum PubRelReasonCode{
     Success,
     PacketIdentifierNotFound,
 }
 
-impl TryFrom<u8> for PubRelReasonCode{
-    type Error = String;
+impl MqttRead for PubRelReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(PubRelReasonCode::Success),
             0x92 => Ok(PubRelReasonCode::PacketIdentifierNotFound),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for PubRelReasonCode {
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for PubRelReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             PubRelReasonCode::Success => 0x00,
             PubRelReasonCode::PacketIdentifierNotFound => 0x92,
-        }
+        };
+
+        buf.put_u8(val);
+        Ok(())
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum SubAckReasonCode{
     GrantedQoS0,
     GrantedQoS1,
@@ -334,12 +433,13 @@ pub enum SubAckReasonCode{
     WildcardSubscriptionsNotSupported,
 }
 
+impl MqttRead for SubAckReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-impl TryFrom<u8> for SubAckReasonCode{
-    type Error = String;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(SubAckReasonCode::GrantedQoS0),
             0x01 => Ok(SubAckReasonCode::GrantedQoS1),
             0x02 => Ok(SubAckReasonCode::GrantedQoS2),
@@ -352,14 +452,14 @@ impl TryFrom<u8> for SubAckReasonCode{
             0x9E => Ok(SubAckReasonCode::SharedSubscriptionsNotSupported),
             0xA1 => Ok(SubAckReasonCode::SubscriptionIdentifiersNotSupported),
             0xA2 => Ok(SubAckReasonCode::WildcardSubscriptionsNotSupported),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for SubAckReasonCode {
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for SubAckReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             SubAckReasonCode::GrantedQoS0 => 0x00,
             SubAckReasonCode::GrantedQoS1 => 0x01,
             SubAckReasonCode::GrantedQoS2 => 0x02,
@@ -372,10 +472,14 @@ impl Into<u8> for SubAckReasonCode {
             SubAckReasonCode::SharedSubscriptionsNotSupported => 0x9E,
             SubAckReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
             SubAckReasonCode::WildcardSubscriptionsNotSupported => 0xA2,
-        }
+        };
+
+        buf.put_u8(val);
+        Ok(())
     }
 }
 
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum UnsubAckReasonCode {
     Success,
     NoSubscriptionExisted,
@@ -386,11 +490,13 @@ pub enum UnsubAckReasonCode {
     PacketIdentifierInUse,
 }
 
-impl TryFrom<u8> for UnsubAckReasonCode{
-    type Error = String;
+impl MqttRead for UnsubAckReasonCode{
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData(0, 1));
+        }
 
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
+        match buf.get_u8() {
             0x00 => Ok(UnsubAckReasonCode::Success),
             0x11 => Ok(UnsubAckReasonCode::NoSubscriptionExisted),
             0x80 => Ok(UnsubAckReasonCode::UnspecifiedError),
@@ -398,14 +504,14 @@ impl TryFrom<u8> for UnsubAckReasonCode{
             0x87 => Ok(UnsubAckReasonCode::NotAuthorized),
             0x8F => Ok(UnsubAckReasonCode::TopicFilterInvalid),
             0x91 => Ok(UnsubAckReasonCode::PacketIdentifierInUse),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
+            t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl Into<u8> for UnsubAckReasonCode {
-    fn into(self) -> u8 {
-        match self {
+impl MqttWrite for UnsubAckReasonCode{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+        let val = match self {
             UnsubAckReasonCode::Success => 0x00,
             UnsubAckReasonCode::NoSubscriptionExisted => 0x11,
             UnsubAckReasonCode::UnspecifiedError => 0x80,
@@ -413,6 +519,9 @@ impl Into<u8> for UnsubAckReasonCode {
             UnsubAckReasonCode::NotAuthorized => 0x87,
             UnsubAckReasonCode::TopicFilterInvalid => 0x8F,
             UnsubAckReasonCode::PacketIdentifierInUse => 0x91,
-        }
+        };
+
+        buf.put_u8(val);
+        Ok(())
     }
 }

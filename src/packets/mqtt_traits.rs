@@ -1,13 +1,13 @@
 use bytes::{BytesMut, Bytes};
 
-use super::errors::PacketError;
+use super::errors::{DeserializeError, SerializeError};
 
 pub trait MqttPacketRead: Sized {
-    fn read(flags: u8, remaining_length: usize,  buf: &mut Bytes) -> Result<Self, PacketError>;
+    fn read(flags: u8, remaining_length: usize,  buf: Bytes) -> Result<Self, DeserializeError>;
 }
 
 pub trait MqttPacketWrite: Sized{
-    fn write(&self, buf: &mut BytesMut) -> Option<String>;
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 
 pub trait WireLength {
@@ -15,11 +15,11 @@ pub trait WireLength {
 }
 
 pub trait MqttRead: Sized{
-    fn read(buf: &mut Bytes) -> Result<Self, PacketError>;
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>;
 }
 
 pub trait MqttWrite: Sized{
-    fn write(&self, buf: &mut BytesMut);
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 
 #[deprecated(note = "Implement MqttRead or MqttWrite.")]

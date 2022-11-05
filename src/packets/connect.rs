@@ -3,7 +3,7 @@ use std::vec;
 use bytes::{Bytes, Buf, BytesMut, BufMut};
 use bitflags::bitflags;
 
-use super::{QoS, SimpleSerialize, read_variable_integer, write_variable_integer, ProtocolVersion, PropertyType, WireLength};
+use super::{QoS, SimpleSerialize, read_variable_integer, write_variable_integer, ProtocolVersion, PropertyType, WireLength, mqtt_traits::{MqttRead, MqttWrite}, errors::{SerializeError, DeserializeError}, PacketType};
 
 /// Variable connect header:
 /// 
@@ -81,9 +81,9 @@ pub struct Connect{
 }
 
 impl Connect{
-    fn read(_: u8, _: usize,  buf: &mut Bytes) -> Result<Self, String> {
+    fn read(_: u8, _: usize,  buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if String::read(buf)? != "MQTT" {
-            return Err("Protocol not MQTT".to_string());
+            return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_string()));
         }
         
         let protocol_version = ProtocolVersion::read(buf)?;
@@ -314,14 +314,14 @@ impl ConnectProperties{
         }
     }
 
-    pub fn read(buf: &mut Bytes) -> Result<Self, String>{
+    pub fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>{
         let (len, _) = read_variable_integer(buf)?;
         
         if len == 0 {
             return Ok(Self::_new());
         }
         else if buf.len() < len{
-            return Err("Not enough data for the given length".to_string());
+            return Err(DeserializeError::InsufficientData(buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
@@ -331,37 +331,37 @@ impl ConnectProperties{
             match PropertyType::from_u8(property_data.get_u8())? {
                 PropertyType::SessionExpiryInterval => {
                     if properties.session_expiry_interval.is_some(){
-                        return Err("Duplicate Session expiry interval".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
                     }
                     properties.session_expiry_interval = Some(property_data.get_u32());
                 },
                 PropertyType::ReceiveMaximum => {
                     if properties.receive_maximum.is_some(){
-                        return Err("Duplicate receive maximum".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReceiveMaximum));
                     }
                     properties.receive_maximum = Some(property_data.get_u16());
                 },
                 PropertyType::MaximumPacketSize => {
                     if properties.maximum_packet_size.is_some(){
-                        return Err("Duplicate maximum packet size".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::MaximumPacketSize));
                     }
                     properties.maximum_packet_size = Some(property_data.get_u32());
                 },
                 PropertyType::TopicAliasMaximum => {
                     if properties.topic_alias_maximum.is_some(){
-                        return Err("Duplicate topic alias maximum".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::TopicAliasMaximum));
                     }
                     properties.topic_alias_maximum = Some(property_data.get_u16());
                 },
                 PropertyType::RequestResponseInformation => {
                     if properties.request_response_information.is_some(){
-                        return Err("Duplicate maximum packet size".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::RequestResponseInformation));
                     }
                     properties.request_response_information = Some(property_data.get_u8());
                 },
                 PropertyType::RequestProblemInformation => {
                     if properties.request_problem_information.is_some(){
-                        return Err("Duplicate request_problem_information".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::RequestProblemInformation));
                     }
                     properties.request_problem_information = Some(property_data.get_u8());
                 },
@@ -370,17 +370,17 @@ impl ConnectProperties{
                 },
                 PropertyType::AuthenticationMethod => {
                     if properties.authentication_method.is_some(){
-                        return Err("Duplicate authentication_method".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
                     }
                     properties.authentication_method = Some(String::read(&mut property_data)?);
                 },
                 PropertyType::AuthenticationData => {
                     if properties.authentication_data.is_empty(){
-                        return Err("Duplicate authentication_data".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
                     }
                     properties.authentication_data = Bytes::read(&mut property_data)?;
                 },
-                e => return Err(format!("Unexpected property type: {:?}", e)),
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
             }
         
             if property_data.is_empty(){
@@ -389,7 +389,7 @@ impl ConnectProperties{
         }
 
         if !properties.authentication_data.is_empty() && properties.authentication_method.is_none(){
-            return Err("Authentication data is not empty while authentication method is".to_string());
+            return Err(DeserializeError::MalformedPacketWithInfo("Authentication data is not empty while authentication method is".to_string()));
         }
 
         Ok(properties)
@@ -497,7 +497,7 @@ impl LastWill {
         }
     }
 
-    pub fn read(qos: QoS, retain: bool, buf: &mut Bytes) -> Result<Self, String>{
+    pub fn read(qos: QoS, retain: bool, buf: &mut Bytes) -> Result<Self, DeserializeError>{
         let last_will_properties = LastWillProperties::read(buf)?;
         let topic = String::read(buf)?;
         let payload = Bytes::read(buf)?;
@@ -555,14 +555,14 @@ impl LastWillProperties{
         }
     }
 
-    pub fn read(buf: &mut Bytes) -> Result<Self, String>{
+    pub fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>{
         let (len, _) = read_variable_integer(buf)?;
         
         if len == 0 {
             return Ok(Self::new_empty());
         }
         else if buf.len() < len{
-            return Err("Not enough data for the given length".to_string());
+            return Err(DeserializeError::InsufficientData(buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
@@ -573,44 +573,44 @@ impl LastWillProperties{
             match PropertyType::from_u8(property_data.get_u8())? {
                 PropertyType::WillDelayInterval => {
                     if properties.delay_interval.is_some(){
-                        return Err("Duplicate delay_interval".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::WillDelayInterval));
                     }
                     properties.delay_interval = Some(property_data.get_u32());
                 },
                 PropertyType::PayloadFormatIndicator => {
                     if properties.payload_format_indicator.is_none(){
-                        return Err("Duplicate is_utf8_encoded_data".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator));
                     }
                     properties.payload_format_indicator = Some(property_data.get_u8());
                 },
                 PropertyType::MessageExpiryInterval => {
                     if properties.message_expiry_interval.is_some(){
-                        return Err("Duplicate message_expiry_interval".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval));
                     }
                     properties.message_expiry_interval = Some(property_data.get_u32());
                 },
                 PropertyType::ContentType => {
                     if properties.content_type.is_some(){
-                        return Err("Duplicate content_type".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ContentType));
                     }
                     properties.content_type = Some(String::read(&mut property_data)?);
                 },
                 PropertyType::ResponseTopic => {
                     if properties.response_topic.is_some(){
-                        return Err("Duplicate response_topic".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic));
                     }
                     properties.response_topic = Some(String::read(&mut property_data)?);
                 },
                 PropertyType::CorrelationData => {
                     if properties.correlation_data.is_some(){
-                        return Err("Duplicate correlation_data".to_string());
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::CorrelationData));
                     }
                     properties.correlation_data = Some(Bytes::read(&mut property_data)?);
                 },
                 PropertyType::UserProperty => {
                     properties.user_properties.push((String::read(&mut property_data)?,String::read(&mut property_data)?))
                 },
-                e => return Err(format!("Unexpected property type: {:?}", e)),
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
             }
         
             if property_data.is_empty(){
