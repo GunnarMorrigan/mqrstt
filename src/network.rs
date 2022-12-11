@@ -43,7 +43,7 @@ impl<N> MqttNetwork<N>
 
             options,
 
-            last_communication: Arc::new(Mutex::)
+            last_communication: Arc::new(Mutex::new(data))
 
             incoming_packet_sender,
             // incoming_packet_receiver: incoming_packet_receiver.clone(),
