@@ -3,10 +3,13 @@ vulnerability = "deny"
 unsound = "deny"
 unmaintained = "deny"
 
-
 [licenses]
 unlicensed = "deny"
 allow-osi-fsf-free = "neither"
 copyleft = "deny"
 confidence-threshold = 0.95
 allow = ["Apache-2.0", "MIT", "BSD-3-Clause", "ISC"]
+
+exceptions = [
+    { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
+]

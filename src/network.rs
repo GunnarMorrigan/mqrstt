@@ -22,7 +22,7 @@ pub struct MqttNetwork<N>{
     /// Options of the current mqtt connection
     options: ConnectOptions,
 
-    last_communication: Arc<Mutex<Instant>>,
+    last_network_action: Arc<Mutex<Instant>>,
     
     incoming_packet_sender: Sender<Packet>,
     // incoming_packet_receiver: Receiver<Packet>,
@@ -33,9 +33,11 @@ pub struct MqttNetwork<N>{
 impl<N> MqttNetwork<N> 
     where N: AsyncMqttNetwork{
 
-    pub fn new(options: ConnectOptions) -> (Self, Sender<Incoming>, Receiver<Outgoing>){
+    pub fn new(options: ConnectOptions) -> (Self, Sender<Incoming>, Receiver<Outgoing>, Arc<Mutex<Instant>>){
         let (incoming_packet_sender, incoming_packet_receiver) = async_channel::bounded(100);
         let (outgoing_packet_sender, outgoing_packet_receiver) = async_channel::bounded(100);
+
+        let last_network_action = Arc::new(Mutex::new(Instant::now()));
 
         let network = Self{
             network: None,
@@ -43,7 +45,7 @@ impl<N> MqttNetwork<N>
 
             options,
 
-            last_communication: Arc::new(Mutex::new(data))
+            last_network_action: last_network_action.clone(),
 
             incoming_packet_sender,
             // incoming_packet_receiver: incoming_packet_receiver.clone(),
@@ -51,7 +53,7 @@ impl<N> MqttNetwork<N>
             outgoing_packet_receiver,
         };
 
-        (network, outgoing_packet_sender, incoming_packet_receiver)
+        (network, outgoing_packet_sender, incoming_packet_receiver, last_network_action)
     }
 
 
@@ -76,7 +78,6 @@ impl<N> MqttNetwork<N>
         // let shutdown_process = shutdown_handler(shutdown_signal);
 
         if let Some(network) = self.network.as_mut(){
-            
             loop{
                 tokio::select! {
                     net = network.read_many(&mut self.incoming_packet_sender) => {
@@ -87,6 +88,8 @@ impl<N> MqttNetwork<N>
                         tracing::trace!("Writing packet to network {:?}", packet);
                         packet.write(&mut self.write_buffer)?;
                         network.write(&mut self.write_buffer).await?;
+                        let mut lock = self.last_network_action.lock().await;
+                        *lock = Instant::now();
                     },
                 }
                 // network.read_many(&mut self.incoming_packet_sender).await

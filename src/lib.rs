@@ -23,14 +23,14 @@ pub fn create_new_tcp<H>(options: ConnectOptions, custom_handler: H) -> (MqttNet
     where H: EventHandler + Send + Sized + 'static{
     
     let receive_maximum = options.receive_maximum();
-    let (network, network_sender, network_receiver) = MqttNetwork::<Tcp>::new(options);
+    let (network, network_sender, network_receiver, last_comm) = MqttNetwork::<Tcp>::new(options);
     
     let (handler, handler_sender, packet_ids) = EventHandlerTask::new(
         receive_maximum,
         network_receiver,
         network_sender.clone(),
         custom_handler,
-        
+        last_comm,
     );
     let client = AsyncClient::new(packet_ids, handler_sender, network_sender);
 

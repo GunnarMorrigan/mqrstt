@@ -14,6 +14,7 @@ use crate::state::State;
 // use crate::{Incoming, MqttOptions, MqttState, Outgoing, Packet, Request, StateError, Transport};
 
 use async_channel::{Receiver, Sender};
+use async_mutex::Mutex;
 use futures::{select, FutureExt};
 use tracing::{debug, error, trace};
 
@@ -41,7 +42,7 @@ pub struct EventHandlerTask<H>{
 
     client_receiver: Receiver<Packet>,
 
-    last_network_action: Arc<Instant>,
+    last_network_action: Arc<Mutex<Instant>>,
 }
 
 impl<H> EventHandlerTask<H>
@@ -57,7 +58,7 @@ impl<H> EventHandlerTask<H>
         network_receiver: Receiver<Packet>,
         network_sender: Sender<Packet>,
         handler: H,
-        last_network_action: Arc<Instant>
+        last_network_action: Arc<Mutex<Instant>>,
     ) -> (Self, Sender<Packet>, Receiver<u16>) {
 
         let (client_sender, client_receiver) = async_channel::bounded(receive_maximum as usize);
