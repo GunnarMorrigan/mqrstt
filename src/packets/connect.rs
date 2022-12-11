@@ -1,9 +1,7 @@
-use std::vec;
-
 use bytes::{Bytes, Buf, BytesMut, BufMut};
 use bitflags::bitflags;
 
-use super::{QoS, SimpleSerialize, read_variable_integer, write_variable_integer, ProtocolVersion, PropertyType, WireLength, mqtt_traits::{MqttRead, MqttWrite}, errors::{SerializeError, DeserializeError}, PacketType};
+use super::{QoS, read_variable_integer, write_variable_integer, ProtocolVersion, PropertyType, WireLength, mqtt_traits::{MqttRead, MqttWrite, VariableHeaderWrite, VariableHeaderRead}, error::{SerializeError, DeserializeError}, PacketType, variable_integer_len};
 
 /// Variable connect header:
 /// 
@@ -81,104 +79,6 @@ pub struct Connect{
 }
 
 impl Connect{
-    fn read(_: u8, _: usize,  buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if String::read(buf)? != "MQTT" {
-            return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_string()));
-        }
-        
-        let protocol_version = ProtocolVersion::read(buf)?;
-
-        let connect_flags_byte = buf.get_u8();
-        let connect_flags = ConnectFlags::from_bits(connect_flags_byte).ok_or("Can't read ConnectFlags".to_string())?;
-
-        let clean_session = connect_flags.contains(ConnectFlags::CLEAN_START);
-        let keep_alive = buf.get_u16();
-
-        let connect_properties = ConnectProperties::read(buf)?;
-
-        let client_id = String::read(buf)?;
-        let mut last_will = None;
-        if connect_flags.contains(ConnectFlags::WILL_FLAG){
-            let retain = connect_flags.contains(ConnectFlags::WILL_RETAIN);
-
-            let qos = QoS::try_from(connect_flags)?;
-
-            last_will = Some(LastWill::read(qos, retain, buf)?);
-        }
-
-        let username;
-        let password;
-        if connect_flags.contains(ConnectFlags::USERNAME){
-            username = Some(String::read(buf)?);
-        }
-        else{
-            username = None;
-        }
-        if connect_flags.contains(ConnectFlags::PASSWORD){
-            password = Some(String::read(buf)?);
-        }
-        else{
-            password = None;
-        }
-
-        let connect = Connect {
-            protocol_version,
-            clean_session,
-            last_will,
-            username,
-            password,
-            keep_alive,
-            connect_properties,
-            client_id,
-        };
-
-        Ok(connect)
-    }
-
-    fn write(&self, buf: &mut BytesMut){
-        "MQTT".write(buf);
-
-        self.protocol_version.write(buf);
-
-        let mut connect_flags = ConnectFlags::empty();
-
-        if self.clean_session{
-            connect_flags |= ConnectFlags::CLEAN_START;
-        }
-        if let Some(last_will) = &self.last_will {
-            connect_flags |= ConnectFlags::WILL_FLAG;
-            if last_will.retain{
-                connect_flags |= ConnectFlags::WILL_RETAIN;
-            }
-            connect_flags |= last_will.qos.into();
-        }
-        if self.username.is_some(){
-            connect_flags |= ConnectFlags::USERNAME;
-        }
-        if self.password.is_some(){
-            connect_flags |= ConnectFlags::PASSWORD;
-        }
-
-        buf.put_u8(connect_flags.bits());
-
-        buf.put_u16(self.keep_alive);
-
-        self.connect_properties.write(buf);
-
-        self.client_id.write(buf);
-
-        if let Some(last_will) = &self.last_will{
-            last_will.write(buf);
-        }
-        if let Some(username) = &self.username{
-            username.write(buf);
-        }
-        if let Some(password) = &self.password{
-            password.write(buf);
-        }
-    }
-
-
     fn write_bits(&self, buf: &mut BytesMut){
         "MQTT".write(buf);
 
@@ -224,6 +124,146 @@ impl Connect{
     }
 }
 
+impl Default for Connect{
+    fn default() -> Self {
+        Self{
+            protocol_version: ProtocolVersion::V5,
+            clean_session: true,
+            last_will: None,
+            username: None,
+            password: None,
+            keep_alive: 60,
+            connect_properties: ConnectProperties::default(),
+            client_id: "MQRSTT".to_string(),
+        }
+    }
+}
+
+impl VariableHeaderRead for Connect{
+    fn read(_: u8, _: usize,  mut buf: Bytes) -> Result<Self, DeserializeError> {
+        if String::read(&mut buf)? != "MQTT" {
+            return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_string()));
+        }
+        
+        let protocol_version = ProtocolVersion::read(&mut buf)?;
+
+        let connect_flags_byte = buf.get_u8();
+        let connect_flags = ConnectFlags::from_bits(connect_flags_byte).ok_or("Can't read ConnectFlags".to_string())?;
+
+        let clean_session = connect_flags.contains(ConnectFlags::CLEAN_START);
+        let keep_alive = buf.get_u16();
+
+        let connect_properties = ConnectProperties::read(&mut buf)?;
+
+        let client_id = String::read(&mut buf)?;
+        let mut last_will = None;
+        if connect_flags.contains(ConnectFlags::WILL_FLAG){
+            let retain = connect_flags.contains(ConnectFlags::WILL_RETAIN);
+
+            let qos = QoS::try_from(connect_flags)?;
+
+            last_will = Some(LastWill::read(qos, retain, &mut buf)?);
+        }
+
+        let username;
+        let password;
+        if connect_flags.contains(ConnectFlags::USERNAME){
+            username = Some(String::read(&mut buf)?);
+        }
+        else{
+            username = None;
+        }
+        if connect_flags.contains(ConnectFlags::PASSWORD){
+            password = Some(String::read(&mut buf)?);
+        }
+        else{
+            password = None;
+        }
+
+        let connect = Connect {
+            protocol_version,
+            clean_session,
+            last_will,
+            username,
+            password,
+            keep_alive,
+            connect_properties,
+            client_id,
+        };
+
+        Ok(connect)
+    }
+}
+
+impl VariableHeaderWrite for Connect{
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+            "MQTT".write(buf)?;
+    
+            self.protocol_version.write(buf)?;
+    
+            let mut connect_flags = ConnectFlags::empty();
+    
+            if self.clean_session{
+                connect_flags |= ConnectFlags::CLEAN_START;
+            }
+            if let Some(last_will) = &self.last_will {
+                connect_flags |= ConnectFlags::WILL_FLAG;
+                if last_will.retain{
+                    connect_flags |= ConnectFlags::WILL_RETAIN;
+                }
+                connect_flags |= last_will.qos.into();
+            }
+            if self.username.is_some(){
+                connect_flags |= ConnectFlags::USERNAME;
+            }
+            if self.password.is_some(){
+                connect_flags |= ConnectFlags::PASSWORD;
+            }
+    
+            buf.put_u8(connect_flags.bits());
+    
+            buf.put_u16(self.keep_alive);
+    
+            self.connect_properties.write(buf)?;
+    
+            self.client_id.write(buf)?;
+    
+            if let Some(last_will) = &self.last_will{
+                last_will.write(buf)?;
+            }
+            if let Some(username) = &self.username{
+                username.write(buf)?;
+            }
+            if let Some(password) = &self.password{
+                password.write(buf)?;
+            }
+        Ok(())
+    }
+}
+
+impl WireLength for Connect{
+    fn wire_len(&self) -> usize {
+        let mut len = "MQTT".wire_len() + 1 + 1 + 2; // protocol version, connect_flags and keep alive
+
+        len += variable_integer_len(self.connect_properties.wire_len());
+        len += self.connect_properties.wire_len();
+
+        if let Some(last_will) = &self.last_will{
+            len += last_will.wire_len();
+        }
+        if let Some(username) = &self.username{
+            len += username.wire_len()
+        }
+        if let Some(password) = &self.password{
+            len += password.wire_len()
+        }
+
+        len += self.client_id.wire_len();
+
+        len
+    }
+}
+
 bitflags! {
     /// ╔═════╦═══════════╦══════════╦═════════════╦═════╦════╦═══════════╦═════════════╦══════════╗
     /// ║ Bit ║ 7         ║ 6        ║ 5           ║ 4   ║ 3  ║ 2         ║ 1           ║ 0        ║
@@ -260,7 +300,7 @@ impl From<QoS> for ConnectFlags{
 /// 3.1.2.11.1 Property Length
 /// The length of the Properties in the CONNECT packet Variable Header encoded as a Variable Byte Integer.
 /// Followed by all possible connect properties:
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ConnectProperties {
     /// 3.1.2.11.2 Session Expiry Interval
     /// 17 (0x11) Byte Identifier of the Session Expiry Interval
@@ -299,36 +339,71 @@ pub struct ConnectProperties {
     pub authentication_data: Bytes,
 }
 
-impl ConnectProperties{
-    fn _new() -> Self{
-        Self{
-            session_expiry_interval: None,
-            receive_maximum: None,
-            maximum_packet_size: None,
-            topic_alias_maximum: None,
-            request_response_information: None,
-            request_problem_information: None,
-            user_properties: vec![],
-            authentication_method: None,
-            authentication_data: Bytes::new(),
-        }
-    }
+impl MqttWrite for ConnectProperties{
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+            write_variable_integer(buf, self.wire_len())?;
+    
+            if let Some(session_expiry_interval) = self.session_expiry_interval{
+                PropertyType::SessionExpiryInterval.write(buf)?;
+                buf.put_u32(session_expiry_interval);
+            }
+            if let Some(receive_maximum) = self.receive_maximum{
+                PropertyType::ReceiveMaximum.write(buf)?;
+                buf.put_u16(receive_maximum);
+            }
+            if let Some(maximum_packet_size) = self.maximum_packet_size{
+                PropertyType::MaximumPacketSize.write(buf)?;
+                buf.put_u32(maximum_packet_size);
+            }
+            if let Some(topic_alias_maximum) = self.topic_alias_maximum{
+                PropertyType::TopicAliasMaximum.write(buf)?;
+                buf.put_u16(topic_alias_maximum);
+            }
+            if let Some(request_response_information) = self.request_response_information{
+                PropertyType::RequestResponseInformation.write(buf)?;
+                buf.put_u8(request_response_information);
+            }
+            if let Some(request_problem_information) = self.request_problem_information{
+                PropertyType::RequestProblemInformation.write(buf)?;
+                buf.put_u8(request_problem_information);
+            }
+            for (key, value) in &self.user_properties{
+                PropertyType::UserProperty.write(buf)?;
+                key.write(buf)?;
+                value.write(buf)?;
+            }
+            if let Some(authentication_method) = &self.authentication_method{
+                PropertyType::AuthenticationMethod.write(buf)?;
+                authentication_method.write(buf)?;
+            }
+            if !self.authentication_data.is_empty(){
+                if self.authentication_method.is_none(){
+                    return Err(SerializeError::AuthDataWithoutAuthMethod);
+                }
+                PropertyType::AuthenticationData.write(buf)?;
+                self.authentication_data.write(buf)?;
+            }
 
-    pub fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>{
+            Ok(())
+    }
+}
+
+impl MqttRead for ConnectProperties{
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
         
+        let mut properties = Self::default();
         if len == 0 {
-            return Ok(Self::_new());
+            return Ok(properties);
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("ConnectProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
         
-        let mut properties = Self::_new();
         loop{
-            match PropertyType::from_u8(property_data.get_u8())? {
+            match PropertyType::read(&mut property_data)? {
                 PropertyType::SessionExpiryInterval => {
                     if properties.session_expiry_interval.is_some(){
                         return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
@@ -394,48 +469,10 @@ impl ConnectProperties{
 
         Ok(properties)
     }
+}
 
-    pub fn write(&self, buf: &mut BytesMut){
-        write_variable_integer(buf, self.wire_len());
-
-        if let Some(session_expiry_interval) = self.session_expiry_interval{
-            buf.put_u8(PropertyType::SessionExpiryInterval.to_u8());
-            buf.put_u32(session_expiry_interval);
-        }
-        if let Some(receive_maximum) = self.receive_maximum{
-            buf.put_u8(PropertyType::ReceiveMaximum.to_u8());
-            buf.put_u16(receive_maximum);
-        }
-        if let Some(maximum_packet_size) = self.maximum_packet_size{
-            buf.put_u8(PropertyType::MaximumPacketSize.to_u8());
-            buf.put_u32(maximum_packet_size);
-        }
-        if let Some(topic_alias_maximum) = self.topic_alias_maximum{
-            buf.put_u8(PropertyType::TopicAliasMaximum.to_u8());
-            buf.put_u16(topic_alias_maximum);
-        }
-        if let Some(request_response_information) = self.request_response_information{
-            buf.put_u8(PropertyType::RequestResponseInformation.to_u8());
-            buf.put_u8(request_response_information);
-        }
-        if let Some(request_problem_information) = self.request_problem_information{
-            buf.put_u8(PropertyType::RequestProblemInformation.to_u8());
-            buf.put_u8(request_problem_information);
-        }
-        for (key, value) in &self.user_properties{
-            String::write(key, buf);
-            String::write(value, buf);
-        }
-        if let Some(authentication_method) = &self.authentication_method{
-            String::write(authentication_method, buf);
-        }
-        if !self.authentication_data.is_empty() && self.authentication_method.is_some(){
-            self.authentication_data.write(buf);
-        }
-
-    }
-
-    pub fn wire_len(&self) -> usize{
+impl WireLength for ConnectProperties{
+    fn wire_len(&self) -> usize {
         let mut len:usize = 0;
 
         if self.session_expiry_interval.is_some(){
@@ -448,7 +485,7 @@ impl ConnectProperties{
             len+=1+4;
         }
         if self.topic_alias_maximum.is_some(){
-            len+=1+4;
+            len+=1+2;
         }
         if self.request_response_information.is_some(){
             len+=2;
@@ -457,14 +494,15 @@ impl ConnectProperties{
             len+=2;
         }
         for (key, value) in &self.user_properties{
+            len += 1;
             len += key.wire_len();
             len += value.wire_len();
         }
         if let Some(authentication_method) = &self.authentication_method{
-            len += authentication_method.wire_len();
+            len += 1 + authentication_method.wire_len();
         }
         if !self.authentication_data.is_empty() && self.authentication_method.is_some(){
-            len += self.authentication_data.wire_len();
+            len += 1 + self.authentication_data.wire_len();
         }
 
         len
@@ -491,12 +529,11 @@ impl LastWill {
         Self{
             qos,
             retain,
-            last_will_properties: LastWillProperties::new_empty(),
+            last_will_properties: LastWillProperties::default(),
             topic: topic.into(),
             payload: Bytes::from(payload.into()),
         }
     }
-
     pub fn read(qos: QoS, retain: bool, buf: &mut Bytes) -> Result<Self, DeserializeError>{
         let last_will_properties = LastWillProperties::read(buf)?;
         let topic = String::read(buf)?;
@@ -510,21 +547,25 @@ impl LastWill {
             last_will_properties,
         })
     }
+}
 
-    pub fn write(&self, buf: &mut BytesMut){
-        self.last_will_properties.write(buf);
-        self.topic.write(buf);
-        self.payload.write(buf);
+impl MqttWrite for LastWill{
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        self.last_will_properties.write(buf)?;
+        self.topic.write(buf)?;
+        self.payload.write(buf)?;
+        Ok(())
     }
+}
 
-    /// The length of a will information is just the Topic, Payload and properties
-    /// The QoS and Retain information is stored in byte 8 of the variable connect header.
-    pub fn wire_len(&self) -> usize{
+impl WireLength for LastWill{
+    fn wire_len(&self) -> usize{
         self.topic.wire_len() + self.payload.wire_len() + self.last_will_properties.wire_len()
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct LastWillProperties{
     /// 3.1.3.2.2 Will Delay Interval
     delay_interval: Option<u32>,
@@ -542,52 +583,39 @@ pub struct LastWillProperties{
     user_properties: Vec::<(String, String)>,
 }
 
-impl LastWillProperties{
-    pub fn new_empty() -> Self{
-        Self{
-            delay_interval: None,
-            payload_format_indicator: None,
-            message_expiry_interval: None,
-            content_type: None,
-            response_topic: None,
-            correlation_data: None,
-            user_properties: vec![],
-        }
-    }
-
-    pub fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>{
+impl MqttRead for LastWillProperties{
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
         
+        let mut properties = Self::default();
         if len == 0 {
-            return Ok(Self::new_empty());
+            return Ok(properties);
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("LastWillProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
-        
-        let mut properties = Self::new_empty();
 
         loop{
-            match PropertyType::from_u8(property_data.get_u8())? {
+            match PropertyType::read(&mut property_data)? {
                 PropertyType::WillDelayInterval => {
                     if properties.delay_interval.is_some(){
                         return Err(DeserializeError::DuplicateProperty(PropertyType::WillDelayInterval));
                     }
-                    properties.delay_interval = Some(property_data.get_u32());
+                    properties.delay_interval = Some(u32::read(&mut property_data)?);
                 },
                 PropertyType::PayloadFormatIndicator => {
                     if properties.payload_format_indicator.is_none(){
                         return Err(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator));
                     }
-                    properties.payload_format_indicator = Some(property_data.get_u8());
+                    properties.payload_format_indicator = Some(u8::read(&mut property_data)?);
                 },
                 PropertyType::MessageExpiryInterval => {
                     if properties.message_expiry_interval.is_some(){
                         return Err(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval));
                     }
-                    properties.message_expiry_interval = Some(property_data.get_u32());
+                    properties.message_expiry_interval = Some(u32::read(&mut property_data)?);
                 },
                 PropertyType::ContentType => {
                     if properties.content_type.is_some(){
@@ -620,44 +648,49 @@ impl LastWillProperties{
 
         Ok(properties)
     }
+}
 
-    pub fn write(&self, buf: &mut BytesMut){
-        write_variable_integer(buf, self.wire_len());
+impl MqttWrite for LastWillProperties{
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        write_variable_integer(buf, self.wire_len())?;
 
         if let Some(delay_interval) = self.delay_interval{
-            buf.put_u8(PropertyType::WillDelayInterval.to_u8());
+            PropertyType::WillDelayInterval.write(buf)?;
             buf.put_u32(delay_interval);
         }
         if let Some(payload_format_indicator) = self.payload_format_indicator{
-            buf.put_u8(PropertyType::PayloadFormatIndicator.to_u8());
+            PropertyType::PayloadFormatIndicator.write(buf)?;
             buf.put_u8(payload_format_indicator);
         }
         if let Some(message_expiry_interval) = self.message_expiry_interval{
-            buf.put_u8(PropertyType::MessageExpiryInterval.to_u8());
+            PropertyType::MessageExpiryInterval.write(buf)?;
             buf.put_u32(message_expiry_interval);
         }
         if let Some(content_type) = &self.content_type{
-            buf.put_u8(PropertyType::ContentType.to_u8());
-            content_type.write(buf);
+            PropertyType::ContentType.write(buf)?;
+            content_type.write(buf)?;
         }
         if let Some(response_topic) = &self.response_topic{
-            buf.put_u8(PropertyType::ResponseTopic.to_u8());
-            response_topic.write(buf);
+            PropertyType::ResponseTopic.write(buf)?;
+            response_topic.write(buf)?;
         }
         if let Some(correlation_data) = &self.correlation_data{
-            buf.put_u8(PropertyType::CorrelationData.to_u8());
-            correlation_data.write(buf);
+            PropertyType::CorrelationData.write(buf)?;
+            correlation_data.write(buf)?;
         }
         if !self.user_properties.is_empty(){
             for (key, value) in &self.user_properties{
-                buf.put_u8(PropertyType::UserProperty.to_u8());
-                key.write(buf);
-                value.write(buf);
+                PropertyType::UserProperty.write(buf)?;
+                key.write(buf)?;
+                value.write(buf)?;
             } 
         }
+        Ok(())
     }
+}
 
-    pub fn wire_len(&self) -> usize{
+impl WireLength for LastWillProperties{
+    fn wire_len(&self) -> usize{
         let mut len:usize = 0;
 
         len += self.delay_interval.map_or(0, |_| 5);
@@ -676,7 +709,7 @@ impl LastWillProperties{
 
 #[cfg(test)]
 mod tests{
-    use crate::packets::QoS;
+    use crate::packets::{QoS, mqtt_traits::{VariableHeaderRead, VariableHeaderWrite, MqttWrite}};
 
     use super::{Connect, LastWill};
 
@@ -739,7 +772,7 @@ mod tests{
         ];
 
         buf.extend_from_slice(packet);
-        let c = Connect::read(0, 0, &mut buf.into()).unwrap();
+        let c = Connect::read(0, 0,  buf.into()).unwrap();
 
         dbg!(c);
 
@@ -801,10 +834,10 @@ mod tests{
         ];
 
         buf.extend_from_slice(packet);
-        let c = Connect::read(0, 0, &mut buf.into()).unwrap();
+        let c = Connect::read(0, 0,  buf.into()).unwrap();
 
         let mut write_buf = bytes::BytesMut::new();
-        c.write(&mut write_buf);
+        c.write(&mut write_buf).unwrap();
 
         assert_eq!(packet.to_vec(), write_buf.to_vec());
 
@@ -841,6 +874,27 @@ mod tests{
     }
 
     #[test]
+    fn read_and_write_connect2(){
+        let packet = [0x10, 0x1d, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff,
+        0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73, 0x74];
+
+        let data = [0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff,
+        0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73, 0x74];
+
+        let mut buf = bytes::BytesMut::new();
+        buf.extend_from_slice(&data);
+
+        let c = Connect::read(0, 0,  buf.into()).unwrap();
+
+        dbg!(c.clone());
+
+        let mut write_buf = bytes::BytesMut::new();
+        c.write(&mut write_buf).unwrap();
+
+        assert_eq!(data.to_vec(), write_buf.to_vec());
+    }
+
+    #[test]
     fn parsing_and_writing_last_will(){
         let last_will = &[
             0x00, // Will properties length
@@ -867,7 +921,7 @@ mod tests{
         let lw = LastWill::read(QoS::AtLeastOnce, false, &mut buf).unwrap();
 
         let mut write_buf = bytes::BytesMut::new();
-        lw.write(&mut write_buf);
+        lw.write(&mut write_buf).unwrap();
 
         assert_eq!(last_will.to_vec(), write_buf.to_vec());
     }

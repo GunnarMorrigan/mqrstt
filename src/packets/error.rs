@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{PacketType, PropertyType};
 
-#[derive(Error, Debug)]
+#[derive(Error, Clone, Debug)]
 pub enum DeserializeError {
     #[error("Malformed packet: {0}")]
     MalformedPacketWithInfo(String),
@@ -12,9 +12,21 @@ pub enum DeserializeError {
     #[error("Malformed packet")]
     MalformedPacket,
 
-    #[error("There is insufficient data ({0}) to take {1} bytes")]
-    InsufficientData(usize, usize),
+    #[error("Malformed FixedHeader {0:b}")]
+    UnknownFixedHeader(u8),
 
+    #[error("Unsupported protocol version")]
+    UnsupportedProtocolVersion,
+    
+    #[error("Unknown protocol version")]
+    UnknownProtocolVersion,
+    
+    #[error("There is insufficient for {0} data ({1}) to take {2} bytes")]
+    InsufficientData(String, usize, usize),
+
+    #[error("There is insufficient to read the protocol version.")]
+    InsufficientDataForProtocolVersion,
+    
     #[error("Reason code {0} is not allowed for packet type {1:?}")]
     UnexpectedReasonCode(u8, PacketType),
 
@@ -40,8 +52,20 @@ impl From<String> for DeserializeError{
     }
 }
 
+#[derive(Error, Clone, Debug)]
+pub enum ReadBytes<T>{
+    #[error("Normal error")]
+    Err(#[from] T),
+    
+    #[error("Should read more data from the stream.")]
+    InsufficientBytes(usize),
+}
+
 #[derive(Error, Debug)]
 pub enum SerializeError{
     #[error("Can not write {0} in a 4 byte variable integer.")]
-    VariableIntegerOverflow(usize)
+    VariableIntegerOverflow(usize),
+
+    #[error("Authentication data without authentication method")]
+    AuthDataWithoutAuthMethod,
 }

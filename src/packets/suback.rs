@@ -1,6 +1,6 @@
 use bytes::BufMut;
 
-use super::{mqtt_traits::{MqttPacketRead, MqttRead, MqttWrite, WireLength, MqttPacketWrite}, reason_codes::{SubAckReasonCode}, read_variable_integer, errors::{DeserializeError, SerializeError}, PropertyType, PacketType, write_variable_integer, variable_integer_len};
+use super::{mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite}, reason_codes::{SubAckReasonCode}, read_variable_integer, error::{DeserializeError, SerializeError}, PropertyType, PacketType, write_variable_integer, variable_integer_len};
 
 ///3.9 SUBACK – Subscribe acknowledgement
 /// A SUBACK packet is sent by the Server to the Client to confirm receipt and processing of a SUBSCRIBE packet.
@@ -13,8 +13,8 @@ pub struct SubAck{
 }
 
 
-impl MqttPacketRead for SubAck{
-    fn read(_: u8, _: usize,  mut buf: bytes::Bytes) -> Result<Self, super::errors::DeserializeError> {
+impl VariableHeaderRead for SubAck{
+    fn read(_: u8, _: usize,  mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubAckProperties::read(&mut buf)?;
         let mut reason_codes = vec![];
@@ -37,7 +37,7 @@ impl MqttPacketRead for SubAck{
     }
 }
 
-impl MqttPacketWrite for SubAck{
+impl VariableHeaderWrite for SubAck{
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.packet_identifier);
 
@@ -71,7 +71,7 @@ impl MqttRead for SubAckProperties{
             return Ok(properties);
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("SubAckProperties".to_string(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);
@@ -91,7 +91,7 @@ impl MqttRead for SubAckProperties{
                 PropertyType::UserProperty => {                 
                     properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
                 },
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::SubAck)),
             }
 
             if buf.len() == 0{
@@ -103,7 +103,7 @@ impl MqttRead for SubAckProperties{
 }
 
 impl MqttWrite for SubAckProperties{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         write_variable_integer(buf, self.wire_len())?;
         if let Some(sub_id) = self.subscription_id{
             PropertyType::SubscriptionIdentifier.write(buf)?;
@@ -138,7 +138,7 @@ mod test {
     use pretty_assertions::assert_eq;
 
     use super::SubAck;
-    use crate::packets::mqtt_traits::{MqttPacketRead, MqttPacketWrite};
+    use crate::packets::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite};
 
     #[test]
     fn read_write_suback() {

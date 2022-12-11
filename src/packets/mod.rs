@@ -1,8 +1,8 @@
-mod connect;
-mod publish;
-mod errors;
+pub mod publish;
+pub mod error;
 pub mod mqtt_traits;
 
+pub mod connect;
 pub mod connack;
 pub mod reason_codes;
 pub mod puback;
@@ -14,35 +14,17 @@ pub mod suback;
 pub mod unsubscribe;
 pub mod unsuback;
 pub mod disconnect;
-
+pub mod auth;
+pub mod packets;
 
 use bytes::{BufMut, Bytes, BytesMut, Buf};
+use core::slice::Iter;
+
+use self::mqtt_traits::{WireLength, MqttRead, MqttWrite, VariableHeaderWrite};
+use self::error::{DeserializeError, SerializeError, ReadBytes};
 
 use self::connect::ConnectFlags;
-use self::errors::{DeserializeError, SerializeError};
-use self::mqtt_traits::{SimpleSerialize, WireLength, MqttRead, MqttWrite};
-
-use self::connect::Connect;
-use self::publish::Publish;
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Packet {
-    Connect(Connect),
-    ConnAck(),
-    Publish(Publish),
-    PubAck(),
-    PubRec(),
-    PubRel(),
-    PubComp(),
-    Subscribe(),
-    SubAck(),
-    Unsubscribe(),
-    UnsubAck(),
-    PingReq,
-    PingResp,
-    Disconnect(),
-    Auth(),
-}
+use self::packets::PacketType;
 
 /// Protocol version
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
@@ -50,24 +32,26 @@ pub enum ProtocolVersion {
     V5,
 }
 
-impl SimpleSerialize for ProtocolVersion {
+impl MqttWrite for ProtocolVersion{
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        buf.put_u8(5u8);
+        Ok(())
+    }
+}
 
-    fn read(buf: &mut Bytes) -> Result<Self, String> {
+impl MqttRead for ProtocolVersion{
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientDataForProtocolVersion)
+        }
+
         match buf.get_u8() {
-            3 => Err("Unsupported protocol version".to_string()),
-            4 => Err("Unsupported protocol version".to_string()),
+            3 => Err(DeserializeError::UnsupportedProtocolVersion),
+            4 => Err(DeserializeError::UnsupportedProtocolVersion),
             5 => Ok(ProtocolVersion::V5),
-            _ => Err("Unknown protocol version".to_string()),
+            _ => Err(DeserializeError::UnknownProtocolVersion),
         }
     }
-
-    fn write(&self, buf: &mut BytesMut) {
-        buf.put_u8(5u8)
-    }
-
-    // fn size(&self) -> usize{
-    //     1
-    // }
 }
 
 
@@ -87,35 +71,49 @@ impl QoS{
             _ => Err(DeserializeError::UnknownQoS(value))
         }
     }
+    pub fn into_u8(&self) -> u8{
+        match self {
+            QoS::AtMostOnce => 0,
+            QoS::AtLeastOnce => 1,
+            QoS::ExactlyOnce => 2,
+        }
+    }
 }
 
-impl SimpleSerialize for QoS{
-    fn read(buf: &mut Bytes) -> Result<Self, String> {
+impl MqttRead for QoS{
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty(){
+            return Err(DeserializeError::InsufficientData("QoS".to_string(), 0, 1))
+        }
+
         match buf.get_u8() {
             0 => Ok(QoS::AtMostOnce),
             1 => Ok(QoS::AtLeastOnce),
             2 => Ok(QoS::ExactlyOnce),
-            _ => Err("Error serializing. This should be replaced with proper error type".to_string())
-        }
+            q => Err(DeserializeError::UnknownQoS(q))
+        }   
     }
+}
 
-    fn write(&self, buf: &mut BytesMut) {
+impl MqttWrite for QoS{
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         let val = match self {
             QoS::AtMostOnce => 0,
             QoS::AtLeastOnce => 1,
             QoS::ExactlyOnce => 2,
         };
         buf.put_u8(val);
+        Ok(())
     }
 }
 
 
 impl TryFrom<ConnectFlags> for QoS{
-    type Error = String;
+    type Error = DeserializeError;
 
     fn try_from(c: ConnectFlags) -> Result<Self, Self::Error> {
         if c.contains(ConnectFlags::WILL_QOS1 | ConnectFlags::WILL_QOS2){
-            Err("QoS2 and QoS1 can't be active at the same time".to_string())
+            Err(DeserializeError::MalformedPacket)
         }
         else if c.contains(ConnectFlags::WILL_QOS2){
             Ok(QoS::ExactlyOnce)
@@ -129,45 +127,18 @@ impl TryFrom<ConnectFlags> for QoS{
     }
 }
 
-// 2.1.1 Fixed Header
-// ```
-//          7                          3                          0
-//          +--------------------------+--------------------------+
-// byte 1   | MQTT Control Packet Type | Flags for Packet type    |
-//          +--------------------------+--------------------------+
-//          |                   Remaining Length                  |
-//          +-----------------------------------------------------+
-//
-// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901021
-// ```
-
-
-
-/// 2.1.2 MQTT Control Packet type
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub enum PacketType {
-    Connect,
-    ConnAck,
-    Publish,
-    PubAck,
-    PubRec,
-    PubRel,
-    PubComp,
-    Subscribe,
-    SubAck,
-    Unsubscribe,
-    UnsubAck,
-    PingReq,
-    PingResp,
-    Disconnect,
-    Auth,
-}
-
 impl MqttWrite for &str{
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.len() as u16);
         buf.extend(self.as_bytes());
         Ok(())
+    }
+}
+
+impl WireLength for &str{
+    #[inline(always)]
+    fn wire_len(&self) -> usize{
+        self.len() + 2
     }
 }
 
@@ -202,7 +173,7 @@ impl MqttRead for Bytes {
         let len = buf.get_u16() as usize;
         
         if len > buf.len() {
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("Bytes".to_string(), buf.len(), len));
         }
     
         Ok(buf.split_to(len))
@@ -226,15 +197,15 @@ impl WireLength for Bytes {
 }
 
 impl MqttRead for bool{
-    fn read(buf: &mut Bytes) -> Result<Self, errors::DeserializeError> {
+    fn read(buf: &mut Bytes) -> Result<Self, error::DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("bool".to_string(), 0, 1));
         }
 
         match buf.get_u8(){
             0 => Ok(false),
             1 => Ok(true),
-            _ => Err(errors::DeserializeError::MalformedPacket),
+            _ => Err(error::DeserializeError::MalformedPacket),
         }
     }
 }
@@ -253,7 +224,7 @@ impl MqttWrite for bool{
 impl MqttRead for u8{
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("u8".to_string(), 0, 1));
         }
         Ok(buf.get_u8())
     }
@@ -262,7 +233,7 @@ impl MqttRead for u8{
 impl MqttRead for u16{
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 2{
-            return Err(DeserializeError::InsufficientData(buf.len(), 2));
+            return Err(DeserializeError::InsufficientData("u16".to_string(), buf.len(), 2));
         }
         Ok(buf.get_u16())
     }
@@ -271,17 +242,40 @@ impl MqttRead for u16{
 impl MqttRead for u32{
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 4{
-            return Err(DeserializeError::InsufficientData(buf.len(), 4));
+            return Err(DeserializeError::InsufficientData("u32".to_string(), buf.len(), 4));
         }
         Ok(buf.get_u32())
     }
 }
 
-pub fn read_variable_integer(buf: &mut Bytes) -> Result<(usize, usize), String>{
+pub fn read_fixed_header_rem_len(mut buf: Iter<u8>) -> Result<(usize, usize), ReadBytes<DeserializeError>>{
     let mut integer = 0;
     let mut length = 0;
 
     for i in 0..4{
+        if let Some(byte) = buf.next(){
+            length += 1;
+            integer += (*byte as usize & 0x7f) << 7*i;
+    
+            if (*byte & 0b1000_0000) == 0{
+                return Ok((integer, length));
+            }
+        }
+        else{
+            return Err(ReadBytes::InsufficientBytes(1));
+        }
+    }
+    Err(ReadBytes::Err(DeserializeError::MalformedPacket))
+}
+
+pub fn read_variable_integer(buf: &mut Bytes) -> Result<(usize, usize), DeserializeError>{
+    let mut integer = 0;
+    let mut length = 0;
+
+    for i in 0..4{
+        if buf.is_empty(){
+            return Err(DeserializeError::MalformedPacket);
+        }
         length += 1;
         let byte = buf.get_u8();
 
@@ -291,7 +285,7 @@ pub fn read_variable_integer(buf: &mut Bytes) -> Result<(usize, usize), String>{
             return Ok((integer, length));
         }
     }
-    Err("Variable integer malformed".to_string())
+    Err(DeserializeError::MalformedPacket)
 }
 
 pub fn write_variable_integer(buf: &mut BytesMut, integer: usize) -> Result<(), SerializeError>{
@@ -328,7 +322,7 @@ pub fn variable_integer_len(integer: usize) -> usize{
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum PropertyType {
+pub enum PropertyType {
     PayloadFormatIndicator = 1,
     MessageExpiryInterval = 2,
     ContentType = 3,
@@ -362,7 +356,7 @@ impl MqttRead for PropertyType{
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
 
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("PropertyType".to_string(), 0, 1));
         }
 
         match buf.get_u8() {

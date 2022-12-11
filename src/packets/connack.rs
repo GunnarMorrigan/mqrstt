@@ -1,4 +1,4 @@
-use super::{errors::DeserializeError, read_variable_integer, reason_codes::ConAckReasonCode, QoS, PropertyType, PacketType, mqtt_traits::{MqttRead, MqttPacketRead, SimpleSerialize}};
+use super::{error::DeserializeError, read_variable_integer, reason_codes::ConAckReasonCode, QoS, PropertyType, PacketType, mqtt_traits::{MqttRead, VariableHeaderRead, SimpleSerialize, VariableHeaderWrite}};
 use bitflags::bitflags;
 use bytes::{Buf, Bytes};
 
@@ -6,22 +6,22 @@ use bytes::{Buf, Bytes};
 pub struct ConnAck{
 
     /// 3.2.2.1 Connect Acknowledge Flags
-    connack_flags: ConnAckFlags,
+    pub connack_flags: ConnAckFlags,
 
     /// 3.2.2.2 Connect Reason Code
     /// Byte 2 in the Variable Header is the Connect Reason Code.
-    reason_code: ConAckReasonCode,
+    pub reason_code: ConAckReasonCode,
     
     /// 3.2.2.3 CONNACK Properties
-    connack_properties: ConnAckProperties,
+    pub connack_properties: ConnAckProperties,
 }
 
-impl MqttPacketRead for ConnAck{
-    fn read(_: u8, _: usize,  mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
-        let (header_len, _) = read_variable_integer(&mut buf).map_err(DeserializeError::from)?;
+impl VariableHeaderRead for ConnAck{
+    fn read(_: u8, header_len: usize,  mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
+        // let (header_len, _) = read_variable_integer(&mut buf).map_err(DeserializeError::from)?;
 
         if header_len > buf.len(){
-            return Err(DeserializeError::InsufficientData(buf.len(), header_len));
+            return Err(DeserializeError::InsufficientData("ConnAck".to_string(), buf.len(), header_len));
         }
 
         let connack_flags = ConnAckFlags::from_bits(buf.get_u8()).ok_or(DeserializeError::MalformedPacketWithInfo("Can't read ConnAckFlags".to_string()))?;
@@ -116,14 +116,15 @@ impl MqttRead for ConnAckProperties{
             return Ok(properties);
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("ConnAckProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
         
 
         loop{
-            match PropertyType::from_u8(u8::read(&mut property_data)?)? {
+            let property = PropertyType::read(&mut property_data)?;
+            match property {
                 PropertyType::SessionExpiryInterval => {
                     if properties.session_expiry_interval.is_some(){
                         return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
@@ -244,7 +245,7 @@ bitflags! {
 
 #[cfg(test)]
 mod tests{
-    use crate::packets::{connack::{ConnAck, ConnAckProperties}, mqtt_traits::{MqttPacketRead, MqttRead}};
+    use crate::packets::{connack::{ConnAck, ConnAckProperties}, mqtt_traits::{VariableHeaderRead, MqttRead}};
 
     #[test]
     fn read_connack(){

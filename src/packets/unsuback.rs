@@ -1,8 +1,8 @@
 use bytes::BufMut;
 
 use super::{reason_codes::{UnsubAckReasonCode}, read_variable_integer, PropertyType, PacketType, write_variable_integer, variable_integer_len};
-use super::errors::{DeserializeError, SerializeError};
-use super::mqtt_traits::{MqttPacketRead, MqttRead, MqttWrite, WireLength, MqttPacketWrite};
+use super::error::{DeserializeError, SerializeError};
+use super::mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct UnsubAck{
@@ -12,8 +12,8 @@ pub struct UnsubAck{
 }
 
 
-impl MqttPacketRead for UnsubAck{
-    fn read(_: u8, _: usize,  mut buf: bytes::Bytes) -> Result<Self, super::errors::DeserializeError> {
+impl VariableHeaderRead for UnsubAck{
+    fn read(_: u8, _: usize,  mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubAckProperties::read(&mut buf)?;
         let mut reason_codes = vec![];
@@ -36,7 +36,7 @@ impl MqttPacketRead for UnsubAck{
     }
 }
 
-impl MqttPacketWrite for UnsubAck{
+impl VariableHeaderWrite for UnsubAck{
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.packet_identifier);
         self.properties.write(buf)?;
@@ -66,7 +66,7 @@ impl MqttRead for UnsubAckProperties{
             return Ok(properties);
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("UnsubAckProperties".to_string(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);
@@ -85,7 +85,7 @@ impl MqttRead for UnsubAckProperties{
                 PropertyType::UserProperty => {                 
                     properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
                 },
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::UnsubAck)),
             }
 
             if buf.len() == 0{
@@ -97,7 +97,7 @@ impl MqttRead for UnsubAckProperties{
 }
 
 impl MqttWrite for UnsubAckProperties{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         write_variable_integer(buf, self.wire_len())?;
         if let Some(reason_string) = &self.reason_string{
             PropertyType::ReasonString.write(buf)?;
@@ -130,7 +130,7 @@ impl WireLength for UnsubAckProperties{
 mod tests{
     use bytes::{BytesMut, Bytes};
 
-    use crate::packets::{unsuback::UnsubAck, mqtt_traits::{MqttPacketRead, MqttPacketWrite}};
+    use crate::packets::{unsuback::UnsubAck, mqtt_traits::{VariableHeaderRead, VariableHeaderWrite}};
 
 
     #[test]

@@ -1,12 +1,12 @@
 use bytes::{BytesMut, Bytes};
 
-use super::errors::{DeserializeError, SerializeError};
+use super::error::{DeserializeError, SerializeError};
 
-pub trait MqttPacketRead: Sized {
+pub trait VariableHeaderRead: Sized {
     fn read(flags: u8, remaining_length: usize,  buf: Bytes) -> Result<Self, DeserializeError>;
 }
 
-pub trait MqttPacketWrite: Sized{
+pub trait VariableHeaderWrite: Sized{
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 

@@ -1,7 +1,7 @@
 use bytes::{Bytes, BufMut};
 
-use super::mqtt_traits::{MqttWrite, MqttRead, MqttPacketRead, WireLength, MqttPacketWrite};
-use super::{QoS, read_variable_integer, errors::{DeserializeError, SerializeError}, PropertyType, PacketType, variable_integer_len, write_variable_integer};
+use super::mqtt_traits::{MqttWrite, MqttRead, VariableHeaderRead, WireLength, VariableHeaderWrite};
+use super::{QoS, read_variable_integer, error::{DeserializeError, SerializeError}, PropertyType, PacketType, variable_integer_len, write_variable_integer};
 
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -28,8 +28,22 @@ pub struct Publish{
     pub payload: Bytes,
 }
 
-impl MqttPacketRead for Publish{
-    fn read(flags: u8, remaining_length: usize,  mut buf: bytes::Bytes) -> Result<Self, super::errors::DeserializeError> {
+impl Publish {
+    pub fn new(qos: QoS, retain: bool, topic: String, packet_identifier: Option<u16>, publish_properties: PublishProperties, payload: Bytes) -> Self{
+        Self{
+            dup: false,
+            qos,
+            retain,
+            topic,
+            packet_identifier,
+            publish_properties,
+            payload,
+        }
+    }
+}
+
+impl VariableHeaderRead for Publish{
+    fn read(flags: u8, remaining_length: usize,  mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         let dup = flags & 0b1000 != 0;
         let qos = QoS::from_u8((flags & 0b110) >> 1)?;
         let retain = flags & 0b1 != 0;
@@ -44,7 +58,7 @@ impl MqttPacketRead for Publish{
 
         let payload_len = remaining_length - remaining_length;
         if buf.len() < payload_len {
-            return Err(super::errors::DeserializeError::InsufficientData(buf.len(), payload_len));
+            return Err(DeserializeError::InsufficientData("Publish".to_string(), buf.len(), payload_len));
         }
 
         Ok(Self{
@@ -60,7 +74,7 @@ impl MqttPacketRead for Publish{
     }
 }
 
-impl MqttPacketWrite for Publish{
+impl VariableHeaderWrite for Publish{
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
         self.topic.write(buf)?;
 
@@ -91,35 +105,35 @@ impl WireLength for Publish{
 pub struct PublishProperties{
     /// 3.3.2.3.2 Payload Format Indicator
     /// 1 (0x01) Byte, Identifier of the Payload Format Indicator. 
-    payload_format_indicator: Option<u8>,
+    pub(crate) payload_format_indicator: Option<u8>,
 
     /// 3.3.2.3.3 Message Expiry Interval
     /// 2 (0x02) Byte, Identifier of the Message Expiry Interval. 
-    message_expiry_interval: Option<u32>,
+    pub(crate) message_expiry_interval: Option<u32>,
 
     /// 3.3.2.3.4 Topic Alias 
     /// 35 (0x23) Byte, Identifier of the Topic Alias. 
-    topic_alias: Option<u16>,
+    pub(crate) topic_alias: Option<u16>,
 
     /// 3.3.2.3.5 Response Topic
     /// 8 (0x08) Byte, Identifier of the Response Topic. 
-    response_topic: Option<String>,
+    pub(crate) response_topic: Option<String>,
 
     /// 3.3.2.3.6 Correlation Data
     /// 9 (0x09) Byte, Identifier of the Correlation Data. 
-    correlation_data: Option<Bytes>,
+    pub(crate) correlation_data: Option<Bytes>,
     
     /// 3.3.2.3.8 Subscription Identifier
     /// 11 (0x0B), Identifier of the Subscription Identifier.
-    subscription_identifier: Vec<usize>,
+    pub(crate) subscription_identifier: Vec<usize>,
     
     /// 3.3.2.3.7 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    user_properties: Vec<(String, String)>,
+    pub(crate) user_properties: Vec<(String, String)>,
 
     /// 3.3.2.3.9 Content Type
     /// 3 (0x03) Identifier of the Content Type
-    content_type: Option<String>,
+    pub(crate) content_type: Option<String>,
 }
 
 impl Default for PublishProperties{
@@ -138,14 +152,14 @@ impl Default for PublishProperties{
 }
 
 impl MqttRead for PublishProperties{
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::errors::DeserializeError> {
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let (len, _) = read_variable_integer(buf).map_err(DeserializeError::from)?;
 
         if len == 0 {
             return Ok(Self::default());
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("PublishProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
@@ -286,7 +300,7 @@ impl WireLength for PublishProperties{
 mod tests{
     use bytes::{BytesMut, BufMut};
 
-    use crate::packets::{mqtt_traits::{MqttPacketRead, MqttPacketWrite}, write_variable_integer};
+    use crate::packets::{mqtt_traits::{VariableHeaderRead, VariableHeaderWrite}, write_variable_integer};
 
     use super::Publish;
 

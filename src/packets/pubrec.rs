@@ -1,6 +1,6 @@
 use bytes::BufMut;
 
-use super::{reason_codes::{PubRecReasonCode, self}, mqtt_traits::{MqttRead, MqttWrite, WireLength, MqttPacketRead, MqttPacketWrite}, read_variable_integer, errors::DeserializeError, PropertyType, PacketType, variable_integer_len, write_variable_integer};
+use super::{reason_codes::{PubRecReasonCode, self}, mqtt_traits::{MqttRead, MqttWrite, WireLength, VariableHeaderRead, VariableHeaderWrite}, read_variable_integer, error::DeserializeError, PropertyType, PacketType, variable_integer_len, write_variable_integer};
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -9,8 +9,17 @@ pub struct PubRec{
     pub reason_code: PubRecReasonCode,
     pub properties: PubRecProperties,
 }
+impl PubRec {
+    pub(crate) fn new(packet_identifier: u16) -> Self {
+        Self { 
+            packet_identifier,
+            reason_code: PubRecReasonCode::Success,
+            properties: PubRecProperties::default()
+        }
+    }
+}
 
-impl MqttPacketRead for PubRec{
+impl VariableHeaderRead for PubRec{
     fn read(_: u8, remaining_length: usize,  mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2{
@@ -22,7 +31,7 @@ impl MqttPacketRead for PubRec{
         }
         // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
         else if remaining_length < 4 {
-            return Err(DeserializeError::InsufficientData(buf.len(), 4));
+            return Err(DeserializeError::InsufficientData("PubRec".to_string(), buf.len(), 4));
         }
         
         let packet_identifier = u16::read(&mut buf)?;
@@ -37,8 +46,8 @@ impl MqttPacketRead for PubRec{
     }
 }
 
-impl MqttPacketWrite for PubRec{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+impl VariableHeaderWrite for PubRec{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
 
         if  self.reason_code == PubRecReasonCode::Success &&
@@ -82,14 +91,14 @@ impl Default for PubRecProperties{
 }
 
 impl MqttRead for PubRecProperties{
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::errors::DeserializeError> {
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
 
         if len == 0{
             return Ok(Self::default());
         }
         if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("PubRecProperties".to_string(), buf.len(), len));
         }
 
         let mut properties = PubRecProperties::default();
@@ -116,7 +125,7 @@ impl MqttRead for PubRecProperties{
 }
 
 impl MqttWrite for PubRecProperties{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let len = self.wire_len();
 
         write_variable_integer(buf, len)?;
@@ -152,7 +161,7 @@ impl WireLength for PubRecProperties{
 #[cfg(test)]
 mod tests{
     use bytes::{Bytes, BytesMut, BufMut};
-    use crate::packets::{pubrec::{PubRec, PubRecProperties}, mqtt_traits::{MqttPacketRead, MqttWrite, MqttPacketWrite, MqttRead}, reason_codes::PubRecReasonCode, PropertyType, write_variable_integer};
+    use crate::packets::{pubrec::{PubRec, PubRecProperties}, mqtt_traits::{VariableHeaderRead, MqttWrite, VariableHeaderWrite, MqttRead}, reason_codes::PubRecReasonCode, PropertyType, write_variable_integer};
 
     #[test]
     fn test_read_simple_pub_rec(){

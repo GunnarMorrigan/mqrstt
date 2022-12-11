@@ -1,12 +1,22 @@
-use super::{reason_codes::{DisconnectReasonCode, self}, mqtt_traits::{MqttPacketRead, WireLength, MqttPacketWrite, MqttRead, MqttWrite}, errors::DeserializeError, PropertyType, PacketType, read_variable_integer};
+use super::{reason_codes::{DisconnectReasonCode, self}, mqtt_traits::{VariableHeaderRead, WireLength, VariableHeaderWrite, MqttRead, MqttWrite}, error::DeserializeError, PropertyType, PacketType, read_variable_integer};
 
-pub struct Disconenct{
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Disconnect{
     pub reason_code: DisconnectReasonCode,
     pub properties: DisconnectProperties,
 }
 
-impl MqttPacketRead for Disconenct{
-    fn read(_: u8, remaining_length: usize,  mut buf: bytes::Bytes) -> Result<Self, super::errors::DeserializeError> {
+impl Default for Disconnect{
+    fn default() -> Self {
+        Self { 
+            reason_code: DisconnectReasonCode::NormalDisconnection, 
+            properties: Default::default() 
+        }
+    }
+}
+
+impl VariableHeaderRead for Disconnect{
+    fn read(_: u8, remaining_length: usize,  mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let reason_code;
         let properties;  
         if remaining_length == 0{
@@ -24,8 +34,8 @@ impl MqttPacketRead for Disconenct{
         })
     }
 }
-impl MqttPacketWrite for Disconenct{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {  
+impl VariableHeaderWrite for Disconnect{
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {  
         if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
@@ -33,7 +43,7 @@ impl MqttPacketWrite for Disconenct{
         Ok(())
     }
 }
-impl WireLength for Disconenct{
+impl WireLength for Disconnect{
     fn wire_len(&self) -> usize {
         todo!()
     }
@@ -56,7 +66,7 @@ impl MqttRead for DisconnectProperties{
             return Ok(properties);
         }
         else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData(buf.len(), len));
+            return Err(DeserializeError::InsufficientData("DisconnectProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data =  buf.split_to(len);
@@ -98,7 +108,7 @@ impl MqttRead for DisconnectProperties{
 }
 
 impl MqttWrite for DisconnectProperties{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         todo!()
     }
 }

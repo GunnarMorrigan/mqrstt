@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut};
 
 use super::mqtt_traits::{MqttRead, MqttWrite};
-use super::errors::DeserializeError;
+use super::error::DeserializeError;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConAckReasonCode {
@@ -32,7 +32,7 @@ pub enum ConAckReasonCode {
 impl MqttRead for ConAckReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("ConAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -64,7 +64,7 @@ impl MqttRead for ConAckReasonCode{
 }
 
 impl MqttWrite for ConAckReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             ConAckReasonCode::Success => 0x00,
             ConAckReasonCode::UnspecifiedError => 0x80,
@@ -106,7 +106,7 @@ pub enum AuthReasonCode {
 impl MqttRead for AuthReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("AuthReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -119,7 +119,7 @@ impl MqttRead for AuthReasonCode{
 }
 
 impl MqttWrite for AuthReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             AuthReasonCode::Success => 0x00,
             AuthReasonCode::ContinueAuthentication => 0x18,
@@ -168,7 +168,7 @@ pub enum DisconnectReasonCode {
 impl MqttRead for DisconnectReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("DisconnectReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -207,7 +207,7 @@ impl MqttRead for DisconnectReasonCode{
 }
 
 impl MqttWrite for DisconnectReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             DisconnectReasonCode::NormalDisconnection => 0x00,
             DisconnectReasonCode::DisconnectWithWillMessage => 0x04,
@@ -262,7 +262,7 @@ pub enum PubAckReasonCode {
 impl MqttRead for PubAckReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("PubAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -281,7 +281,7 @@ impl MqttRead for PubAckReasonCode{
 }
 
 impl MqttWrite for PubAckReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubAckReasonCode::Success => 0x00,
             PubAckReasonCode::NoMatchingSubscribers => 0x10,
@@ -309,7 +309,7 @@ pub enum PubCompReasonCode{
 impl MqttRead for PubCompReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("PubCompReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -321,7 +321,7 @@ impl MqttRead for PubCompReasonCode{
 }
 
 impl MqttWrite for PubCompReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubCompReasonCode::Success => 0x00,
             PubCompReasonCode::PacketIdentifierNotFound => 0x92,
@@ -348,7 +348,7 @@ pub enum PubRecReasonCode{
 impl MqttRead for PubRecReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("PubRecReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -367,7 +367,7 @@ impl MqttRead for PubRecReasonCode{
 }
 
 impl MqttWrite for PubRecReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubRecReasonCode::Success => 0x00,
             PubRecReasonCode::NoMatchingSubscribers => 0x10,
@@ -394,7 +394,7 @@ pub enum PubRelReasonCode{
 impl MqttRead for PubRelReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("PubRelReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -406,7 +406,7 @@ impl MqttRead for PubRelReasonCode{
 }
 
 impl MqttWrite for PubRelReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubRelReasonCode::Success => 0x00,
             PubRelReasonCode::PacketIdentifierNotFound => 0x92,
@@ -436,7 +436,7 @@ pub enum SubAckReasonCode{
 impl MqttRead for SubAckReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("SubAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -458,7 +458,7 @@ impl MqttRead for SubAckReasonCode{
 }
 
 impl MqttWrite for SubAckReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             SubAckReasonCode::GrantedQoS0 => 0x00,
             SubAckReasonCode::GrantedQoS1 => 0x01,
@@ -493,7 +493,7 @@ pub enum UnsubAckReasonCode {
 impl MqttRead for UnsubAckReasonCode{
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData(0, 1));
+            return Err(DeserializeError::InsufficientData("UnsubAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -510,7 +510,7 @@ impl MqttRead for UnsubAckReasonCode{
 }
 
 impl MqttWrite for UnsubAckReasonCode{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::errors::SerializeError> {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             UnsubAckReasonCode::Success => 0x00,
             UnsubAckReasonCode::NoSubscriptionExisted => 0x11,
