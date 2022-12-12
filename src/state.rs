@@ -9,18 +9,8 @@ use crate::{packets::{publish::Publish, packets::Packet, QoS, puback::{PubAck, P
 pub struct State {
     /// Status of last ping
     pub await_ping_resp: bool,
-    /// Last incoming packet time
-    // last_incoming: Instant,
-    /// Last outgoing packet time
-    // last_outgoing: Instant,
-    /// Number of outgoing inflight publishes
-    // pub(crate) inflight: u16,
-
 
     pub(crate) apkid: AvailablePacketIds,
-
-    // /// Maximum number of allowed inflight
-    // pub(crate) max_inflight: u16,
 
     /// Outgoing Subcribe requests which aren't acked yet
     pub(crate) outgoing_sub: BTreeMap<u16, Subscribe>,
@@ -33,14 +23,6 @@ pub struct State {
 
     /// Packets on incoming QoS 2 publishes
     pub(crate) incoming_pub: BTreeSet<u16>,
-    // /// Last collision due to broker not acking in order
-    // pub collision: Option<Publish>,
-    
-    // /// Buffered incoming packets
-    // pub events: VecDeque<Event>,
-
-    // /// Indicates if acknowledgements should be send immediately
-    // pub manual_acks: bool,
 }
 
 impl State{

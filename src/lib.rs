@@ -3,7 +3,7 @@
 
 use client::AsyncClient;
 use connect_options::ConnectOptions;
-use connections::{tcp::Tcp};
+use connections::tcp::Tcp;
 use event_handler::{EventHandlerTask, EventHandler};
 use network::MqttNetwork;
 use packets::packets::Packet;
@@ -18,6 +18,7 @@ mod event_handler;
 pub mod util;
 pub mod client;
 mod network;
+mod main;
 
 pub fn create_new_tcp<H>(options: ConnectOptions, custom_handler: H) -> (MqttNetwork<Tcp>, EventHandlerTask<H>, AsyncClient)
     where H: EventHandler + Send + Sized + 'static{
@@ -42,7 +43,7 @@ pub struct Hello{}
 
 impl EventHandler for Hello{
 
-    fn handle<'a> (&mut self, event: &'a Packet) -> impl futures::Future<Output = ()> + Send + 'a{
+    fn handle<'a> (&mut self, event: &'a Packet) -> impl core::future::Future<Output = ()> + Send + 'a{
         async move {
             tracing::warn!("Received event {:?}", event);
         }
@@ -112,7 +113,6 @@ mod tests {
         let a = dbg!(join!(network, handler, sender));
         println!("Hello {:?}", a);
     }
-
 
     #[tokio::test]
     async fn media(){

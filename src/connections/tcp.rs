@@ -1,16 +1,24 @@
 use std::io::{self, ErrorKind, Error};
 
 use bytes::{BytesMut, Buf};
-use tokio::{net::TcpStream, io::{AsyncWriteExt, AsyncReadExt}};
+#[cfg(feature = "tokio")]
+use tokio::{io::{AsyncWriteExt, AsyncReadExt}};
+#[cfg(feature = "smol")]
+use futures_lite::{AsyncReadExt, AsyncWriteExt};
+
 use tracing::debug;
 
-use crate::{state::State, error::ConnectionError, connect_options::ConnectOptions, network::Incoming};
+use crate::{error::ConnectionError, connect_options::ConnectOptions, network::Incoming};
 use crate::packets::{connect::Connect, error::ReadBytes, packets::{Packet, FixedHeader}};
 
 use super::AsyncMqttNetwork;
 
 pub struct Tcp{
-    connection: TcpStream,
+    #[cfg(feature = "tokio")]
+    connection: tokio::net::TcpStream,
+    #[cfg(feature = "smol")]
+    connection: async_net::TcpStream,
+
     /// Buffered reads
     buffer: BytesMut,
     /// Maximum packet size
@@ -19,7 +27,10 @@ pub struct Tcp{
 
 impl Tcp{
     pub async fn new_tcp(options: &ConnectOptions) -> Self{
-        let connection = TcpStream::connect((options.address.clone(), options.port)).await.unwrap();
+        #[cfg(feature = "tokio")]
+        let connection = tokio::net::TcpStream::connect((options.address.clone(), options.port)).await.unwrap();
+        #[cfg(feature = "smol")]
+        let connection = async_net::TcpStream::connect((options.address.clone(), options.port)).await.unwrap();
         Tcp{
             connection,
             buffer: BytesMut::with_capacity(u32::MAX as usize),
@@ -53,8 +64,12 @@ impl Tcp{
     /// Reads more than 'required' bytes to frame a packet into self.read buffer
     async fn read_bytes(&mut self, required: usize) -> io::Result<usize> {
         let mut total_read = 0;
+
         loop {
+            #[cfg(feature = "tokio")]
             let read = self.connection.read_buf(&mut self.buffer).await?;
+            #[cfg(feature = "smol")]
+            let read = self.connection.read(&mut self.buffer).await?;
             if 0 == read {
                 return if self.buffer.is_empty() {
                     Err(io::Error::new(
@@ -91,7 +106,10 @@ impl Tcp{
 
         packet.write(&mut buf_out).unwrap();
 
+        #[cfg(feature = "tokio")]
         self.connection.write_buf(&mut buf_out).await.unwrap();
+        #[cfg(feature = "smol")]
+        self.connection.write(&mut buf_out).await.unwrap();
     }
 }
 

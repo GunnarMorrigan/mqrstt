@@ -3,14 +3,17 @@ use std::sync::Arc;
 use async_channel::{Sender, Receiver};
 use async_mutex::Mutex;
 use bytes::BytesMut;
-use futures::{future, Future};
 use std::time::Instant;
 use tracing::debug;
+use futures_concurrency::future::Race;
+
 
 use crate::connections::AsyncMqttNetwork;
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::packets::Packet;
+
+
 
 pub type Incoming = Packet;
 pub type Outgoing = Packet;
@@ -56,12 +59,15 @@ impl<N> MqttNetwork<N>
         (network, outgoing_packet_sender, incoming_packet_receiver, last_network_action)
     }
 
-
-    pub async fn run(&mut self) -> Result<(), ConnectionError>{
-        self.run_with_shutdown_signal(future::pending()).await
+    pub fn reset(&mut self){
+        self.network = None;
     }
 
-    pub async fn run_with_shutdown_signal(&mut self, shutdown_signal: impl Future<Output = ()>) -> Result<(), ConnectionError>{
+    pub async fn run(&mut self) -> Result<(), ConnectionError>{
+        self.run_with_shutdown_signal(futures_lite::future::pending()).await
+    }
+
+    pub async fn run_with_shutdown_signal(&mut self, shutdown_signal: impl core::future::Future<Output = ()>) -> Result<(), ConnectionError>{
         if self.network.is_none(){
             debug!("Creating network");
 
@@ -78,22 +84,35 @@ impl<N> MqttNetwork<N>
         // let shutdown_process = shutdown_handler(shutdown_signal);
 
         if let Some(network) = self.network.as_mut(){
-            loop{
-                tokio::select! {
-                    net = network.read_many(&mut self.incoming_packet_sender) => {
-                        net?
-                    },
-                    outgoing_packet = self.outgoing_packet_receiver.recv() => {
-                        let packet = outgoing_packet?;
-                        tracing::trace!("Writing packet to network {:?}", packet);
-                        packet.write(&mut self.write_buffer)?;
-                        network.write(&mut self.write_buffer).await?;
-                        let mut lock = self.last_network_action.lock().await;
-                        *lock = Instant::now();
-                    },
+
+
+
+            let a = async{
+                loop{
+                    match network.read_many(&mut self.incoming_packet_sender).await{
+                        Ok(_) => (),
+                        Err(err) => {
+                            self.reset();
+                            return Err(err);
+                        },
+                    }
                 }
-                // network.read_many(&mut self.incoming_packet_sender).await
-            }
+            };
+            
+
+            let b = async {
+                loop{
+                    let outgoing_packet = self.outgoing_packet_receiver.recv().await;
+                    let packet = outgoing_packet?;
+                    tracing::trace!("Writing packet to network {:?}", packet);
+                    packet.write(&mut self.write_buffer)?;
+                    network.write(&mut self.write_buffer).await?;
+                    let mut lock = self.last_network_action.lock().await;
+                    *lock = Instant::now(); 
+                }
+            };
+
+            let c = (a,b).race().await;
         }
         Ok(())
     }

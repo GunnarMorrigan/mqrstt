@@ -11,11 +11,13 @@ use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
 use crate::packets::packets::{Packet, PacketType};
 use crate::state::State;
 
+use futures_concurrency::future::{Race};
+
 // use crate::{Incoming, MqttOptions, MqttState, Outgoing, Packet, Request, StateError, Transport};
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
-use futures::{select, FutureExt};
+// use futures::{select, FutureExt};
 use tracing::{debug, error, trace};
 
 
@@ -67,9 +69,7 @@ impl<H> EventHandlerTask<H>
 
         let task = EventHandlerTask {
             state,
-            
-            // keep_alive: KeepAlive::new_empty(),
-            
+                        
             handler,
 
             network_receiver,
@@ -82,25 +82,39 @@ impl<H> EventHandlerTask<H>
         (task, client_sender, packet_id_channel)
     }
 
-    pub async fn handle(&mut self) -> Result<(), MqttError>{
-        tokio::select! {
-            network_event = self.network_receiver.recv() => {
+    pub async fn handle(&mut self) -> Result<(), MqttError>{       
+        let a = async {
+            loop{
+                let network_event = self.network_receiver.recv().await;
                 match network_event {
                     Ok(event) => {
-                        self.handle_incoming_packet(event).await
+                        self.handle_incoming_packet(event).await?
                     },
-                    Err(err) => Err(MqttError::IncomingNetworkChannelClosed(err)),
+                    Err(err) => Err(MqttError::IncomingNetworkChannelClosed(err))?,
                 }
-            },
-            client_event = self.client_receiver.recv() => {
-                match client_event {
+            }
+        };
+
+        let b = async{
+            loop{
+                let client_event = self.client_receiver.recv().await;
+                let ret = match client_event {
                     Ok(event) => {
                         self.handle_outgoing_packet(event).await
                     },
                     Err(err) => Err(MqttError::ClientChannelClosed(err)),
+                };
+                if ret.is_err(){
+                    return ret;
                 }
-            },
-        }
+            }
+        };
+
+        // We do not use an select! because that has a high possibility of data loss.
+        // Instead, we use a endless loop of which both are polled.
+        // Nevertheless, they are raced because they only return if there is a fatel error
+        let c = (a,b).race();
+        todo!()
     }
 
     async fn handle_incoming_packet(&mut self, packet: Packet) -> Result<(), MqttError>{
@@ -111,18 +125,15 @@ impl<H> EventHandlerTask<H>
             Packet::PubAck(puback) => self.handle_incoming_puback(&puback).await?,
             Packet::PubRec(pubrec) => self.handle_incoming_pubrec(&pubrec).await?,
             Packet::PubRel(pubrel) => self.handle_incoming_pubrel(&pubrel).await?,
-            Packet::PubComp(_) => todo!(),
+            Packet::PubComp(pubcomp) => self.handle_incoming_pubcomp(&pubcomp).await?,
             Packet::PingResp => todo!(),
-
             _ => (),
         };
         Ok(())
     }
 
     async fn handle_incoming_publish(&mut self, publish: &Publish) -> Result<(), MqttError> {
-        let qos = publish.qos;
-
-        match qos {
+        match publish.qos {
             QoS::AtMostOnce => Ok(()),
             QoS::AtLeastOnce => {
                 let puback = PubAck{
@@ -157,34 +168,35 @@ impl<H> EventHandlerTask<H>
                 p.packet_identifier,
                 p.qos.into_u8(),
             );
+            self.state.apkid.mark_available(puback.packet_identifier).await;
+            Ok(())
         }
         else{
             error!(
                 "Publish {:?} was not found, while receiving a PubAck for it",
                 puback.packet_identifier,
             );
+            Err(MqttError::Unsolicited(puback.packet_identifier, PacketType::PubAck))
         }
-
-        self.state.apkid.mark_available(puback.packet_identifier).await;
-        Ok(())
     }
 
     async fn handle_incoming_pubrec(&mut self, pubrec: &PubRec) -> Result<(), MqttError> {
         match self.state.outgoing_pub.remove(&pubrec.packet_identifier){
             Some(p) => {
-                debug!(
-                    "Publish {:?} with QoS {} has been PubReced",
-                    p.packet_identifier,
-                    p.qos.into_u8(),
-                );
-
                 match pubrec.reason_code {
                     PubRecReasonCode::Success | PubRecReasonCode::NoMatchingSubscribers => {
                         let pubrel = PubRel::new(pubrec.packet_identifier);
                         self.state.outgoing_rel.insert(pubrec.packet_identifier);
                         self.network_sender.send(Packet::PubRel(pubrel)).await?;
+
+                        debug!(
+                            "Publish {:?} with QoS {} has been PubReced",
+                            p.packet_identifier,
+                            p.qos.into_u8(),
+                        );
+                        Ok(())
                     },
-                    _ => (),
+                    _ => Ok(()),
                 }
             },
             None => {
@@ -192,20 +204,18 @@ impl<H> EventHandlerTask<H>
                     "Publish {} was not found, while receiving a PubRec for it",
                     pubrec.packet_identifier,
                 );
+                Err(MqttError::Unsolicited(pubrec.packet_identifier, PacketType::PubRec))
             },
         }
-
-        
-        Ok(())
     }
 
     async fn handle_incoming_pubrel(&mut self, pubrel: &PubRel) -> Result<(), MqttError> {
-        let pubrel = PubComp::new(pubrel.packet_identifier);
-        self.network_sender.send(Packet::PubComp(pubrel)).await?;
+        let pubcomp = PubComp::new(pubrel.packet_identifier);
+        self.network_sender.send(Packet::PubComp(pubcomp)).await?;
         Ok(())
     }
 
-    async fn handle_incoming_pubcomp(&mut self, pubcomp: PubComp) -> Result<(), MqttError>{
+    async fn handle_incoming_pubcomp(&mut self, pubcomp: &PubComp) -> Result<(), MqttError>{
         if self.state.outgoing_rel.remove(&pubcomp.packet_identifier){
             self.state.apkid.mark_available(pubcomp.packet_identifier).await;
             Ok(())
@@ -287,5 +297,4 @@ impl<H> EventHandlerTask<H>
 
 pub trait EventHandler: Sized + Sync + 'static{
     fn handle<'a> (&mut self, event: &'a Packet) -> impl Future<Output = ()> + Send + 'a;
-    // fn handle<'a, 'b> (&mut self, event: &'a Packet) -> impl Future<Output = ()> + Send + 'b where 'b : 'a, 'a: 'b;
 }

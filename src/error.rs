@@ -1,7 +1,6 @@
 use std::io;
 
 use async_channel::{SendError, RecvError};
-use tokio::time::error::Elapsed;
 
 use crate::packets::{error::{DeserializeError, SerializeError}, packets::{Packet, PacketType}};
 
@@ -38,7 +37,7 @@ pub enum ConnectionError {
     // #[error("Mqtt state: {0}")]
     // MqttState(#[from] StateError),
     #[error("Connect timeout")]
-    Timeout(#[from] Elapsed),
+    Timeout,
  
     #[cfg(feature = "use-rustls")]
     #[error("TLS: {0}")]

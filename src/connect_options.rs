@@ -1,5 +1,3 @@
-use std::time::Duration;
-
 use bytes::Bytes;
 
 use crate::{packets::connect::LastWill};
@@ -34,15 +32,9 @@ pub struct ConnectOptions{
     /// while retransmitting pending packets
     pending_throttle_s: u64,
     
-    // private String[] serverURIs = null; // List of Servers to connect to in order
-	// private boolean useSubscriptionIdentifiers = true; // Whether to automatically assign subscription identifiers.
-	
-    // private boolean sendReasonMessages = false;
     send_reason_messages: bool,
     
-    
     // MQTT v5 Connect Properties:
-
     session_expiry_interval: Option<u32>,
     pub(crate) receive_maximum: Option<u16>,
     maximum_packet_size: Option<u32>,
@@ -55,10 +47,6 @@ pub struct ConnectOptions{
     
     /// Last will that will be issued on unexpected disconnect
     last_will: Option<LastWill>,
-
-    // /// If set to `true` MQTT acknowledgements are not sent automatically.
-    // /// Every incoming publish packet must be manually acknowledged with `client.ack(...)` method.
-    // manual_acks: bool,
 }
 
 impl ConnectOptions{
