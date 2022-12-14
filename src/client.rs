@@ -1,5 +1,6 @@
 use async_channel::{Receiver, Sender};
 use bytes::Bytes;
+use tracing::{debug, info};
 
 use crate::{packets::{packets::Packet, subscribe::{Subscribe, Subscription, SubscribeProperties}, QoS, publish::{Publish, PublishProperties}, unsubscribe::{Unsubscribe, UnsubscribeTopics, UnsubscribeProperties}}, error::ClientError};
 
@@ -9,18 +10,18 @@ pub struct AsyncClient{
     available_packet_ids: Receiver<u16>,
 
     // Sends Publish, Subscribe, Unsubscribe to the event handler to handle later.
-    handler_packet_sender: Sender<Packet>,
+    client_to_handler_s: Sender<Packet>,
     
     // Sends Publish with QoS 0
-    network_packet_sender: Sender<Packet>,
+    to_network_s: Sender<Packet>,
 }
 
 impl AsyncClient{
-    pub fn new(available_packet_ids: Receiver<u16>, handler_packet_sender: Sender<Packet>, network_packet_sender: Sender<Packet>) -> Self{
+    pub fn new(available_packet_ids: Receiver<u16>, client_to_handler_s: Sender<Packet>, to_network_s: Sender<Packet>) -> Self{
         Self{
             available_packet_ids,
-            handler_packet_sender,
-            network_packet_sender,
+            client_to_handler_s,
+            to_network_s,
         }
     }
 
@@ -28,7 +29,7 @@ impl AsyncClient{
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoHandler)?;
         let subscription: Subscription = into_subscribtions.into();
         let sub = Subscribe::new(pkid, subscription.0);
-        self.handler_packet_sender.send(Packet::Subscribe(sub)).await.map_err(|_| ClientError::NoHandler)?;
+        self.client_to_handler_s.send(Packet::Subscribe(sub)).await.map_err(|_| ClientError::NoHandler)?;
         Ok(())
     }
 
@@ -39,7 +40,7 @@ impl AsyncClient{
             properties,
             topics: into_sub.into().0,
         };
-        self.handler_packet_sender.send(Packet::Subscribe(sub)).await.map_err(|_| ClientError::NoHandler)?;
+        self.client_to_handler_s.send(Packet::Subscribe(sub)).await.map_err(|_| ClientError::NoHandler)?;
         Ok(())
     }
 
@@ -48,6 +49,7 @@ impl AsyncClient{
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv().await.map_err(|_| ClientError::NoHandler)?),
         };
+        info!("Published message with ID: {:?}", pkid);
         let publish = Publish{
             dup: false,
             qos,
@@ -58,10 +60,12 @@ impl AsyncClient{
             payload: payload.into(),
         };
         if qos == QoS::AtMostOnce{
-            self.network_packet_sender.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
+            self.to_network_s.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
+            info!("Published message into network_packet_sender. len {}", self.to_network_s.len());
         }
         else{
-            self.handler_packet_sender.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
+            self.client_to_handler_s.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
+            info!("Published message into handler_packet_sender: len {}", self.client_to_handler_s.len());
         }
         Ok(())
     }
@@ -81,10 +85,10 @@ impl AsyncClient{
             payload: payload.into(),
         };
         if qos == QoS::AtMostOnce{
-            self.network_packet_sender.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
+            self.to_network_s.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
         }
         else{
-            self.handler_packet_sender.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
+            self.client_to_handler_s.send(Packet::Publish(publish)).await.map_err(|_| ClientError::NoHandler)?;
         }
         Ok(())
     }
@@ -96,7 +100,7 @@ impl AsyncClient{
             properties: UnsubscribeProperties::default(),
             topics: into_topics.into().0,
         };
-        self.handler_packet_sender.send(Packet::Unsubscribe(unsub)).await.map_err(|_| ClientError::NoHandler)?;
+        self.client_to_handler_s.send(Packet::Unsubscribe(unsub)).await.map_err(|_| ClientError::NoHandler)?;
         Ok(())
     }
 }

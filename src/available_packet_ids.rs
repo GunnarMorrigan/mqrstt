@@ -30,7 +30,7 @@ impl AvailablePacketIds{
         self.receiver.clone()
     }
 
-    pub async fn mark_available(&mut self, pkid: u16){
+    pub async fn mark_available(&self, pkid: u16){
         match self.sender.send(pkid).await {
             Ok(_) => {
                 debug!(

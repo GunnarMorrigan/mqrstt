@@ -18,7 +18,7 @@ use futures_concurrency::future::{Race};
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
 // use futures::{select, FutureExt};
-use tracing::{debug, error, trace};
+use tracing::{debug, error};
 
 
 
@@ -29,27 +29,23 @@ use std::sync::Arc;
 use std::time::Instant;
 
 /// Eventloop with all the state of a connection
-pub struct EventHandlerTask<H>{
+pub struct EventHandlerTask{
 
     /// Options of the current mqtt connection
     // options: ConnectOptions,
     /// Current state of the connection
     state: State,
 
-    handler: H,
-
     network_receiver: Receiver<Packet>,
 
     network_sender: Sender<Packet>,
 
-    client_receiver: Receiver<Packet>,
+    client_to_handler_r: Receiver<Packet>,
 
     last_network_action: Arc<Mutex<Instant>>,
 }
 
-impl<H> EventHandlerTask<H>
-    where 
-        H: EventHandler + Send + Sized + 'static{
+impl EventHandlerTask {
 
     /// New MQTT `EventLoop`
     ///
@@ -59,36 +55,35 @@ impl<H> EventHandlerTask<H>
         receive_maximum: u16,
         network_receiver: Receiver<Packet>,
         network_sender: Sender<Packet>,
-        handler: H,
+        client_to_handler_r: Receiver<Packet>,
         last_network_action: Arc<Mutex<Instant>>,
-    ) -> (Self, Sender<Packet>, Receiver<u16>) {
-
-        let (client_sender, client_receiver) = async_channel::bounded(receive_maximum as usize);
+    ) -> (Self, Receiver<u16>) {
 
         let (state, packet_id_channel) = State::new(receive_maximum);
 
         let task = EventHandlerTask {
             state,
-                        
-            handler,
 
             network_receiver,
             network_sender,
 
-            client_receiver,
+            client_to_handler_r,
 
             last_network_action,
         };
-        (task, client_sender, packet_id_channel)
+        (task, packet_id_channel)
     }
 
-    pub async fn handle(&mut self) -> Result<(), MqttError>{       
+    pub async fn handle<H: EventHandler + Send + Sized + 'static> (&mut self, handler: &mut H) -> Result<(), MqttError>{       
+
         let a = async {
             loop{
+                debug!("Event Handler, network receiver len {:?}", self.network_receiver.len());
                 let network_event = self.network_receiver.recv().await;
                 match network_event {
                     Ok(event) => {
-                        self.handle_incoming_packet(event).await?
+                        debug!("Event Handler, handling incoming packet: {:?}", event);
+                        self.handle_incoming_packet(handler, event).await?
                     },
                     Err(err) => Err(MqttError::IncomingNetworkChannelClosed(err))?,
                 }
@@ -97,9 +92,11 @@ impl<H> EventHandlerTask<H>
 
         let b = async{
             loop{
-                let client_event = self.client_receiver.recv().await;
+                debug!("Event Handler, client receiver len {:?}", self.client_to_handler_r.len());
+                let client_event = self.client_to_handler_r.recv().await;
                 let ret = match client_event {
                     Ok(event) => {
+                        debug!("Event Handler, handling outgoing packet: {:?}", event);
                         self.handle_outgoing_packet(event).await
                     },
                     Err(err) => Err(MqttError::ClientChannelClosed(err)),
@@ -113,12 +110,13 @@ impl<H> EventHandlerTask<H>
         // We do not use an select! because that has a high possibility of data loss.
         // Instead, we use a endless loop of which both are polled.
         // Nevertheless, they are raced because they only return if there is a fatel error
-        let c = (a,b).race();
-        todo!()
+        let r = (a,b).race().await;
+        error!("Ending event_handler.handle()");
+        r
     }
 
-    async fn handle_incoming_packet(&mut self, packet: Packet) -> Result<(), MqttError>{
-        self.handler.handle(&packet).await;
+    async fn handle_incoming_packet<H: EventHandler + Send + Sized + 'static>(&self, handler: &mut H, packet: Packet) -> Result<(), MqttError>{
+        handler.handle(&packet).await;
 
         match packet {
             Packet::Publish(publish) => self.handle_incoming_publish(&publish).await?,
@@ -132,7 +130,7 @@ impl<H> EventHandlerTask<H>
         Ok(())
     }
 
-    async fn handle_incoming_publish(&mut self, publish: &Publish) -> Result<(), MqttError> {
+    async fn handle_incoming_publish(&self, publish: &Publish) -> Result<(), MqttError> {
         match publish.qos {
             QoS::AtMostOnce => Ok(()),
             QoS::AtLeastOnce => {
@@ -146,7 +144,8 @@ impl<H> EventHandlerTask<H>
             }
             QoS::ExactlyOnce => {
                 let pkid = publish.packet_identifier.ok_or(MqttError::MissingPacketId)?;
-                if !self.state.incoming_pub.insert(pkid) && !publish.dup{
+                let mut incoming_pub = self.state.incoming_pub.lock().await;
+                if !incoming_pub.insert(pkid) && !publish.dup{
                     error!(
                         "Received publish with an packet ID ({}) that is in use and the packet was not a duplicate",
                         pkid,
@@ -161,8 +160,9 @@ impl<H> EventHandlerTask<H>
         }
     }
 
-    async fn handle_incoming_puback(&mut self, puback: &PubAck) -> Result<(), MqttError> {
-        if let Some(p) = self.state.outgoing_pub.remove(&puback.packet_identifier){
+    async fn handle_incoming_puback(&self, puback: &PubAck) -> Result<(), MqttError> {
+        let mut outgoing_pub = self.state.outgoing_pub.lock().await;
+        if let Some(p) = outgoing_pub.remove(&puback.packet_identifier){
             debug!(
                 "Publish {:?} with QoS {} has been acknowledged",
                 p.packet_identifier,
@@ -180,13 +180,17 @@ impl<H> EventHandlerTask<H>
         }
     }
 
-    async fn handle_incoming_pubrec(&mut self, pubrec: &PubRec) -> Result<(), MqttError> {
-        match self.state.outgoing_pub.remove(&pubrec.packet_identifier){
+    async fn handle_incoming_pubrec(&self, pubrec: &PubRec) -> Result<(), MqttError> {
+        let mut outgoing_pub = self.state.outgoing_pub.lock().await;
+        match outgoing_pub.remove(&pubrec.packet_identifier){
             Some(p) => {
                 match pubrec.reason_code {
                     PubRecReasonCode::Success | PubRecReasonCode::NoMatchingSubscribers => {
                         let pubrel = PubRel::new(pubrec.packet_identifier);
-                        self.state.outgoing_rel.insert(pubrec.packet_identifier);
+                        {
+                            let mut outgoing_rel = self.state.outgoing_rel.lock().await;
+                            outgoing_rel.insert(pubrec.packet_identifier);
+                        }
                         self.network_sender.send(Packet::PubRel(pubrel)).await?;
 
                         debug!(
@@ -209,14 +213,15 @@ impl<H> EventHandlerTask<H>
         }
     }
 
-    async fn handle_incoming_pubrel(&mut self, pubrel: &PubRel) -> Result<(), MqttError> {
+    async fn handle_incoming_pubrel(&self, pubrel: &PubRel) -> Result<(), MqttError> {
         let pubcomp = PubComp::new(pubrel.packet_identifier);
         self.network_sender.send(Packet::PubComp(pubcomp)).await?;
         Ok(())
     }
 
-    async fn handle_incoming_pubcomp(&mut self, pubcomp: &PubComp) -> Result<(), MqttError>{
-        if self.state.outgoing_rel.remove(&pubcomp.packet_identifier){
+    async fn handle_incoming_pubcomp(&self, pubcomp: &PubComp) -> Result<(), MqttError>{
+        let mut outgoing_rel = self.state.outgoing_rel.lock().await;
+        if outgoing_rel.remove(&pubcomp.packet_identifier){
             self.state.apkid.mark_available(pubcomp.packet_identifier).await;
             Ok(())
         }
@@ -229,7 +234,7 @@ impl<H> EventHandlerTask<H>
         }
     }
 
-    async fn handle_outgoing_packet(&mut self, packet: Packet) -> Result<(), MqttError>{
+    async fn handle_outgoing_packet(&self, packet: Packet) -> Result<(), MqttError>{
         match packet {
             Packet::Publish(publish) => self.handle_outgoing_publish(publish).await,
             Packet::Subscribe(sub) => self.handle_outgoing_subscribe(sub).await,
@@ -241,14 +246,15 @@ impl<H> EventHandlerTask<H>
         }
     }
     
-    async fn handle_outgoing_publish(&mut self, publish: Publish) -> Result<(), MqttError>{
+    async fn handle_outgoing_publish(&self, publish: Publish) -> Result<(), MqttError>{
         match publish.qos{
             QoS::AtMostOnce => {
                 self.network_sender.send(Packet::Publish(publish)).await?;
             },
             QoS::AtLeastOnce => {
                 self.network_sender.send(Packet::Publish(publish.clone())).await?;
-                if let Some(pub_collision) = self.state.outgoing_pub.insert(publish.packet_identifier.unwrap(), publish){
+                let mut outgoing_pub = self.state.outgoing_pub.lock().await;
+                if let Some(pub_collision) = outgoing_pub.insert(publish.packet_identifier.unwrap(), publish){
                     error!(
                         "Encountered a colliding packet ID ({:?}) in a publish QoS 1 packet",
                         pub_collision.packet_identifier,
@@ -257,7 +263,8 @@ impl<H> EventHandlerTask<H>
             },
             QoS::ExactlyOnce => {
                 self.network_sender.send(Packet::Publish(publish.clone())).await?;
-                if let Some(pub_collision) = self.state.outgoing_pub.insert(publish.packet_identifier.unwrap(), publish){
+                let mut outgoing_pub = self.state.outgoing_pub.lock().await;
+                if let Some(pub_collision) = outgoing_pub.insert(publish.packet_identifier.unwrap(), publish){
                     error!(
                         "Encountered a colliding packet ID ({:?}) in a publish QoS 2 packet",
                         pub_collision.packet_identifier,
@@ -268,8 +275,9 @@ impl<H> EventHandlerTask<H>
         Ok(())
     }
     
-    async fn handle_outgoing_subscribe(&mut self, sub: Subscribe) -> Result<(), MqttError>{
-        if let Some(_) = self.state.outgoing_sub.insert(sub.packet_identifier, sub.clone()){
+    async fn handle_outgoing_subscribe(&self, sub: Subscribe) -> Result<(), MqttError>{
+        let mut outgoing_sub = self.state.outgoing_sub.lock().await;
+        if let Some(_) = outgoing_sub.insert(sub.packet_identifier, sub.clone()){
             error!(
                 "Encountered a colliding packet ID ({}) in a subscribe packet",
                 sub.packet_identifier,
@@ -281,8 +289,9 @@ impl<H> EventHandlerTask<H>
         Ok(())
     }
 
-    async fn handle_outgoing_unsubscribe(&mut self, unsub: Unsubscribe) -> Result<(), MqttError>{
-        if let Some(_) = self.state.outgoing_unsub.insert(unsub.packet_identifier, unsub.clone()){
+    async fn handle_outgoing_unsubscribe(&self, unsub: Unsubscribe) -> Result<(), MqttError>{
+        let mut outgoing_unsub = self.state.outgoing_unsub.lock().await;
+        if let Some(_) = outgoing_unsub.insert(unsub.packet_identifier, unsub.clone()){
             error!(
                 "Encountered a colliding packet ID ({}) in a unsubscribe packet",
                 unsub.packet_identifier,

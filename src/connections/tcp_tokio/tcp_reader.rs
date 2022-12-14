@@ -1,6 +1,7 @@
 use std::{io::{self, ErrorKind, Error}, sync::Arc};
 
 use bytes::{BytesMut, Buf};
+use tokio::net::tcp::{ReadHalf, OwnedReadHalf};
 #[cfg(feature = "tokio")]
 use tokio::{io::{AsyncWriteExt, AsyncReadExt}, net::TcpStream, sync::Mutex};
 #[cfg(feature = "smol")]
@@ -8,40 +9,36 @@ use smol::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
 use tracing::debug;
 
-use crate::{error::ConnectionError, connect_options::ConnectOptions, network::Incoming};
+use crate::{error::ConnectionError, connect_options::ConnectOptions, network::Incoming, connections::{tcp_tokio::AsyncMqttNetworkWrite, create_connect_from_options}};
 use crate::packets::{connect::Connect, error::ReadBytes, packets::{Packet, FixedHeader}};
 
-use super::AsyncMqttNetwork;
-
+use super::{AsyncMqttNetworkRead, tcp_writer::TcpWriter};
 
 #[derive(Debug)]
-pub struct Tcp{
-    // readhalf: OwnedReadHalf,
-    // writehalf: OwnedWriteHalf,
-
-    connection: Mutex<TcpStream>,
+pub struct TcpReader{
+    readhalf: OwnedReadHalf,
 
     /// Buffered reads
-    buffer: Mutex<BytesMut>,
+    buffer: BytesMut,
     // /// Maximum packet size
     // max_incoming_size: usize,
 }
 
-impl Tcp{
-    pub async fn new_tcp(options: &ConnectOptions) -> Self{
-        let connection = Mutex::new(TcpStream::connect((options.address.clone(), options.port)).await.unwrap());
-        Tcp{
-            connection,
+impl TcpReader{
+    pub async fn new_tcp(options: &ConnectOptions) -> (TcpReader, TcpWriter){
+        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port)).await.unwrap().into_split();
+        let reader = TcpReader{
+            readhalf,
             buffer: BytesMut::with_capacity(20 * 1024),
             // max_incoming_size: u32::MAX as usize,
-        }
+        };
+        let writer = TcpWriter::new(writehalf);
+        (reader, writer)
     }
 
-    pub async fn read(&self) -> io::Result<Packet>{
-        let mut buffer = self.buffer.lock().await;
-
+    pub async fn read(&mut self) -> io::Result<Packet>{
         loop {
-            let (header, header_length) = match FixedHeader::read_fixed_header(buffer.iter()) {
+            let (header, header_length) = match FixedHeader::read_fixed_header(self.buffer.iter()) {
                 Ok(header) => header,
                 Err(ReadBytes::InsufficientBytes(required_len)) => {
                     self.read_bytes(required_len).await?; 
@@ -50,26 +47,25 @@ impl Tcp{
                 Err(ReadBytes::Err(err)) => return Err(Error::new(ErrorKind::InvalidData, err)),
             };
 
-            buffer.advance(header_length);
+            self.buffer.advance(header_length);
 
-            if header.remaining_length > buffer.len(){
-                self.read_bytes(header.remaining_length - buffer.len()).await?;
+            if header.remaining_length > self.buffer.len(){
+                self.read_bytes(header.remaining_length - self.buffer.len()).await?;
             }
 
-            let buf = buffer.split_to(header.remaining_length);
+            let buf = self.buffer.split_to(header.remaining_length);
 
             return Packet::read(header, buf.into()).map_err(|err| Error::new(ErrorKind::InvalidData, err));
         }
     }
     
     /// Reads more than 'required' bytes to frame a packet into self.read buffer
-    async fn read_bytes(&self, required: usize) -> io::Result<usize> {
+    async fn read_bytes(&mut self, required: usize) -> io::Result<usize> {
         let mut total_read = 0;
 
         loop {
-            let buffer = self.buffer.lock().await;
             #[cfg(feature = "tokio")]
-            let read = self.connection.lock().await.read_buf(&mut buffer).await?;
+            let read = self.readhalf.read_buf(&mut self.buffer).await?;
             #[cfg(feature = "smol")]
             let read = self.connection.read(&mut self.buffer).await?;
             if 0 == read {
@@ -92,41 +88,27 @@ impl Tcp{
             }
         }
     }
-
-    pub async fn connect(&mut self, options: &ConnectOptions){
-        let mut connect = Connect::default();
-
-        connect.client_id = options.client_id.clone();
-        connect.clean_session = options.clean_session;
-        connect.keep_alive = options.keep_alive_interval_s as u16;
-        connect.connect_properties.request_problem_information = Some(1u8);
-        connect.connect_properties.request_response_information = Some(1u8);
-
-        let packet = Packet::Connect(connect);
-
-        let mut buf_out = BytesMut::new();
-
-        packet.write(&mut buf_out).unwrap();
-
-        #[cfg(feature = "tokio")]
-        self.connection.lock().await.write_buf(&mut buf_out).await.unwrap();
-        #[cfg(feature = "smol")]
-        self.connection.write(&mut buf_out).await.unwrap();
-    }
 }
 
-impl AsyncMqttNetwork for Tcp{
+impl AsyncMqttNetworkRead for TcpReader{
+    type W = TcpWriter;
     
-    fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Packet), ConnectionError>> + Send + '_ {
+    fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_ {
         async{
-            let mut tcp = Tcp::new_tcp(options).await;
-            debug!("Created TCP connection");
-            tcp.connect(options).await;
-            debug!("Send MQTT Connect packet");
-            let packet = tcp.read().await?;
+            let (mut reader, mut writer) = TcpReader::new_tcp(options).await;
+            // debug!("Created TCP connection");
+                
+            let mut buf_out = BytesMut::new();
+
+            create_connect_from_options(options).write(&mut buf_out)?;
+
+            writer.write_buffer(&mut buf_out).await?;
+
+            // debug!("Send MQTT Connect packet");
+            let packet = reader.read().await?;
             if packet.is_connack(){
-                debug!("Received ConnAck");
-                return Ok((tcp, packet));
+                // debug!("Received ConnAck");
+                Ok((reader, writer, packet))
             }
             else{
                 Err(ConnectionError::NotConnAck(packet))
@@ -134,11 +116,11 @@ impl AsyncMqttNetwork for Tcp{
         }
     }
 
-    async fn read(&self) -> Result<Packet, ConnectionError> {
+    async fn read(&mut self) -> Result<Packet, ConnectionError> {
         Ok(self.read().await?)
     }
 
-    async fn read_many(&self, incoming_packet_sender: &async_channel::Sender<Incoming>) -> Result<(), ConnectionError> {
+    async fn read_many(&mut self, incoming_packet_sender: &async_channel::Sender<Incoming>) -> Result<(), ConnectionError> {
         let mut read_packets = 0;
         loop {
             let (header, header_length) = match FixedHeader::read_fixed_header(self.buffer.iter()) {
@@ -165,16 +147,6 @@ impl AsyncMqttNetwork for Tcp{
                 return Ok(());
             }
         }
-    }
-
-    async fn write(&self, buffer: &mut BytesMut) -> Result<(), ConnectionError> {
-        if buffer.is_empty(){
-            return Ok(());
-        }
-
-        self.connection.lock().await.write_all(&buffer[..]).await?;
-        buffer.clear();
-        Ok(())
     }
 }
 

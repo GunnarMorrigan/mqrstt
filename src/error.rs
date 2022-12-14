@@ -2,7 +2,7 @@ use std::io;
 
 use async_channel::{SendError, RecvError};
 
-use crate::packets::{error::{DeserializeError, SerializeError}, packets::{Packet, PacketType}};
+use crate::{packets::{error::{DeserializeError, SerializeError}, packets::{Packet, PacketType}}, util::timeout::Timeout};
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum MqttError{   
@@ -37,7 +37,7 @@ pub enum ConnectionError {
     // #[error("Mqtt state: {0}")]
     // MqttState(#[from] StateError),
     #[error("Connect timeout")]
-    Timeout,
+    Timeout(#[from] Timeout),
  
     #[cfg(feature = "use-rustls")]
     #[error("TLS: {0}")]

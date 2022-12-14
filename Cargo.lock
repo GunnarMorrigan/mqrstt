@@ -388,13 +388,10 @@ name = "mqrstt"
 version = "0.1.0"
 dependencies = [
  "async-channel",
- "async-io",
  "async-mutex",
- "async-net",
  "bitflags",
  "bytes",
  "futures-concurrency",
- "futures-lite",
  "pretty_assertions",
  "quinn",
  "smol",
