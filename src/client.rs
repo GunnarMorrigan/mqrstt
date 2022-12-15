@@ -4,7 +4,7 @@ use tracing::{debug, info};
 
 use crate::{packets::{packets::Packet, subscribe::{Subscribe, Subscription, SubscribeProperties}, QoS, publish::{Publish, PublishProperties}, unsubscribe::{Unsubscribe, UnsubscribeTopics, UnsubscribeProperties}}, error::ClientError};
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AsyncClient{
     // Provides this client with an available packet id or waits on it.
     available_packet_ids: Receiver<u16>,

@@ -25,15 +25,15 @@ pub struct TcpReader{
 }
 
 impl TcpReader{
-    pub async fn new_tcp(options: &ConnectOptions) -> (TcpReader, TcpWriter){
-        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port)).await.unwrap().into_split();
+    pub async fn new_tcp(options: &ConnectOptions) -> Result<(TcpReader, TcpWriter), ConnectionError>{
+        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port)).await?.into_split();
         let reader = TcpReader{
             readhalf,
             buffer: BytesMut::with_capacity(20 * 1024),
             // max_incoming_size: u32::MAX as usize,
         };
         let writer = TcpWriter::new(writehalf);
-        (reader, writer)
+        Ok((reader, writer))
     }
 
     pub async fn read(&mut self) -> io::Result<Packet>{
@@ -95,7 +95,7 @@ impl AsyncMqttNetworkRead for TcpReader{
     
     fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_ {
         async{
-            let (mut reader, mut writer) = TcpReader::new_tcp(options).await;
+            let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
             // debug!("Created TCP connection");
                 
             let mut buf_out = BytesMut::new();

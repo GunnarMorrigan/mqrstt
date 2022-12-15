@@ -22,7 +22,6 @@ mod event_handler;
 pub mod util;
 pub mod client;
 mod network;
-mod main;
 
 pub fn create_new_tcp(options: ConnectOptions) -> (MqttNetwork<TcpReader, TcpWriter>, EventHandlerTask, AsyncClient, Receiver<Packet>){
     
@@ -63,12 +62,13 @@ impl EventHandler for Hello{
 
 #[cfg(test)]
 mod tests {
+    use async_channel::Receiver;
     use futures_concurrency::future::Join;
-    use tokio::{net::TcpStream};
-    use tracing::{Level, warn};
+    use tokio::{net::TcpStream, join};
+    use tracing::{Level, warn, info, debug};
     use tracing_subscriber::FmtSubscriber;
 
-    use crate::{connect_options::ConnectOptions, create_new_tcp, Hello, error::ClientError, packets::QoS};
+    use crate::{connect_options::ConnectOptions, create_new_tcp, Hello, error::{ClientError, MqttError}, packets::QoS};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create(){
@@ -86,14 +86,15 @@ mod tests {
 
         tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
 
-        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
-        // let opt = ConnectOptions::new("azurewe1576.azureexternal.dnvgl.com".to_string(), 1883, "test123123".to_string());
+        // let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
+        let opt = ConnectOptions::new("azurewe1576.azureexternal.dnvgl.com".to_string(), 1883, "test123123".to_string());
 
-        let (mut network, mut handler, client, r) = create_new_tcp(opt);
+        let (mut mqtt_network, mut handler, client, r) = create_new_tcp(opt);
     
         let network = tokio::task::spawn(async move{
-            dbg!(network.run_with_shutdown_signal().await)
+            dbg!(mqtt_network.run_with_shutdown_signal().await)
         });
+
         let event_handler = tokio::task::spawn(async move{
             let mut custom_handler = Hello{};
             loop{
@@ -105,42 +106,17 @@ mod tests {
                 }
             }
         });
-
-        let outputtask = tokio::task::spawn(async move {
-            loop {
-                warn!("Length of client->handler rcv {}", r.len());
-                tokio::time::sleep(tokio::time::Duration::new(2, 0)).await;
-            }
-        });
-
-        tokio::time::sleep(tokio::time::Duration::new(5, 0)).await;
-
+        
         let sender = tokio::task::spawn(async move{
-            // client.subscribe("test/123").await?;
-            // client.publish(QoS::ExactlyOnce, false, "Lol".to_string(), "123456789").await?;
-            // let p = Publish::new(QoS::AtMostOnce, false, "test".to_string(), None, PublishProperties::default(), Bytes::from_static(b"lmfao bru wtf"));
+
             client.publish(QoS::ExactlyOnce, false, "test/123".to_string(), "123456789").await?;
-            // loop{
-            //     let p = Publish::new(QoS::AtMostOnce, false, "test".to_string(), None, PublishProperties::default(), Bytes::from_static(b"lmfao bru wtf"));
-            //     tracing::trace!("Sending a packet"); 
-            //     tokio::time::sleep(tokio::time::Duration::new(10, 0)).await;
-            // }
-            loop{
-                ()
-            }
-            let ret: Result<(), ClientError> = Ok(());
-            ret
+
+            let lol = smol::future::pending::<Result<(), ClientError>>();
+            lol.await
         });
 
         // dbg!(network.await);
-        let a = dbg!((network, event_handler, sender, outputtask).join().await);
+        let a = dbg!((network, event_handler, sender).join().await);
         // println!("Hello {:?}", a);
-    }
-
-    #[tokio::test]
-    async fn media(){
-        println!("started");
-        let connection = TcpStream::connect(("broker.emqx.io", 1883)).await;
-        println!("Done");
     }
 }
