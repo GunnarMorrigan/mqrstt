@@ -1,7 +1,7 @@
 use bytes::{Buf, BufMut};
 
-use super::mqtt_traits::{MqttRead, MqttWrite};
 use super::error::DeserializeError;
+use super::mqtt_traits::{MqttRead, MqttWrite};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConAckReasonCode {
@@ -29,10 +29,14 @@ pub enum ConAckReasonCode {
     ConnectionRateExceeded,
 }
 
-impl MqttRead for ConAckReasonCode{
+impl MqttRead for ConAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("ConAckReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "ConAckReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -63,7 +67,7 @@ impl MqttRead for ConAckReasonCode{
     }
 }
 
-impl MqttWrite for ConAckReasonCode{
+impl MqttWrite for ConAckReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             ConAckReasonCode::Success => 0x00,
@@ -103,10 +107,14 @@ pub enum AuthReasonCode {
     ReAuthenticate,
 }
 
-impl MqttRead for AuthReasonCode{
+impl MqttRead for AuthReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("AuthReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "AuthReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -118,7 +126,7 @@ impl MqttRead for AuthReasonCode{
     }
 }
 
-impl MqttWrite for AuthReasonCode{
+impl MqttWrite for AuthReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             AuthReasonCode::Success => 0x00,
@@ -134,79 +142,83 @@ impl MqttWrite for AuthReasonCode{
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum DisconnectReasonCode {
-    NormalDisconnection, 
-    DisconnectWithWillMessage, 
-    UnspecifiedError, 
-    MalformedPacket, 
-    ProtocolError, 
-    ImplementationSpecificError, 
-    NotAuthorized, 
-    ServerBusy, 
-    ServerShuttingDown, 
-    KeepAliveTimeout, 
-    SessionTakenOver, 
-    TopicFilterInvalid, 
-    TopicNameInvalid, 
-    ReceiveMaximumExceeded, 
-    TopicAliasInvalid, 
-    PacketTooLarge, 
-    MessageRateTooHigh, 
-    QuotaExceeded, 
-    AdministrativeAction, 
-    PayloadFormatInvalid, 
-    RetainNotSupported, 
-    QosNotSupported, 
-    UseAnotherServer, 
-    ServerMoved, 
-    SharedSubscriptionsNotSupported, 
-    ConnectionRateExceeded, 
-    MaximumConnectTime, 
-    SubscriptionIdentifiersNotSupported, 
-    WildcardSubscriptionsNotSupported, 
+    NormalDisconnection,
+    DisconnectWithWillMessage,
+    UnspecifiedError,
+    MalformedPacket,
+    ProtocolError,
+    ImplementationSpecificError,
+    NotAuthorized,
+    ServerBusy,
+    ServerShuttingDown,
+    KeepAliveTimeout,
+    SessionTakenOver,
+    TopicFilterInvalid,
+    TopicNameInvalid,
+    ReceiveMaximumExceeded,
+    TopicAliasInvalid,
+    PacketTooLarge,
+    MessageRateTooHigh,
+    QuotaExceeded,
+    AdministrativeAction,
+    PayloadFormatInvalid,
+    RetainNotSupported,
+    QosNotSupported,
+    UseAnotherServer,
+    ServerMoved,
+    SharedSubscriptionsNotSupported,
+    ConnectionRateExceeded,
+    MaximumConnectTime,
+    SubscriptionIdentifiersNotSupported,
+    WildcardSubscriptionsNotSupported,
 }
 
-impl MqttRead for DisconnectReasonCode{
+impl MqttRead for DisconnectReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("DisconnectReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "DisconnectReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
-            0x00 => Ok(DisconnectReasonCode::NormalDisconnection), 
-            0x04 => Ok(DisconnectReasonCode::DisconnectWithWillMessage), 
-            0x80 => Ok(DisconnectReasonCode::UnspecifiedError), 
-            0x81 => Ok(DisconnectReasonCode::MalformedPacket), 
-            0x82 => Ok(DisconnectReasonCode::ProtocolError), 
-            0x83 => Ok(DisconnectReasonCode::ImplementationSpecificError), 
-            0x87 => Ok(DisconnectReasonCode::NotAuthorized), 
-            0x89 => Ok(DisconnectReasonCode::ServerBusy), 
-            0x8B => Ok(DisconnectReasonCode::ServerShuttingDown), 
-            0x8D => Ok(DisconnectReasonCode::KeepAliveTimeout), 
-            0x8E => Ok(DisconnectReasonCode::SessionTakenOver), 
-            0x8F => Ok(DisconnectReasonCode::TopicFilterInvalid), 
-            0x90 => Ok(DisconnectReasonCode::TopicNameInvalid), 
-            0x93 => Ok(DisconnectReasonCode::ReceiveMaximumExceeded), 
-            0x94 => Ok(DisconnectReasonCode::TopicAliasInvalid), 
-            0x95 => Ok(DisconnectReasonCode::PacketTooLarge), 
-            0x96 => Ok(DisconnectReasonCode::MessageRateTooHigh), 
-            0x97 => Ok(DisconnectReasonCode::QuotaExceeded), 
-            0x98 => Ok(DisconnectReasonCode::AdministrativeAction), 
-            0x99 => Ok(DisconnectReasonCode::PayloadFormatInvalid), 
-            0x9A => Ok(DisconnectReasonCode::RetainNotSupported), 
-            0x9B => Ok(DisconnectReasonCode::QosNotSupported), 
-            0x9C => Ok(DisconnectReasonCode::UseAnotherServer), 
-            0x9D => Ok(DisconnectReasonCode::ServerMoved), 
-            0x9E => Ok(DisconnectReasonCode::SharedSubscriptionsNotSupported), 
-            0x9F => Ok(DisconnectReasonCode::ConnectionRateExceeded), 
-            0xA0 => Ok(DisconnectReasonCode::MaximumConnectTime), 
-            0xA1 => Ok(DisconnectReasonCode::SubscriptionIdentifiersNotSupported), 
+            0x00 => Ok(DisconnectReasonCode::NormalDisconnection),
+            0x04 => Ok(DisconnectReasonCode::DisconnectWithWillMessage),
+            0x80 => Ok(DisconnectReasonCode::UnspecifiedError),
+            0x81 => Ok(DisconnectReasonCode::MalformedPacket),
+            0x82 => Ok(DisconnectReasonCode::ProtocolError),
+            0x83 => Ok(DisconnectReasonCode::ImplementationSpecificError),
+            0x87 => Ok(DisconnectReasonCode::NotAuthorized),
+            0x89 => Ok(DisconnectReasonCode::ServerBusy),
+            0x8B => Ok(DisconnectReasonCode::ServerShuttingDown),
+            0x8D => Ok(DisconnectReasonCode::KeepAliveTimeout),
+            0x8E => Ok(DisconnectReasonCode::SessionTakenOver),
+            0x8F => Ok(DisconnectReasonCode::TopicFilterInvalid),
+            0x90 => Ok(DisconnectReasonCode::TopicNameInvalid),
+            0x93 => Ok(DisconnectReasonCode::ReceiveMaximumExceeded),
+            0x94 => Ok(DisconnectReasonCode::TopicAliasInvalid),
+            0x95 => Ok(DisconnectReasonCode::PacketTooLarge),
+            0x96 => Ok(DisconnectReasonCode::MessageRateTooHigh),
+            0x97 => Ok(DisconnectReasonCode::QuotaExceeded),
+            0x98 => Ok(DisconnectReasonCode::AdministrativeAction),
+            0x99 => Ok(DisconnectReasonCode::PayloadFormatInvalid),
+            0x9A => Ok(DisconnectReasonCode::RetainNotSupported),
+            0x9B => Ok(DisconnectReasonCode::QosNotSupported),
+            0x9C => Ok(DisconnectReasonCode::UseAnotherServer),
+            0x9D => Ok(DisconnectReasonCode::ServerMoved),
+            0x9E => Ok(DisconnectReasonCode::SharedSubscriptionsNotSupported),
+            0x9F => Ok(DisconnectReasonCode::ConnectionRateExceeded),
+            0xA0 => Ok(DisconnectReasonCode::MaximumConnectTime),
+            0xA1 => Ok(DisconnectReasonCode::SubscriptionIdentifiersNotSupported),
             0xA2 => Ok(DisconnectReasonCode::WildcardSubscriptionsNotSupported),
             t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl MqttWrite for DisconnectReasonCode{
+impl MqttWrite for DisconnectReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             DisconnectReasonCode::NormalDisconnection => 0x00,
@@ -259,10 +271,14 @@ pub enum PubAckReasonCode {
     PayloadFormatInvalid,
 }
 
-impl MqttRead for PubAckReasonCode{
+impl MqttRead for PubAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("PubAckReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "PubAckReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -280,7 +296,7 @@ impl MqttRead for PubAckReasonCode{
     }
 }
 
-impl MqttWrite for PubAckReasonCode{
+impl MqttWrite for PubAckReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubAckReasonCode::Success => 0x00,
@@ -301,15 +317,19 @@ impl MqttWrite for PubAckReasonCode{
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum PubCompReasonCode{
-        Success,
-        PacketIdentifierNotFound,
+pub enum PubCompReasonCode {
+    Success,
+    PacketIdentifierNotFound,
 }
 
-impl MqttRead for PubCompReasonCode{
+impl MqttRead for PubCompReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("PubCompReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "PubCompReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -320,7 +340,7 @@ impl MqttRead for PubCompReasonCode{
     }
 }
 
-impl MqttWrite for PubCompReasonCode{
+impl MqttWrite for PubCompReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubCompReasonCode::Success => 0x00,
@@ -333,22 +353,26 @@ impl MqttWrite for PubCompReasonCode{
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum PubRecReasonCode{
-        Success,
-        NoMatchingSubscribers,
-        UnspecifiedError,
-        ImplementationSpecificError,
-        NotAuthorized,
-        TopicNameInvalid,
-        PacketIdentifierInUse,
-        QuotaExceeded,
-        PayloadFormatInvalid,
+pub enum PubRecReasonCode {
+    Success,
+    NoMatchingSubscribers,
+    UnspecifiedError,
+    ImplementationSpecificError,
+    NotAuthorized,
+    TopicNameInvalid,
+    PacketIdentifierInUse,
+    QuotaExceeded,
+    PayloadFormatInvalid,
 }
 
-impl MqttRead for PubRecReasonCode{
+impl MqttRead for PubRecReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("PubRecReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "PubRecReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -366,7 +390,7 @@ impl MqttRead for PubRecReasonCode{
     }
 }
 
-impl MqttWrite for PubRecReasonCode{
+impl MqttWrite for PubRecReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubRecReasonCode::Success => 0x00,
@@ -386,15 +410,19 @@ impl MqttWrite for PubRecReasonCode{
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum PubRelReasonCode{
+pub enum PubRelReasonCode {
     Success,
     PacketIdentifierNotFound,
 }
 
-impl MqttRead for PubRelReasonCode{
+impl MqttRead for PubRelReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("PubRelReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "PubRelReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -405,7 +433,7 @@ impl MqttRead for PubRelReasonCode{
     }
 }
 
-impl MqttWrite for PubRelReasonCode{
+impl MqttWrite for PubRelReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             PubRelReasonCode::Success => 0x00,
@@ -418,7 +446,7 @@ impl MqttWrite for PubRelReasonCode{
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum SubAckReasonCode{
+pub enum SubAckReasonCode {
     GrantedQoS0,
     GrantedQoS1,
     GrantedQoS2,
@@ -433,10 +461,14 @@ pub enum SubAckReasonCode{
     WildcardSubscriptionsNotSupported,
 }
 
-impl MqttRead for SubAckReasonCode{
+impl MqttRead for SubAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("SubAckReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "SubAckReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -457,7 +489,7 @@ impl MqttRead for SubAckReasonCode{
     }
 }
 
-impl MqttWrite for SubAckReasonCode{
+impl MqttWrite for SubAckReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             SubAckReasonCode::GrantedQoS0 => 0x00,
@@ -490,10 +522,14 @@ pub enum UnsubAckReasonCode {
     PacketIdentifierInUse,
 }
 
-impl MqttRead for UnsubAckReasonCode{
+impl MqttRead for UnsubAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty(){
-            return Err(DeserializeError::InsufficientData("UnsubAckReasonCode".to_string(), 0, 1));
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "UnsubAckReasonCode".to_string(),
+                0,
+                1,
+            ));
         }
 
         match buf.get_u8() {
@@ -509,7 +545,7 @@ impl MqttRead for UnsubAckReasonCode{
     }
 }
 
-impl MqttWrite for UnsubAckReasonCode{
+impl MqttWrite for UnsubAckReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
             UnsubAckReasonCode::Success => 0x00,

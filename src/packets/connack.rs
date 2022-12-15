@@ -1,34 +1,45 @@
-use super::{error::DeserializeError, read_variable_integer, reason_codes::ConAckReasonCode, QoS, PropertyType, PacketType, mqtt_traits::{MqttRead, VariableHeaderRead, SimpleSerialize}};
+use super::{
+    error::DeserializeError,
+    mqtt_traits::{MqttRead, VariableHeaderRead},
+    read_variable_integer,
+    reason_codes::ConAckReasonCode,
+    PacketType, PropertyType, QoS,
+};
 use bitflags::bitflags;
 use bytes::{Buf, Bytes};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ConnAck{
-
+pub struct ConnAck {
     /// 3.2.2.1 Connect Acknowledge Flags
     pub connack_flags: ConnAckFlags,
 
     /// 3.2.2.2 Connect Reason Code
     /// Byte 2 in the Variable Header is the Connect Reason Code.
     pub reason_code: ConAckReasonCode,
-    
+
     /// 3.2.2.3 CONNACK Properties
     pub connack_properties: ConnAckProperties,
 }
 
-impl VariableHeaderRead for ConnAck{
-    fn read(_: u8, header_len: usize,  mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
+impl VariableHeaderRead for ConnAck {
+    fn read(_: u8, header_len: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         // let (header_len, _) = read_variable_integer(&mut buf).map_err(DeserializeError::from)?;
 
-        if header_len > buf.len(){
-            return Err(DeserializeError::InsufficientData("ConnAck".to_string(), buf.len(), header_len));
+        if header_len > buf.len() {
+            return Err(DeserializeError::InsufficientData(
+                "ConnAck".to_string(),
+                buf.len(),
+                header_len,
+            ));
         }
 
-        let connack_flags = ConnAckFlags::from_bits(buf.get_u8()).ok_or(DeserializeError::MalformedPacketWithInfo("Can't read ConnAckFlags".to_string()))?;
+        let connack_flags = ConnAckFlags::from_bits(buf.get_u8()).ok_or(
+            DeserializeError::MalformedPacketWithInfo("Can't read ConnAckFlags".to_string()),
+        )?;
         let reason_code = ConAckReasonCode::read(&mut buf)?;
         let connack_properties = ConnAckProperties::read(&mut buf)?;
 
-        Ok(Self{
+        Ok(Self {
             connack_flags,
             reason_code,
             connack_properties,
@@ -37,7 +48,7 @@ impl VariableHeaderRead for ConnAck{
 }
 
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ConnAckProperties{
+pub struct ConnAckProperties {
     /// 3.2.2.3.2 Session Expiry Interval
     /// 17 (0x11) Byte Identifier of the Session Expiry Interval
     pub session_expiry_interval: Option<u32>,
@@ -47,7 +58,7 @@ pub struct ConnAckProperties{
     pub receive_maximum: Option<u16>,
 
     /// 3.2.2.3.4 Maximum QoS
-    /// 36 (0x24) Byte, Identifier of the Maximum QoS. 
+    /// 36 (0x24) Byte, Identifier of the Maximum QoS.
     pub maximum_qos: Option<QoS>,
 
     /// 3.2.2.3.5 Retain Available
@@ -55,19 +66,19 @@ pub struct ConnAckProperties{
     pub retain_available: Option<bool>,
 
     /// 3.2.2.3.6 Maximum Packet Size
-    /// 39 (0x27) Byte, Identifier of the Maximum Packet Size. 
+    /// 39 (0x27) Byte, Identifier of the Maximum Packet Size.
     pub maximum_packet_size: Option<u32>,
 
     /// 3.2.2.3.7 Assigned Client Identifier
-    /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier. 
+    /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier.
     pub assigned_client_id: Option<String>,
 
     /// 3.2.2.3.8 Topic Alias Maximum
-    /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum. 
+    /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum.
     pub topic_alias_maximum: Option<u16>,
 
     /// 3.2.2.3.9 Reason String
-    /// 31 (0x1F) Byte Identifier of the Reason String. 
+    /// 31 (0x1F) Byte Identifier of the Reason String.
     pub reason_string: Option<String>,
 
     /// 3.2.2.3.10 User Property
@@ -91,9 +102,9 @@ pub struct ConnAckProperties{
     pub server_keep_alive: Option<u16>,
 
     /// 3.2.2.3.15 Response Information
-    /// 26 (0x1A) Byte, Identifier of the Response Information. 
+    /// 26 (0x1A) Byte, Identifier of the Response Information.
     pub response_info: Option<String>,
-    
+
     /// 3.2.2.3.16 Server Reference
     /// 28 (0x1C) Byte, Identifier of the Server Reference
     pub server_reference: Option<String>,
@@ -107,128 +118,164 @@ pub struct ConnAckProperties{
     pub authentication_data: Option<Bytes>,
 }
 
-impl MqttRead for ConnAckProperties{
+impl MqttRead for ConnAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         let (len, _) = read_variable_integer(buf).map_err(DeserializeError::from)?;
 
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData("ConnAckProperties".to_string(), buf.len(), len));
+        } else if buf.len() < len {
+            return Err(DeserializeError::InsufficientData(
+                "ConnAckProperties".to_string(),
+                buf.len(),
+                len,
+            ));
         }
 
-        let mut property_data =  buf.split_to(len);
-        
+        let mut property_data = buf.split_to(len);
 
-        loop{
+        loop {
             let property = PropertyType::read(&mut property_data)?;
             match property {
                 PropertyType::SessionExpiryInterval => {
-                    if properties.session_expiry_interval.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
+                    if properties.session_expiry_interval.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::SessionExpiryInterval,
+                        ));
                     }
                     properties.session_expiry_interval = Some(u32::read(&mut property_data)?);
-                },
+                }
                 PropertyType::ReceiveMaximum => {
-                    if properties.receive_maximum.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReceiveMaximum));
+                    if properties.receive_maximum.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ReceiveMaximum,
+                        ));
                     }
                     properties.receive_maximum = Some(u16::read(&mut property_data)?);
-                },
-                PropertyType::MaximumQos =>{
-                    if properties.maximum_qos.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::MaximumQos));
+                }
+                PropertyType::MaximumQos => {
+                    if properties.maximum_qos.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::MaximumQos,
+                        ));
                     }
                     properties.maximum_qos = Some(QoS::read(&mut property_data)?);
-                },
-                PropertyType::RetainAvailable =>{
-                    if properties.retain_available.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::RetainAvailable));
+                }
+                PropertyType::RetainAvailable => {
+                    if properties.retain_available.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::RetainAvailable,
+                        ));
                     }
                     properties.retain_available = Some(bool::read(&mut property_data)?);
-                },
+                }
                 PropertyType::MaximumPacketSize => {
-                    if properties.maximum_packet_size.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::MaximumPacketSize));
+                    if properties.maximum_packet_size.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::MaximumPacketSize,
+                        ));
                     }
                     properties.maximum_packet_size = Some(u32::read(&mut property_data)?);
-                },
-                PropertyType::AssignedClientIdentifier =>{
-                    if properties.assigned_client_id.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AssignedClientIdentifier));
+                }
+                PropertyType::AssignedClientIdentifier => {
+                    if properties.assigned_client_id.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::AssignedClientIdentifier,
+                        ));
                     }
                     properties.assigned_client_id = Some(String::read(&mut property_data)?);
-                },
+                }
                 PropertyType::TopicAliasMaximum => {
-                    if properties.topic_alias_maximum.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::TopicAliasMaximum));
+                    if properties.topic_alias_maximum.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::TopicAliasMaximum,
+                        ));
                     }
                     properties.topic_alias_maximum = Some(u16::read(&mut property_data)?);
-                },
-                PropertyType::ReasonString =>{
-                    if properties.reason_string.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
+                }
+                PropertyType::ReasonString => {
+                    if properties.reason_string.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ReasonString,
+                        ));
                     }
                     properties.reason_string = Some(String::read(&mut property_data)?);
-                },
-                PropertyType::UserProperty =>{
-                    properties.user_properties.push((String::read(&mut property_data)?,String::read(&mut property_data)?))
-                },
-                PropertyType::WildcardSubscriptionAvailable =>{
-                    if properties.wildcards_available.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::WildcardSubscriptionAvailable));
+                }
+                PropertyType::UserProperty => properties.user_properties.push((
+                    String::read(&mut property_data)?,
+                    String::read(&mut property_data)?,
+                )),
+                PropertyType::WildcardSubscriptionAvailable => {
+                    if properties.wildcards_available.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::WildcardSubscriptionAvailable,
+                        ));
                     }
                     properties.wildcards_available = Some(bool::read(&mut property_data)?);
-                },
-                PropertyType::SubscriptionIdentifierAvailable =>{
-                    if properties.subscription_ids_available.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifierAvailable));
+                }
+                PropertyType::SubscriptionIdentifierAvailable => {
+                    if properties.subscription_ids_available.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::SubscriptionIdentifierAvailable,
+                        ));
                     }
                     properties.subscription_ids_available = Some(bool::read(&mut property_data)?);
-                },
-                PropertyType::SharedSubscriptionAvailable =>{
-                    if properties.shared_subscription_available.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::SharedSubscriptionAvailable));
+                }
+                PropertyType::SharedSubscriptionAvailable => {
+                    if properties.shared_subscription_available.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::SharedSubscriptionAvailable,
+                        ));
                     }
-                    properties.shared_subscription_available = Some(bool::read(&mut property_data)?);
-                },
-                PropertyType::ServerKeepAlive =>{
-                    if properties.server_keep_alive.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ServerKeepAlive));
+                    properties.shared_subscription_available =
+                        Some(bool::read(&mut property_data)?);
+                }
+                PropertyType::ServerKeepAlive => {
+                    if properties.server_keep_alive.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ServerKeepAlive,
+                        ));
                     }
                     properties.server_keep_alive = Some(u16::read(&mut property_data)?);
-                },
-                PropertyType::ResponseInformation =>{
-                    if properties.response_info.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseInformation));
+                }
+                PropertyType::ResponseInformation => {
+                    if properties.response_info.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ResponseInformation,
+                        ));
                     }
                     properties.response_info = Some(String::read(&mut property_data)?);
-                },
-                PropertyType::ServerReference =>{
-                    if properties.server_reference.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ServerReference));
+                }
+                PropertyType::ServerReference => {
+                    if properties.server_reference.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ServerReference,
+                        ));
                     }
                     properties.server_reference = Some(String::read(&mut property_data)?);
-                },
-                PropertyType::AuthenticationMethod =>{
-                    if properties.authentication_method.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
+                }
+                PropertyType::AuthenticationMethod => {
+                    if properties.authentication_method.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::AuthenticationMethod,
+                        ));
                     }
                     properties.authentication_method = Some(String::read(&mut property_data)?);
-                },
-                PropertyType::AuthenticationData =>{
-                    if properties.authentication_data.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
+                }
+                PropertyType::AuthenticationData => {
+                    if properties.authentication_data.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::AuthenticationData,
+                        ));
                     }
                     properties.authentication_data = Some(Bytes::read(&mut property_data)?);
-                },
-                
+                }
+
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::ConnAck)),
             }
-        
-            if property_data.is_empty(){ 
+
+            if property_data.is_empty() {
                 break;
             }
         }
@@ -244,17 +291,20 @@ bitflags! {
 }
 
 #[cfg(test)]
-mod tests{
-    use crate::packets::{connack::{ConnAck, ConnAckProperties}, mqtt_traits::{VariableHeaderRead, MqttRead}};
+mod tests {
+    use crate::packets::{
+        connack::{ConnAck, ConnAckProperties},
+        mqtt_traits::{MqttRead, VariableHeaderRead},
+    };
 
     #[test]
-    fn read_connack(){
+    fn read_connack() {
         let mut buf = bytes::BytesMut::new();
         let packet = &[
-            0x03,   // Variable header length
-            0x01,   // Connack flags
-            0x00,   // Reason code,
-            0x00    // empty properties
+            0x03, // Variable header length
+            0x01, // Connack flags
+            0x00, // Reason code,
+            0x00, // empty properties
         ];
 
         buf.extend_from_slice(packet);
@@ -264,66 +314,23 @@ mod tests{
     }
 
     #[test]
-    fn read_connack_properties(){
+    fn read_connack_properties() {
         let mut buf = bytes::BytesMut::new();
         let packet = &[
-            56,   // ConnAckProperties variable length
-            17,     // session_expiry_interval
-            0xff,
-            0xff,
-            37, // retain_available
+            56, // ConnAckProperties variable length
+            17, // session_expiry_interval
+            0xff, 0xff, 37,  // retain_available
             0x1, // true
-            18, // Assigned Client Id
-            0,
-            11, // 11 bytes
+            18,  // Assigned Client Id
+            0, 11,   // 11 bytes
             b'K', // Keanu Reeves without space
-            b'e',
-            b'a',
-            b'n',
-            b'u',
-            b'R',
-            b'e',
-            b'e',
-            b'v',
-            b'e',
-            b's',
-            36, // Max QoS
-            2, // QoS 2 Exactly Once
+            b'e', b'a', b'n', b'u', b'R', b'e', b'e', b'v', b'e', b's', 36, // Max QoS
+            2,  // QoS 2 Exactly Once
             34, // Topic Alias Max = 255
-            0,  
-            255, 
-            31, // Reason String = 'Houston we have got a problem'
-            0,
-            29,
-            b'H',
-            b'o',
-            b'u',
-            b's',
-            b't',
-            b'o',
-            b'n',
-            b' ',
-            b'w',
-            b'e',
-            b' ',
-            b'h',
-            b'a',
-            b'v',
-            b'e', 
-            b' ',
-            b'g',
-            b'o',
-            b't',
-            b' ',
-            b'a',
-            b' ',
-            b'p',
-            b'r',
-            b'o',
-            b'b',
-            b'l',
-            b'e',
-            b'm',
+            0, 255, 31, // Reason String = 'Houston we have got a problem'
+            0, 29, b'H', b'o', b'u', b's', b't', b'o', b'n', b' ', b'w', b'e', b' ', b'h', b'a',
+            b'v', b'e', b' ', b'g', b'o', b't', b' ', b'a', b' ', b'p', b'r', b'o', b'b', b'l',
+            b'e', b'm',
         ];
 
         buf.extend_from_slice(packet);

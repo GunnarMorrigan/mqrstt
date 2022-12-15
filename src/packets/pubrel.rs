@@ -1,18 +1,23 @@
 use bytes::BufMut;
 
-use super::{reason_codes::{PubRelReasonCode}, mqtt_traits::{MqttRead, MqttWrite, WireLength, VariableHeaderRead, VariableHeaderWrite}, read_variable_integer, error::DeserializeError, PropertyType, PacketType, write_variable_integer};
-
+use super::{
+    error::DeserializeError,
+    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    read_variable_integer,
+    reason_codes::PubRelReasonCode,
+    write_variable_integer, PacketType, PropertyType,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct PubRel{
+pub struct PubRel {
     pub packet_identifier: u16,
     pub reason_code: PubRelReasonCode,
     pub properties: PubRelProperties,
 }
 
-impl PubRel{
-    pub fn new(packet_identifier: u16) -> Self{
-        Self{
+impl PubRel {
+    pub fn new(packet_identifier: u16) -> Self {
+        Self {
             packet_identifier,
             reason_code: PubRelReasonCode::Success,
             properties: PubRelProperties::default(),
@@ -20,11 +25,15 @@ impl PubRel{
     }
 }
 
-impl VariableHeaderRead for PubRel{
-    fn read(_: u8, remaining_length: usize,  mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
+impl VariableHeaderRead for PubRel {
+    fn read(
+        _: u8,
+        remaining_length: usize,
+        mut buf: bytes::Bytes,
+    ) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
-        if remaining_length == 2{
-            return Ok(Self{
+        if remaining_length == 2 {
+            return Ok(Self {
                 packet_identifier: u16::read(&mut buf)?,
                 reason_code: PubRelReasonCode::Success,
                 properties: PubRelProperties::default(),
@@ -32,14 +41,18 @@ impl VariableHeaderRead for PubRel{
         }
         // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
         else if remaining_length < 4 {
-            return Err(DeserializeError::InsufficientData("PubRel".to_string(), buf.len(), 4));
+            return Err(DeserializeError::InsufficientData(
+                "PubRel".to_string(),
+                buf.len(),
+                4,
+            ));
         }
-        
+
         let packet_identifier = u16::read(&mut buf)?;
         let reason_code = PubRelReasonCode::read(&mut buf)?;
         let properties = PubRelProperties::read(&mut buf)?;
-        
-        Ok(Self{
+
+        Ok(Self {
             packet_identifier,
             reason_code,
             properties,
@@ -47,14 +60,15 @@ impl VariableHeaderRead for PubRel{
     }
 }
 
-impl VariableHeaderWrite for PubRel{
+impl VariableHeaderWrite for PubRel {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
 
-        if  self.reason_code == PubRelReasonCode::Success &&
-            self.properties.reason_string.is_none() &&
-            self.properties.user_properties.is_empty(){
-                return Ok(());
+        if self.reason_code == PubRelReasonCode::Success
+            && self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty()
+        {
+            return Ok(());
         }
 
         self.reason_code.write(buf)?;
@@ -64,60 +78,66 @@ impl VariableHeaderWrite for PubRel{
     }
 }
 
-impl WireLength for PubRel{
+impl WireLength for PubRel {
     fn wire_len(&self) -> usize {
         2 + 1 + self.properties.wire_len()
     }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct PubRelProperties{
+pub struct PubRelProperties {
     pub reason_string: Option<String>,
     pub user_properties: Vec<(String, String)>,
 }
 
-impl PubRelProperties{
-    pub fn is_empty(&self) -> bool{
+impl PubRelProperties {
+    pub fn is_empty(&self) -> bool {
         self.reason_string.is_none() && self.user_properties.is_empty()
     }
 }
 
-impl Default for PubRelProperties{
+impl Default for PubRelProperties {
     fn default() -> Self {
-        Self { 
-            reason_string: Default::default(), 
-            user_properties: Default::default() 
+        Self {
+            reason_string: Default::default(),
+            user_properties: Default::default(),
         }
     }
 }
 
-impl MqttRead for PubRelProperties{
+impl MqttRead for PubRelProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
 
-        if len == 0{
+        if len == 0 {
             return Ok(Self::default());
         }
         if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("PubRelProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(
+                "PubRelProperties".to_string(),
+                buf.len(),
+                len,
+            ));
         }
 
         let mut properties = PubRelProperties::default();
 
-        loop{
-            match PropertyType::from_u8(u8::read(buf)?)?{
+        loop {
+            match PropertyType::from_u8(u8::read(buf)?)? {
                 PropertyType::ReasonString => {
-                    if properties.reason_string.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
+                    if properties.reason_string.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ReasonString,
+                        ));
                     }
                     properties.reason_string = Some(String::read(buf)?);
-                },
-                PropertyType::UserProperty => {
-                    properties.user_properties.push((String::read(buf)?,String::read(buf)?))
-                },
+                }
+                PropertyType::UserProperty => properties
+                    .user_properties
+                    .push((String::read(buf)?, String::read(buf)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubRel)),
             }
-            if buf.len() == 0{
+            if buf.len() == 0 {
                 break;
             }
         }
@@ -125,17 +145,17 @@ impl MqttRead for PubRelProperties{
     }
 }
 
-impl MqttWrite for PubRelProperties{
+impl MqttWrite for PubRelProperties {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let len = self.wire_len();
 
         write_variable_integer(buf, len)?;
 
-        if let Some(reason_string) = &self.reason_string{
+        if let Some(reason_string) = &self.reason_string {
             PropertyType::ReasonString.write(buf)?;
             reason_string.write(buf)?;
         }
-        for (key, value) in &self.user_properties{
+        for (key, value) in &self.user_properties {
             PropertyType::UserProperty.write(buf)?;
             key.write(buf)?;
             value.write(buf)?
@@ -145,13 +165,13 @@ impl MqttWrite for PubRelProperties{
     }
 }
 
-impl WireLength for PubRelProperties{
+impl WireLength for PubRelProperties {
     fn wire_len(&self) -> usize {
         let mut len = 0;
-        if let Some(reason_string) = &self.reason_string{
+        if let Some(reason_string) = &self.reason_string {
             len += reason_string.wire_len() + 1;
         }
-        for (key, value) in &self.user_properties{
+        for (key, value) in &self.user_properties {
             len += 1 + key.wire_len() + value.wire_len();
         }
 
@@ -160,22 +180,26 @@ impl WireLength for PubRelProperties{
 }
 
 #[cfg(test)]
-mod tests{
-    use bytes::{Bytes, BytesMut, BufMut};
-    use crate::packets::{pubrel::{PubRel, PubRelProperties}, mqtt_traits::{VariableHeaderRead, MqttWrite, VariableHeaderWrite, MqttRead}, reason_codes::PubRelReasonCode, PropertyType, write_variable_integer};
+mod tests {
+    use crate::packets::{
+        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        pubrel::{PubRel, PubRelProperties},
+        reason_codes::PubRelReasonCode,
+        write_variable_integer, PropertyType,
+    };
+    use bytes::{BufMut, Bytes, BytesMut};
 
     #[test]
-    fn test_read_simple_pub_rel(){
+    fn test_read_simple_pub_rel() {
         let stream = &[
-            0x00,
-            0x0C, // Packet identifier = 12
+            0x00, 0x0C, // Packet identifier = 12
             0x00, // Reason code success
             0x00, // no properties
         ];
         let buf = Bytes::from(&stream[..]);
         let p_ack = PubRel::read(0, 4, buf).unwrap();
 
-        let expected = PubRel{
+        let expected = PubRel {
             packet_identifier: 12,
             reason_code: PubRelReasonCode::Success,
             properties: PubRelProperties::default(),
@@ -185,7 +209,7 @@ mod tests{
     }
 
     #[test]
-    fn test_read_write_pub_rel_with_properties(){
+    fn test_read_write_pub_rel_with_properties() {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);
@@ -201,17 +225,13 @@ mod tests{
         "Another thingy".write(&mut properties).unwrap();
         "The thingy".write(&mut properties).unwrap();
 
-
         write_variable_integer(&mut buf, properties.len()).unwrap();
 
         buf.extend(properties);
 
-
         // flags can be 0 because not used.
         // remaining_length must be at least 4
         let p_ack = PubRel::read(0, buf.len(), buf.clone().into()).unwrap();
-
-        
 
         let mut result = BytesMut::new();
         p_ack.write(&mut result).unwrap();
@@ -220,14 +240,22 @@ mod tests{
     }
 
     #[test]
-    fn test_properties(){
+    fn test_properties() {
         let mut properties_data = BytesMut::new();
-        PropertyType::ReasonString.write(&mut properties_data).unwrap();
-        "reason string, test 1-2-3.".write(&mut properties_data).unwrap();
-        PropertyType::UserProperty.write(&mut properties_data).unwrap();
+        PropertyType::ReasonString
+            .write(&mut properties_data)
+            .unwrap();
+        "reason string, test 1-2-3."
+            .write(&mut properties_data)
+            .unwrap();
+        PropertyType::UserProperty
+            .write(&mut properties_data)
+            .unwrap();
         "This is the key".write(&mut properties_data).unwrap();
         "This is the value".write(&mut properties_data).unwrap();
-        PropertyType::UserProperty.write(&mut properties_data).unwrap();
+        PropertyType::UserProperty
+            .write(&mut properties_data)
+            .unwrap();
         "Another thingy".write(&mut properties_data).unwrap();
         "The thingy".write(&mut properties_data).unwrap();
 
@@ -239,12 +267,11 @@ mod tests{
         let mut result = BytesMut::new();
         properties.write(&mut result).unwrap();
 
-
         assert_eq!(buf.to_vec(), result.to_vec());
     }
 
     #[test]
-    fn no_reason_code_or_props(){
+    fn no_reason_code_or_props() {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);
@@ -253,7 +280,7 @@ mod tests{
         let mut result = BytesMut::new();
         p_ack.write(&mut result).unwrap();
 
-        let expected = PubRel{
+        let expected = PubRel {
             packet_identifier: 65535,
             reason_code: PubRelReasonCode::Success,
             properties: PubRelProperties::default(),

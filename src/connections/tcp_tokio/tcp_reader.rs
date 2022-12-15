@@ -1,21 +1,30 @@
-use std::{io::{self, ErrorKind, Error}};
+use std::io::{self, Error, ErrorKind};
 
-use bytes::{BytesMut, Buf};
-use tokio::net::tcp::{OwnedReadHalf};
-#[cfg(feature = "tokio")]
-use tokio::{io::{AsyncWriteExt, AsyncReadExt}, net::TcpStream};
+use bytes::{Buf, BytesMut};
 #[cfg(feature = "smol")]
-use smol::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
+use smol::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+use tokio::net::tcp::OwnedReadHalf;
+#[cfg(feature = "tokio")]
+use tokio::{io::AsyncReadExt, net::TcpStream};
 
+use crate::packets::{
+    error::ReadBytes,
+    packets::{FixedHeader, Packet},
+};
+use crate::{
+    connect_options::ConnectOptions,
+    connections::{create_connect_from_options, tcp_tokio::AsyncMqttNetworkWrite},
+    error::ConnectionError,
+    network::Incoming,
+};
 
-
-use crate::{error::ConnectionError, connect_options::ConnectOptions, network::Incoming, connections::{tcp_tokio::AsyncMqttNetworkWrite, create_connect_from_options}};
-use crate::packets::{error::ReadBytes, packets::{Packet, FixedHeader}};
-
-use super::{AsyncMqttNetworkRead, tcp_writer::TcpWriter};
+use super::{tcp_writer::TcpWriter, AsyncMqttNetworkRead};
 
 #[derive(Debug)]
-pub struct TcpReader{
+pub struct TcpReader {
     readhalf: OwnedReadHalf,
 
     /// Buffered reads
@@ -24,10 +33,14 @@ pub struct TcpReader{
     // max_incoming_size: usize,
 }
 
-impl TcpReader{
-    pub async fn new_tcp(options: &ConnectOptions) -> Result<(TcpReader, TcpWriter), ConnectionError>{
-        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port)).await?.into_split();
-        let reader = TcpReader{
+impl TcpReader {
+    pub async fn new_tcp(
+        options: &ConnectOptions,
+    ) -> Result<(TcpReader, TcpWriter), ConnectionError> {
+        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port))
+            .await?
+            .into_split();
+        let reader = TcpReader {
             readhalf,
             buffer: BytesMut::with_capacity(20 * 1024),
             // max_incoming_size: u32::MAX as usize,
@@ -36,29 +49,31 @@ impl TcpReader{
         Ok((reader, writer))
     }
 
-    pub async fn read(&mut self) -> io::Result<Packet>{
+    pub async fn read(&mut self) -> io::Result<Packet> {
         loop {
             let (header, header_length) = match FixedHeader::read_fixed_header(self.buffer.iter()) {
                 Ok(header) => header,
                 Err(ReadBytes::InsufficientBytes(required_len)) => {
-                    self.read_bytes(required_len).await?; 
+                    self.read_bytes(required_len).await?;
                     continue;
-                },
+                }
                 Err(ReadBytes::Err(err)) => return Err(Error::new(ErrorKind::InvalidData, err)),
             };
 
             self.buffer.advance(header_length);
 
-            if header.remaining_length > self.buffer.len(){
-                self.read_bytes(header.remaining_length - self.buffer.len()).await?;
+            if header.remaining_length > self.buffer.len() {
+                self.read_bytes(header.remaining_length - self.buffer.len())
+                    .await?;
             }
 
             let buf = self.buffer.split_to(header.remaining_length);
 
-            return Packet::read(header, buf.into()).map_err(|err| Error::new(ErrorKind::InvalidData, err));
+            return Packet::read(header, buf.into())
+                .map_err(|err| Error::new(ErrorKind::InvalidData, err));
         }
     }
-    
+
     /// Reads more than 'required' bytes to frame a packet into self.read buffer
     async fn read_bytes(&mut self, required: usize) -> io::Result<usize> {
         let mut total_read = 0;
@@ -69,7 +84,7 @@ impl TcpReader{
             #[cfg(feature = "smol")]
             let read = self.connection.read(&mut self.buffer).await?;
             if 0 == read {
-                return if self.buffer.is_empty(){
+                return if self.buffer.is_empty() {
                     Err(io::Error::new(
                         io::ErrorKind::ConnectionAborted,
                         "Connection closed by peer",
@@ -90,14 +105,17 @@ impl TcpReader{
     }
 }
 
-impl AsyncMqttNetworkRead for TcpReader{
+impl AsyncMqttNetworkRead for TcpReader {
     type W = TcpWriter;
-    
-    fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_ {
-        async{
+
+    fn connect(
+        options: &ConnectOptions,
+    ) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_
+    {
+        async {
             let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
             // debug!("Created TCP connection");
-                
+
             let mut buf_out = BytesMut::new();
 
             create_connect_from_options(options).write(&mut buf_out)?;
@@ -106,11 +124,10 @@ impl AsyncMqttNetworkRead for TcpReader{
 
             // debug!("Send MQTT Connect packet");
             let packet = reader.read().await?;
-            if packet.is_connack(){
+            if packet.is_connack() {
                 // debug!("Received ConnAck");
                 Ok((reader, writer, packet))
-            }
-            else{
+            } else {
                 Err(ConnectionError::NotConnAck(packet))
             }
         }
@@ -120,7 +137,10 @@ impl AsyncMqttNetworkRead for TcpReader{
         Ok(self.read().await?)
     }
 
-    async fn read_many(&mut self, incoming_packet_sender: &async_channel::Sender<Incoming>) -> Result<(), ConnectionError> {
+    async fn read_many(
+        &mut self,
+        incoming_packet_sender: &async_channel::Sender<Incoming>,
+    ) -> Result<(), ConnectionError> {
         let mut read_packets = 0;
         loop {
             let (header, header_length) = match FixedHeader::read_fixed_header(self.buffer.iter()) {
@@ -128,14 +148,15 @@ impl AsyncMqttNetworkRead for TcpReader{
                 Err(ReadBytes::InsufficientBytes(required_len)) => {
                     self.read_bytes(required_len).await?;
                     continue;
-                },
+                }
                 Err(ReadBytes::Err(err)) => return Err(ConnectionError::DeserializationError(err)),
             };
 
             self.buffer.advance(header_length);
 
-            if header.remaining_length > self.buffer.len(){
-                self.read_bytes(header.remaining_length - self.buffer.len()).await?;
+            if header.remaining_length > self.buffer.len() {
+                self.read_bytes(header.remaining_length - self.buffer.len())
+                    .await?;
             }
 
             let buf = self.buffer.split_to(header.remaining_length);
@@ -143,7 +164,7 @@ impl AsyncMqttNetworkRead for TcpReader{
             tracing::trace!("Read packet from network {:?}", read_packet);
             incoming_packet_sender.send(read_packet).await?;
             read_packets += 1;
-            if read_packets >= 10{
+            if read_packets >= 10 {
                 return Ok(());
             }
         }
@@ -151,38 +172,42 @@ impl AsyncMqttNetworkRead for TcpReader{
 }
 
 #[cfg(test)]
-mod tests{
-    use bytes::{BytesMut, Buf, Bytes};
+mod tests {
+    use bytes::{Buf, Bytes, BytesMut};
 
-    use crate::packets::QoS;
-    use crate::packets::disconnect::{DisconnectProperties, Disconnect};
     use crate::packets::connack::{ConnAck, ConnAckFlags, ConnAckProperties};
+    use crate::packets::disconnect::{Disconnect, DisconnectProperties};
+    use crate::packets::QoS;
 
+    use crate::packets::error::{DeserializeError, ReadBytes};
+    use crate::packets::packets::{FixedHeader, Packet};
     use crate::packets::publish::{Publish, PublishProperties};
     use crate::packets::reason_codes::{ConAckReasonCode, DisconnectReasonCode};
-    use crate::packets::error::{ReadBytes, DeserializeError};
-    use crate::packets::packets::{FixedHeader, Packet};
 
-    pub fn read(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>>{
+    pub fn read(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
         let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
-    
-        if header.remaining_length > buffer.len(){
-            return Err(ReadBytes::InsufficientBytes(header.remaining_length - buffer.len()));
+
+        if header.remaining_length > buffer.len() {
+            return Err(ReadBytes::InsufficientBytes(
+                header.remaining_length - buffer.len(),
+            ));
         }
         buffer.advance(header_length);
-        
+
         let buf = buffer.split_to(header.remaining_length);
-    
+
         return Ok(Packet::read(header, buf.into())?);
     }
 
     #[test]
-    fn test_connack_read(){
-        let connack = [0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01, 0x29, 0x01,
-        0x22, 0xff, 0xff, 0x28, 0x01];
+    fn test_connack_read() {
+        let connack = [
+            0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01,
+            0x29, 0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
+        ];
         let mut buf = BytesMut::new();
         buf.extend(connack);
-        
+
         let res = read(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -194,27 +219,15 @@ mod tests{
                 session_expiry_interval: None,
                 receive_maximum: None,
                 maximum_qos: None,
-                retain_available: Some(
-                    true,
-                ),
-                maximum_packet_size: Some(
-                    1048576,
-                ),
+                retain_available: Some(true),
+                maximum_packet_size: Some(1048576),
                 assigned_client_id: None,
-                topic_alias_maximum: Some(
-                    65535,
-                ),
+                topic_alias_maximum: Some(65535),
                 reason_string: None,
                 user_properties: vec![],
-                wildcards_available: Some(
-                    true,
-                ),
-                subscription_ids_available: Some(
-                    true,
-                ),
-                shared_subscription_available: Some(
-                    true,
-                ),
+                wildcards_available: Some(true),
+                subscription_ids_available: Some(true),
+                shared_subscription_available: Some(true),
                 server_keep_alive: None,
                 response_info: None,
                 server_reference: None,
@@ -227,11 +240,11 @@ mod tests{
     }
 
     #[test]
-    fn test_disconnect_read(){
+    fn test_disconnect_read() {
         let packet = [0xe0, 0x02, 0x8e, 0x00];
         let mut buf = BytesMut::new();
         buf.extend(packet);
-        
+
         let res = read(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -250,11 +263,11 @@ mod tests{
     }
 
     #[test]
-    fn test_pingreq_read(){
+    fn test_pingreq_read() {
         let packet = [0xc0, 0x00];
         let mut buf = BytesMut::new();
         buf.extend(packet);
-        
+
         let res = read(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -263,11 +276,11 @@ mod tests{
     }
 
     #[test]
-    fn test_pingresp_read(){
+    fn test_pingresp_read() {
         let packet = [0xd0, 0x00];
         let mut buf = BytesMut::new();
         buf.extend(packet);
-        
+
         let res = read(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -276,14 +289,16 @@ mod tests{
     }
 
     #[test]
-    fn test_publish_read(){
-        let packet = [0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74, 0x65, 0x73,
-        0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01, 0x01, 0x09, 0x00, 0x04,
-        0x31, 0x32, 0x31, 0x32, 0x0b, 0x01];
+    fn test_publish_read() {
+        let packet = [
+            0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74,
+            0x65, 0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01,
+            0x01, 0x09, 0x00, 0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
+        ];
 
         let mut buf = BytesMut::new();
         buf.extend(packet);
-        
+
         let res = read(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
@@ -293,19 +308,13 @@ mod tests{
             qos: QoS::ExactlyOnce,
             retain: true,
             topic: "test/123/test/blabla".to_string(),
-            packet_identifier: Some(
-                13779,
-            ),
+            packet_identifier: Some(13779),
             publish_properties: PublishProperties {
-                payload_format_indicator: Some(
-                    1,
-                ),
+                payload_format_indicator: Some(1),
                 message_expiry_interval: None,
                 topic_alias: None,
                 response_topic: None,
-                correlation_data: Some(
-                    Bytes::from_static(b"1212"),
-                ),
+                correlation_data: Some(Bytes::from_static(b"1212")),
                 subscription_identifier: vec![1],
                 user_properties: vec![],
                 content_type: None,
@@ -315,7 +324,4 @@ mod tests{
 
         assert_eq!(Packet::Publish(expected), res);
     }
-    
-
 }
-

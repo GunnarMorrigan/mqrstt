@@ -7,35 +7,46 @@ use async_channel::Receiver;
 use async_mutex::Mutex;
 use client::AsyncClient;
 use connect_options::ConnectOptions;
-use connections::{tcp_tokio::{tcp_reader::TcpReader, tcp_writer::TcpWriter}};
-use event_handler::{EventHandlerTask, EventHandler};
+use connections::tcp_tokio::{tcp_reader::TcpReader, tcp_writer::TcpWriter};
+use event_handler::{EventHandler, EventHandlerTask};
 use network::MqttNetwork;
 use packets::packets::Packet;
 
+mod available_packet_ids;
+pub mod client;
+pub mod connect_options;
 mod connections;
+mod error;
+mod event_handler;
+mod network;
 mod packets;
 mod state;
-mod error;
-mod available_packet_ids;
-pub mod connect_options;
-mod event_handler;
 pub mod util;
-pub mod client;
-mod network;
 
-pub fn create_new_tcp(options: ConnectOptions) -> (MqttNetwork<TcpReader, TcpWriter>, EventHandlerTask, AsyncClient, Receiver<Packet>){
-    
+pub fn create_new_tcp(
+    options: ConnectOptions,
+) -> (
+    MqttNetwork<TcpReader, TcpWriter>,
+    EventHandlerTask,
+    AsyncClient,
+    Receiver<Packet>,
+) {
     let receive_maximum = options.receive_maximum();
 
     let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);
     let (to_network_s, to_network_r) = async_channel::bounded(100);
-    let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(receive_maximum as usize);
+    let (client_to_handler_s, client_to_handler_r) =
+        async_channel::bounded(receive_maximum as usize);
 
     let last_network_action = Arc::new(Mutex::new(Instant::now()));
 
+    let network = MqttNetwork::<TcpReader, TcpWriter>::new(
+        options,
+        network_to_handler_s,
+        to_network_r,
+        last_network_action.clone(),
+    );
 
-    let network = MqttNetwork::<TcpReader, TcpWriter>::new(options, network_to_handler_s, to_network_r, last_network_action.clone());
-    
     let (handler, packet_ids) = EventHandlerTask::new(
         receive_maximum,
         network_to_handler_r,
@@ -48,12 +59,13 @@ pub fn create_new_tcp(options: ConnectOptions) -> (MqttNetwork<TcpReader, TcpWri
     (network, handler, client, client_to_handler_r)
 }
 
+pub struct Hello {}
 
-pub struct Hello{}
-
-impl EventHandler for Hello{
-
-    fn handle<'a> (&mut self, _event: &'a Packet) -> impl core::future::Future<Output = ()> + Send + 'a{
+impl EventHandler for Hello {
+    fn handle<'a>(
+        &mut self,
+        _event: &'a Packet,
+    ) -> impl core::future::Future<Output = ()> + Send + 'a {
         async move {
             // tracing::warn!("Received event {:?}", event);
         }
@@ -62,54 +74,60 @@ impl EventHandler for Hello{
 
 #[cfg(test)]
 mod tests {
-    
+
     use futures_concurrency::future::Join;
-    
-    use tracing::{Level};
+
+    use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
 
-    use crate::{connect_options::ConnectOptions, create_new_tcp, Hello, error::{ClientError}, packets::QoS};
+    use crate::{
+        connect_options::ConnectOptions, create_new_tcp, error::ClientError, packets::QoS, Hello,
+    };
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn create(){
-
+    async fn create() {
         let filter = tracing_subscriber::filter::EnvFilter::new("none,mqrstt=trace");
 
         let subscriber = FmtSubscriber::builder()
-        // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
-        // will be written to stdout.
-        .with_env_filter(filter)
-        .with_max_level(Level::TRACE)
-        .with_line_number(true)
-        // completes the builder.
-        .finish();
+            // all spans/events with a level higher than TRACE (e.g, debug, info, warn, etc.)
+            // will be written to stdout.
+            .with_env_filter(filter)
+            .with_max_level(Level::TRACE)
+            .with_line_number(true)
+            // completes the builder.
+            .finish();
 
-        tracing::subscriber::set_global_default(subscriber).expect("setting default subscriber failed");
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
 
         // let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
-        let opt = ConnectOptions::new("azurewe1576.azureexternal.dnvgl.com".to_string(), 1883, "test123123".to_string());
+        let opt = ConnectOptions::new(
+            "azurewe1576.azureexternal.dnvgl.com".to_string(),
+            1883,
+            "test123123".to_string(),
+        );
 
         let (mut mqtt_network, handler, client, _r) = create_new_tcp(opt);
-    
-        let network = tokio::task::spawn(async move{
-            dbg!(mqtt_network.run_with_shutdown_signal().await)
-        });
 
-        let event_handler = tokio::task::spawn(async move{
-            let mut custom_handler = Hello{};
-            loop{
-                match handler.handle(&mut custom_handler).await{
+        let network =
+            tokio::task::spawn(async move { dbg!(mqtt_network.run_with_shutdown_signal().await) });
+
+        let event_handler = tokio::task::spawn(async move {
+            let mut custom_handler = Hello {};
+            loop {
+                match handler.handle(&mut custom_handler).await {
                     Ok(_) => (),
                     a => {
                         return dbg!(a);
-                    },
+                    }
                 }
             }
         });
-        
-        let sender = tokio::task::spawn(async move{
 
-            client.publish(QoS::ExactlyOnce, false, "test/123".to_string(), "123456789").await?;
+        let sender = tokio::task::spawn(async move {
+            client
+                .publish(QoS::ExactlyOnce, false, "test/123".to_string(), "123456789")
+                .await?;
 
             let lol = smol::future::pending::<Result<(), ClientError>>();
             lol.await

@@ -1,10 +1,12 @@
-use std::{collections::{BTreeMap, BTreeSet}};
+use std::collections::{BTreeMap, BTreeSet};
 
 use async_channel::Receiver;
 use async_mutex::Mutex;
 
-
-use crate::{packets::{publish::Publish, subscribe::Subscribe, unsubscribe::Unsubscribe}, available_packet_ids::AvailablePacketIds};
+use crate::{
+    available_packet_ids::AvailablePacketIds,
+    packets::{publish::Publish, subscribe::Subscribe, unsubscribe::Unsubscribe},
+};
 
 #[derive(Debug)]
 pub struct State {
@@ -26,16 +28,14 @@ pub struct State {
     pub(crate) incoming_pub: Mutex<BTreeSet<u16>>,
 }
 
-impl State{
-    pub fn new(receive_maximum: u16) -> (Self, Receiver<u16>){
-
+impl State {
+    pub fn new(receive_maximum: u16) -> (Self, Receiver<u16>) {
         let (apkid, r) = AvailablePacketIds::new(receive_maximum);
 
-        let state = Self{
+        let state = Self {
             await_ping_resp: false,
             // last_incoming: Instant::now(),
             // last_outgoing: Instant::now(),
-
             apkid,
 
             // inflight: 0,
@@ -51,7 +51,4 @@ impl State{
 
         (state, r)
     }
-
-    
-
 }

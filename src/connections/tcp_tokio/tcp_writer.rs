@@ -1,35 +1,37 @@
 use async_channel::Receiver;
 use bytes::BytesMut;
-use tokio::net::tcp::{OwnedWriteHalf};
-#[cfg(feature = "tokio")]
-use tokio::{io::{AsyncWriteExt,}};
 #[cfg(feature = "smol")]
-use smol::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
+use smol::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpStream,
+};
+#[cfg(feature = "tokio")]
+use tokio::io::AsyncWriteExt;
+use tokio::net::tcp::OwnedWriteHalf;
 use tracing::trace;
 
 use crate::{error::ConnectionError, packets::packets::Packet};
 
 use super::AsyncMqttNetworkWrite;
 
-
-pub struct TcpWriter{
+pub struct TcpWriter {
     writehalf: OwnedWriteHalf,
 
     buffer: BytesMut,
 }
 
-impl TcpWriter{
-    pub fn new(writehalf: OwnedWriteHalf) -> Self{
-        Self{
+impl TcpWriter {
+    pub fn new(writehalf: OwnedWriteHalf) -> Self {
+        Self {
             writehalf,
             buffer: BytesMut::with_capacity(20 * 1024),
         }
     }
 }
 
-impl AsyncMqttNetworkWrite for TcpWriter{
+impl AsyncMqttNetworkWrite for TcpWriter {
     async fn write_buffer(&mut self, buffer: &mut BytesMut) -> Result<(), ConnectionError> {
-        if buffer.is_empty(){
+        if buffer.is_empty() {
             return Ok(());
         }
 
@@ -48,5 +50,5 @@ impl AsyncMqttNetworkWrite for TcpWriter{
         self.writehalf.write_all(&self.buffer[..]).await?;
         self.buffer.clear();
         Ok(())
-    }   
+    }
 }

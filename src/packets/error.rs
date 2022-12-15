@@ -17,16 +17,16 @@ pub enum DeserializeError {
 
     #[error("Unsupported protocol version")]
     UnsupportedProtocolVersion,
-    
+
     #[error("Unknown protocol version")]
     UnknownProtocolVersion,
-    
+
     #[error("There is insufficient for {0} data ({1}) to take {2} bytes")]
     InsufficientData(String, usize, usize),
 
     #[error("There is insufficient to read the protocol version.")]
     InsufficientDataForProtocolVersion,
-    
+
     #[error("Reason code {0} is not allowed for packet type {1:?}")]
     UnexpectedReasonCode(u8, PacketType),
 
@@ -46,23 +46,23 @@ pub enum DeserializeError {
     Utf8Error(FromUtf8Error),
 }
 
-impl From<String> for DeserializeError{
+impl From<String> for DeserializeError {
     fn from(s: String) -> Self {
         DeserializeError::MalformedPacketWithInfo(s)
     }
 }
 
 #[derive(Error, Clone, Debug)]
-pub enum ReadBytes<T>{
+pub enum ReadBytes<T> {
     #[error("Normal error")]
     Err(#[from] T),
-    
+
     #[error("Should read more data from the stream.")]
     InsufficientBytes(usize),
 }
 
 #[derive(Error, Debug)]
-pub enum SerializeError{
+pub enum SerializeError {
     #[error("Can not write {0} in a 4 byte variable integer.")]
     VariableIntegerOverflow(usize),
 

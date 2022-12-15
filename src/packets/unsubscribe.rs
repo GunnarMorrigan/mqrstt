@@ -1,32 +1,37 @@
-use super::{mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite}, read_variable_integer, PropertyType, error::DeserializeError, PacketType, write_variable_integer};
-use bytes::{BufMut};
-
+use super::{
+    error::DeserializeError,
+    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    read_variable_integer, write_variable_integer, PacketType, PropertyType,
+};
+use bytes::BufMut;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Unsubscribe{
+pub struct Unsubscribe {
     pub packet_identifier: u16,
     pub properties: UnsubscribeProperties,
     pub topics: Vec<String>,
-
 }
 
-impl VariableHeaderRead for Unsubscribe{
-    fn read(_: u8, _: usize,  mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
+impl VariableHeaderRead for Unsubscribe {
+    fn read(
+        _: u8,
+        _: usize,
+        mut buf: bytes::Bytes,
+    ) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubscribeProperties::read(&mut buf)?;
         let mut topics = vec![];
-        loop{
-
+        loop {
             let topic = String::read(&mut buf)?;
 
             topics.push(topic);
 
-            if buf.len() == 0{
+            if buf.len() == 0 {
                 break;
             }
         }
 
-        Ok(Self{
+        Ok(Self {
             packet_identifier,
             properties,
             topics,
@@ -34,12 +39,12 @@ impl VariableHeaderRead for Unsubscribe{
     }
 }
 
-impl VariableHeaderWrite for Unsubscribe{
+impl VariableHeaderWrite for Unsubscribe {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
         self.properties.write(buf)?;
 
-        for topic in &self.topics{
+        for topic in &self.topics {
             topic.write(buf)?;
         }
 
@@ -47,42 +52,52 @@ impl VariableHeaderWrite for Unsubscribe{
     }
 }
 
-impl WireLength for Unsubscribe{
+impl WireLength for Unsubscribe {
     fn wire_len(&self) -> usize {
         todo!()
     }
 }
 
-
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct UnsubscribeProperties{
+pub struct UnsubscribeProperties {
     pub user_properties: Vec<(String, String)>,
 }
 
-impl MqttRead for UnsubscribeProperties{
+impl MqttRead for UnsubscribeProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
-        
+
         let mut properties = UnsubscribeProperties::default();
 
-        if len == 0{
+        if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData("UnsubscribeProperties".to_string(), buf.len(), len));
+        } else if buf.len() < len {
+            return Err(DeserializeError::InsufficientData(
+                "UnsubscribeProperties".to_string(),
+                buf.len(),
+                len,
+            ));
         }
 
         let mut properties_data = buf.split_to(len);
 
-        loop{
+        loop {
             match PropertyType::read(&mut properties_data)? {
-                PropertyType::UserProperty => {                 
-                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
-                },
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Unsubscribe)),
+                PropertyType::UserProperty => {
+                    properties.user_properties.push((
+                        String::read(&mut properties_data)?,
+                        String::read(&mut properties_data)?,
+                    ));
+                }
+                e => {
+                    return Err(DeserializeError::UnexpectedProperty(
+                        e,
+                        PacketType::Unsubscribe,
+                    ))
+                }
             }
 
-            if properties_data.len() == 0{
+            if properties_data.len() == 0 {
                 break;
             }
         }
@@ -90,10 +105,10 @@ impl MqttRead for UnsubscribeProperties{
     }
 }
 
-impl MqttWrite for UnsubscribeProperties{
+impl MqttWrite for UnsubscribeProperties {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         write_variable_integer(buf, self.wire_len())?;
-        for (key, value) in &self.user_properties{
+        for (key, value) in &self.user_properties {
             PropertyType::UserProperty.write(buf)?;
             key.write(buf)?;
             value.write(buf)?;
@@ -102,10 +117,10 @@ impl MqttWrite for UnsubscribeProperties{
     }
 }
 
-impl WireLength for UnsubscribeProperties{
+impl WireLength for UnsubscribeProperties {
     fn wire_len(&self) -> usize {
         let mut len = 0;
-        for (key, value) in &self.user_properties{
+        for (key, value) in &self.user_properties {
             len += 1 + key.wire_len() + value.wire_len();
         }
         len
@@ -114,20 +129,20 @@ impl WireLength for UnsubscribeProperties{
 
 pub struct UnsubscribeTopics(pub Vec<String>);
 
-impl From<String> for UnsubscribeTopics{
+impl From<String> for UnsubscribeTopics {
     fn from(value: String) -> Self {
         Self(vec![value])
     }
 }
 
-impl From<Vec<String>> for UnsubscribeTopics{
+impl From<Vec<String>> for UnsubscribeTopics {
     fn from(value: Vec<String>) -> Self {
         Self(value)
     }
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
 
     // TCP and MQTT packet
     // let unsubscribe_packet = &[0x00, 0x11, 0x22, 0x33, 0x44, 0x55, 0x00, 0x05, 0x9a, 0x3c, 0x7a, 0x00, 0x08, 0x00, 0x45, 0x00,
@@ -138,24 +153,23 @@ mod tests{
     // 0x65, 0x73, 0x74];
 
     // MQTT packet
-    // let unsubscribe_packet = 
+    // let unsubscribe_packet =
     //     &[0xa2, 0x1b, 0x35, 0xd7, 0x00, 0x00, 0x16, 0x73, 0x75, 0x62,
     //     0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74,
     //     0x65, 0x73, 0x74];
 
-    use bytes::{BytesMut, Bytes};
+    use bytes::{Bytes, BytesMut};
 
     use crate::packets::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite};
 
     use super::Unsubscribe;
 
     #[test]
-    fn read_write_unsubscribe(){
-
-        let unsubscribe_packet = 
-        &[0x35, 0xd7, 0x00, 0x00, 0x16, 0x73, 0x75, 0x62,
-        0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74,
-        0x65, 0x73, 0x74];
+    fn read_write_unsubscribe() {
+        let unsubscribe_packet = &[
+            0x35, 0xd7, 0x00, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65,
+            0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73, 0x74,
+        ];
 
         let mut bufmut = BytesMut::new();
         bufmut.extend(&unsubscribe_packet[..]);

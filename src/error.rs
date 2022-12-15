@@ -1,11 +1,17 @@
 use std::io;
 
-use async_channel::{SendError, RecvError};
+use async_channel::{RecvError, SendError};
 
-use crate::{packets::{error::{DeserializeError, SerializeError}, packets::{Packet, PacketType}}, util::timeout::Timeout};
+use crate::{
+    packets::{
+        error::{DeserializeError, SerializeError},
+        packets::{Packet, PacketType},
+    },
+    util::timeout::Timeout,
+};
 
 #[derive(Debug, Clone, thiserror::Error)]
-pub enum MqttError{   
+pub enum MqttError {
     #[error("Missing Packet ID")]
     MissingPacketId,
 
@@ -19,11 +25,11 @@ pub enum MqttError{
     ClientChannelClosed(RecvError),
 
     #[error("Received unsolicited ack pkid: {0}")]
-    Unsolicited(u16, PacketType)
+    Unsolicited(u16, PacketType),
 }
 
 #[derive(Debug, Clone, thiserror::Error)]
-pub enum ClientError{
+pub enum ClientError {
     #[error("One of more of the internal handler channels are closed")]
     NoHandler,
 
@@ -38,7 +44,7 @@ pub enum ConnectionError {
     // MqttState(#[from] StateError),
     #[error("Connect timeout")]
     Timeout(#[from] Timeout),
- 
+
     #[cfg(feature = "use-rustls")]
     #[error("TLS: {0}")]
     Tls(#[from] tls::Error),

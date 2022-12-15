@@ -1,11 +1,16 @@
-use bytes::{Bytes, Buf, BytesMut, BufMut};
 use bitflags::bitflags;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use super::{QoS, read_variable_integer, write_variable_integer, ProtocolVersion, PropertyType, WireLength, mqtt_traits::{MqttRead, MqttWrite, VariableHeaderWrite, VariableHeaderRead}, error::{SerializeError, DeserializeError}, PacketType, variable_integer_len};
+use super::{
+    error::{DeserializeError, SerializeError},
+    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
+    ProtocolVersion, QoS, WireLength,
+};
 
 /// Variable connect header:
-/// 
-/// 
+///
+///
 /// ╔═══════════╦═══════════════════╦══════╦══════╦══════╦══════╦══════╦══════╦══════╦══════╗
 /// ║           ║                   ║      ║      ║      ║      ║      ║      ║      ║      ║
 /// ║           ║ Description       ║ 7    ║ 6    ║ 5    ║ 4    ║ 3    ║ 2    ║ 1    ║ 0    ║
@@ -31,41 +36,41 @@ use super::{QoS, read_variable_integer, write_variable_integer, ProtocolVersion,
 /// ║           ║                   ║      ║      ║      ║      ║      ║      ║      ║      ║
 /// ║ byte 6    ║ ‘T’               ║ 0    ║ 1    ║ 0    ║ 1    ║ 0    ║ 1    ║ 0    ║ 0    ║
 /// ╚═══════════╩═══════════════════╩══════╩══════╩══════╩══════╩══════╩══════╩══════╩══════╝
-/// 
+///
 /// Byte 7:
 /// The protocol version
-/// 
+///
 /// Byte 8:
-/// 3.1.2.3 Connect Flags : 
+/// 3.1.2.3 Connect Flags :
 /// ╔═════╦═══════════╦══════════╦═════════════╦═════╦════╦═══════════╦═════════════╦══════════╗
 /// ║ Bit ║ 7         ║ 6        ║ 5           ║ 4   ║ 3  ║ 2         ║ 1           ║ 0        ║
 /// ╠═════╬═══════════╬══════════╬═════════════╬═════╩════╬═══════════╬═════════════╬══════════╣
 /// ║     ║ User Name ║ Password ║ Will Retain ║ Will QoS ║ Will Flag ║ Clean Start ║ Reserved ║
 /// ╚═════╩═══════════╩══════════╩═════════════╩══════════╩═══════════╩═════════════╩══════════╝
-/// 
+///
 /// Byte 9 and 10:
 /// The keep alive
-/// 
+///
 /// Byte 11:
 /// Length of [`ConnectProperties`]
-/// 
+///
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Connect{
+pub struct Connect {
     /// Byte 7
     pub protocol_version: ProtocolVersion,
-    
+
     /// 3.1.2.4 Clean Start Flag
     /// bit 1
     pub clean_session: bool,
 
     /// 3.1.2.5 Will Flag through option
     pub last_will: Option<LastWill>,
-    
+
     /// 3.1.2.8 User Name Flag
     pub username: Option<String>,
     /// 3.1.2.9 Password Flag
     pub password: Option<String>,
-    
+
     /// 3.1.2.10 Keep Alive
     /// Byte 9 and 10
     pub keep_alive: u16,
@@ -75,58 +80,11 @@ pub struct Connect{
 
     /// 3.1.3.1 Client Identifier (ClientID)
     pub client_id: String,
-
 }
 
-impl Connect{
-    fn write_bits(&self, buf: &mut BytesMut){
-        "MQTT".write(buf);
-
-        self.protocol_version.write(buf);
-
-        let mut connect_flags = 0u8;
-
-        if self.clean_session{
-            connect_flags |= 0b00000010;
-        }
-        if let Some(last_will) = &self.last_will {
-            connect_flags |= 0b00000100;
-            if last_will.retain{
-                connect_flags |= 0b00100000;
-            }
-            connect_flags |=  (last_will.qos as u8) << 3;
-
-        }
-        if self.username.is_some(){
-            connect_flags |= 0b10000000;
-        }
-        if self.password.is_some(){
-            connect_flags |= 0b01000000;
-        }
-
-        buf.put_u8(connect_flags);
-
-        buf.put_u16(self.keep_alive);
-
-        self.connect_properties.write(buf);
-
-        self.client_id.write(buf);
-
-        if let Some(last_will) = &self.last_will{
-            last_will.write(buf);
-        }
-        if let Some(username) = &self.username{
-            username.write(buf);
-        }
-        if let Some(password) = &self.password{
-            password.write(buf);
-        }
-    }
-}
-
-impl Default for Connect{
+impl Default for Connect {
     fn default() -> Self {
-        Self{
+        Self {
             protocol_version: ProtocolVersion::V5,
             clean_session: true,
             last_will: None,
@@ -139,16 +97,19 @@ impl Default for Connect{
     }
 }
 
-impl VariableHeaderRead for Connect{
-    fn read(_: u8, _: usize,  mut buf: Bytes) -> Result<Self, DeserializeError> {
+impl VariableHeaderRead for Connect {
+    fn read(_: u8, _: usize, mut buf: Bytes) -> Result<Self, DeserializeError> {
         if String::read(&mut buf)? != "MQTT" {
-            return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_string()));
+            return Err(DeserializeError::MalformedPacketWithInfo(
+                "Protocol not MQTT".to_string(),
+            ));
         }
-        
+
         let protocol_version = ProtocolVersion::read(&mut buf)?;
 
         let connect_flags_byte = buf.get_u8();
-        let connect_flags = ConnectFlags::from_bits(connect_flags_byte).ok_or("Can't read ConnectFlags".to_string())?;
+        let connect_flags = ConnectFlags::from_bits(connect_flags_byte)
+            .ok_or("Can't read ConnectFlags".to_string())?;
 
         let clean_session = connect_flags.contains(ConnectFlags::CLEAN_START);
         let keep_alive = buf.get_u16();
@@ -157,7 +118,7 @@ impl VariableHeaderRead for Connect{
 
         let client_id = String::read(&mut buf)?;
         let mut last_will = None;
-        if connect_flags.contains(ConnectFlags::WILL_FLAG){
+        if connect_flags.contains(ConnectFlags::WILL_FLAG) {
             let retain = connect_flags.contains(ConnectFlags::WILL_RETAIN);
 
             let qos = QoS::try_from(connect_flags)?;
@@ -167,16 +128,14 @@ impl VariableHeaderRead for Connect{
 
         let username;
         let password;
-        if connect_flags.contains(ConnectFlags::USERNAME){
+        if connect_flags.contains(ConnectFlags::USERNAME) {
             username = Some(String::read(&mut buf)?);
-        }
-        else{
+        } else {
             username = None;
         }
-        if connect_flags.contains(ConnectFlags::PASSWORD){
+        if connect_flags.contains(ConnectFlags::PASSWORD) {
             password = Some(String::read(&mut buf)?);
-        }
-        else{
+        } else {
             password = None;
         }
 
@@ -195,66 +154,66 @@ impl VariableHeaderRead for Connect{
     }
 }
 
-impl VariableHeaderWrite for Connect{
+impl VariableHeaderWrite for Connect {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-            "MQTT".write(buf)?;
-    
-            self.protocol_version.write(buf)?;
-    
-            let mut connect_flags = ConnectFlags::empty();
-    
-            if self.clean_session{
-                connect_flags |= ConnectFlags::CLEAN_START;
+        "MQTT".write(buf)?;
+
+        self.protocol_version.write(buf)?;
+
+        let mut connect_flags = ConnectFlags::empty();
+
+        if self.clean_session {
+            connect_flags |= ConnectFlags::CLEAN_START;
+        }
+        if let Some(last_will) = &self.last_will {
+            connect_flags |= ConnectFlags::WILL_FLAG;
+            if last_will.retain {
+                connect_flags |= ConnectFlags::WILL_RETAIN;
             }
-            if let Some(last_will) = &self.last_will {
-                connect_flags |= ConnectFlags::WILL_FLAG;
-                if last_will.retain{
-                    connect_flags |= ConnectFlags::WILL_RETAIN;
-                }
-                connect_flags |= last_will.qos.into();
-            }
-            if self.username.is_some(){
-                connect_flags |= ConnectFlags::USERNAME;
-            }
-            if self.password.is_some(){
-                connect_flags |= ConnectFlags::PASSWORD;
-            }
-    
-            buf.put_u8(connect_flags.bits());
-    
-            buf.put_u16(self.keep_alive);
-    
-            self.connect_properties.write(buf)?;
-    
-            self.client_id.write(buf)?;
-    
-            if let Some(last_will) = &self.last_will{
-                last_will.write(buf)?;
-            }
-            if let Some(username) = &self.username{
-                username.write(buf)?;
-            }
-            if let Some(password) = &self.password{
-                password.write(buf)?;
-            }
+            connect_flags |= last_will.qos.into();
+        }
+        if self.username.is_some() {
+            connect_flags |= ConnectFlags::USERNAME;
+        }
+        if self.password.is_some() {
+            connect_flags |= ConnectFlags::PASSWORD;
+        }
+
+        buf.put_u8(connect_flags.bits());
+
+        buf.put_u16(self.keep_alive);
+
+        self.connect_properties.write(buf)?;
+
+        self.client_id.write(buf)?;
+
+        if let Some(last_will) = &self.last_will {
+            last_will.write(buf)?;
+        }
+        if let Some(username) = &self.username {
+            username.write(buf)?;
+        }
+        if let Some(password) = &self.password {
+            password.write(buf)?;
+        }
         Ok(())
     }
 }
 
-impl WireLength for Connect{
+impl WireLength for Connect {
     fn wire_len(&self) -> usize {
         let mut len = "MQTT".wire_len() + 1 + 1 + 2; // protocol version, connect_flags and keep alive
 
         len += variable_integer_len(self.connect_properties.wire_len());
         len += self.connect_properties.wire_len();
 
-        if let Some(last_will) = &self.last_will{
+        if let Some(last_will) = &self.last_will {
             len += last_will.wire_len();
         }
-        if let Some(username) = &self.username{
+        if let Some(username) = &self.username {
             len += username.wire_len()
         }
-        if let Some(password) = &self.password{
+        if let Some(password) = &self.password {
             len += password.wire_len()
         }
 
@@ -281,7 +240,7 @@ bitflags! {
     }
 }
 
-impl From<QoS> for ConnectFlags{
+impl From<QoS> for ConnectFlags {
     fn from(q: QoS) -> Self {
         match q {
             QoS::AtMostOnce => ConnectFlags::empty(),
@@ -291,12 +250,11 @@ impl From<QoS> for ConnectFlags{
     }
 }
 
-
 /// Connect Properties
-/// 
-/// The wire representation starts with the length of all properties after which 
+///
+/// The wire representation starts with the length of all properties after which
 /// the identifiers and their actual value are given
-/// 
+///
 /// 3.1.2.11.1 Property Length
 /// The length of the Properties in the CONNECT packet Variable Header encoded as a Variable Byte Integer.
 /// Followed by all possible connect properties:
@@ -305,7 +263,7 @@ pub struct ConnectProperties {
     /// 3.1.2.11.2 Session Expiry Interval
     /// 17 (0x11) Byte Identifier of the Session Expiry Interval
     pub session_expiry_interval: Option<u32>,
-    
+
     /// 3.1.2.11.3 Receive Maximum
     /// 33 (0x21) Byte, Identifier of the Receive Maximum
     pub receive_maximum: Option<u16>,
@@ -339,169 +297,192 @@ pub struct ConnectProperties {
     pub authentication_data: Bytes,
 }
 
-impl MqttWrite for ConnectProperties{
+impl MqttWrite for ConnectProperties {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-            write_variable_integer(buf, self.wire_len())?;
-    
-            if let Some(session_expiry_interval) = self.session_expiry_interval{
-                PropertyType::SessionExpiryInterval.write(buf)?;
-                buf.put_u32(session_expiry_interval);
-            }
-            if let Some(receive_maximum) = self.receive_maximum{
-                PropertyType::ReceiveMaximum.write(buf)?;
-                buf.put_u16(receive_maximum);
-            }
-            if let Some(maximum_packet_size) = self.maximum_packet_size{
-                PropertyType::MaximumPacketSize.write(buf)?;
-                buf.put_u32(maximum_packet_size);
-            }
-            if let Some(topic_alias_maximum) = self.topic_alias_maximum{
-                PropertyType::TopicAliasMaximum.write(buf)?;
-                buf.put_u16(topic_alias_maximum);
-            }
-            if let Some(request_response_information) = self.request_response_information{
-                PropertyType::RequestResponseInformation.write(buf)?;
-                buf.put_u8(request_response_information);
-            }
-            if let Some(request_problem_information) = self.request_problem_information{
-                PropertyType::RequestProblemInformation.write(buf)?;
-                buf.put_u8(request_problem_information);
-            }
-            for (key, value) in &self.user_properties{
-                PropertyType::UserProperty.write(buf)?;
-                key.write(buf)?;
-                value.write(buf)?;
-            }
-            if let Some(authentication_method) = &self.authentication_method{
-                PropertyType::AuthenticationMethod.write(buf)?;
-                authentication_method.write(buf)?;
-            }
-            if !self.authentication_data.is_empty(){
-                if self.authentication_method.is_none(){
-                    return Err(SerializeError::AuthDataWithoutAuthMethod);
-                }
-                PropertyType::AuthenticationData.write(buf)?;
-                self.authentication_data.write(buf)?;
-            }
+        write_variable_integer(buf, self.wire_len())?;
 
-            Ok(())
+        if let Some(session_expiry_interval) = self.session_expiry_interval {
+            PropertyType::SessionExpiryInterval.write(buf)?;
+            buf.put_u32(session_expiry_interval);
+        }
+        if let Some(receive_maximum) = self.receive_maximum {
+            PropertyType::ReceiveMaximum.write(buf)?;
+            buf.put_u16(receive_maximum);
+        }
+        if let Some(maximum_packet_size) = self.maximum_packet_size {
+            PropertyType::MaximumPacketSize.write(buf)?;
+            buf.put_u32(maximum_packet_size);
+        }
+        if let Some(topic_alias_maximum) = self.topic_alias_maximum {
+            PropertyType::TopicAliasMaximum.write(buf)?;
+            buf.put_u16(topic_alias_maximum);
+        }
+        if let Some(request_response_information) = self.request_response_information {
+            PropertyType::RequestResponseInformation.write(buf)?;
+            buf.put_u8(request_response_information);
+        }
+        if let Some(request_problem_information) = self.request_problem_information {
+            PropertyType::RequestProblemInformation.write(buf)?;
+            buf.put_u8(request_problem_information);
+        }
+        for (key, value) in &self.user_properties {
+            PropertyType::UserProperty.write(buf)?;
+            key.write(buf)?;
+            value.write(buf)?;
+        }
+        if let Some(authentication_method) = &self.authentication_method {
+            PropertyType::AuthenticationMethod.write(buf)?;
+            authentication_method.write(buf)?;
+        }
+        if !self.authentication_data.is_empty() {
+            if self.authentication_method.is_none() {
+                return Err(SerializeError::AuthDataWithoutAuthMethod);
+            }
+            PropertyType::AuthenticationData.write(buf)?;
+            self.authentication_data.write(buf)?;
+        }
+
+        Ok(())
     }
 }
 
-impl MqttRead for ConnectProperties{
+impl MqttRead for ConnectProperties {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
-        
+
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData("ConnectProperties".to_string(), buf.len(), len));
+        } else if buf.len() < len {
+            return Err(DeserializeError::InsufficientData(
+                "ConnectProperties".to_string(),
+                buf.len(),
+                len,
+            ));
         }
 
-        let mut property_data =  buf.split_to(len);
-        
-        loop{
+        let mut property_data = buf.split_to(len);
+
+        loop {
             match PropertyType::read(&mut property_data)? {
                 PropertyType::SessionExpiryInterval => {
-                    if properties.session_expiry_interval.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
+                    if properties.session_expiry_interval.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::SessionExpiryInterval,
+                        ));
                     }
                     properties.session_expiry_interval = Some(property_data.get_u32());
-                },
+                }
                 PropertyType::ReceiveMaximum => {
-                    if properties.receive_maximum.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReceiveMaximum));
+                    if properties.receive_maximum.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ReceiveMaximum,
+                        ));
                     }
                     properties.receive_maximum = Some(property_data.get_u16());
-                },
+                }
                 PropertyType::MaximumPacketSize => {
-                    if properties.maximum_packet_size.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::MaximumPacketSize));
+                    if properties.maximum_packet_size.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::MaximumPacketSize,
+                        ));
                     }
                     properties.maximum_packet_size = Some(property_data.get_u32());
-                },
+                }
                 PropertyType::TopicAliasMaximum => {
-                    if properties.topic_alias_maximum.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::TopicAliasMaximum));
+                    if properties.topic_alias_maximum.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::TopicAliasMaximum,
+                        ));
                     }
                     properties.topic_alias_maximum = Some(property_data.get_u16());
-                },
+                }
                 PropertyType::RequestResponseInformation => {
-                    if properties.request_response_information.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::RequestResponseInformation));
+                    if properties.request_response_information.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::RequestResponseInformation,
+                        ));
                     }
                     properties.request_response_information = Some(property_data.get_u8());
-                },
+                }
                 PropertyType::RequestProblemInformation => {
-                    if properties.request_problem_information.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::RequestProblemInformation));
+                    if properties.request_problem_information.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::RequestProblemInformation,
+                        ));
                     }
                     properties.request_problem_information = Some(property_data.get_u8());
-                },
-                PropertyType::UserProperty => {
-                    properties.user_properties.push((String::read(&mut property_data)?,String::read(&mut property_data)?))
-                },
+                }
+                PropertyType::UserProperty => properties.user_properties.push((
+                    String::read(&mut property_data)?,
+                    String::read(&mut property_data)?,
+                )),
                 PropertyType::AuthenticationMethod => {
-                    if properties.authentication_method.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
+                    if properties.authentication_method.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::AuthenticationMethod,
+                        ));
                     }
                     properties.authentication_method = Some(String::read(&mut property_data)?);
-                },
+                }
                 PropertyType::AuthenticationData => {
-                    if properties.authentication_data.is_empty(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
+                    if properties.authentication_data.is_empty() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::AuthenticationData,
+                        ));
                     }
                     properties.authentication_data = Bytes::read(&mut property_data)?;
-                },
+                }
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
             }
-        
-            if property_data.is_empty(){
+
+            if property_data.is_empty() {
                 break;
             }
         }
 
-        if !properties.authentication_data.is_empty() && properties.authentication_method.is_none(){
-            return Err(DeserializeError::MalformedPacketWithInfo("Authentication data is not empty while authentication method is".to_string()));
+        if !properties.authentication_data.is_empty() && properties.authentication_method.is_none()
+        {
+            return Err(DeserializeError::MalformedPacketWithInfo(
+                "Authentication data is not empty while authentication method is".to_string(),
+            ));
         }
 
         Ok(properties)
     }
 }
 
-impl WireLength for ConnectProperties{
+impl WireLength for ConnectProperties {
     fn wire_len(&self) -> usize {
-        let mut len:usize = 0;
+        let mut len: usize = 0;
 
-        if self.session_expiry_interval.is_some(){
-            len+=1+4;
+        if self.session_expiry_interval.is_some() {
+            len += 1 + 4;
         }
-        if self.receive_maximum.is_some(){
-            len+=1+2;
+        if self.receive_maximum.is_some() {
+            len += 1 + 2;
         }
-        if self.maximum_packet_size.is_some(){
-            len+=1+4;
+        if self.maximum_packet_size.is_some() {
+            len += 1 + 4;
         }
-        if self.topic_alias_maximum.is_some(){
-            len+=1+2;
+        if self.topic_alias_maximum.is_some() {
+            len += 1 + 2;
         }
-        if self.request_response_information.is_some(){
-            len+=2;
+        if self.request_response_information.is_some() {
+            len += 2;
         }
-        if self.request_problem_information.is_some(){
-            len+=2;
+        if self.request_problem_information.is_some() {
+            len += 2;
         }
-        for (key, value) in &self.user_properties{
+        for (key, value) in &self.user_properties {
             len += 1;
             len += key.wire_len();
             len += value.wire_len();
         }
-        if let Some(authentication_method) = &self.authentication_method{
+        if let Some(authentication_method) = &self.authentication_method {
             len += 1 + authentication_method.wire_len();
         }
-        if !self.authentication_data.is_empty() && self.authentication_method.is_some(){
+        if !self.authentication_data.is_empty() && self.authentication_method.is_some() {
             len += 1 + self.authentication_data.wire_len();
         }
 
@@ -510,7 +491,7 @@ impl WireLength for ConnectProperties{
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct LastWill{
+pub struct LastWill {
     /// 3.1.2.6 Will QoS
     pub qos: QoS,
     /// 3.1.2.7 Will Retain
@@ -525,8 +506,13 @@ pub struct LastWill{
 }
 
 impl LastWill {
-    pub fn new<T: Into<String>, P: Into<Vec<u8>>>(qos: QoS, retain: bool, topic: T, payload: P) -> LastWill {
-        Self{
+    pub fn new<T: Into<String>, P: Into<Vec<u8>>>(
+        qos: QoS,
+        retain: bool,
+        topic: T,
+        payload: P,
+    ) -> LastWill {
+        Self {
             qos,
             retain,
             last_will_properties: LastWillProperties::default(),
@@ -534,12 +520,12 @@ impl LastWill {
             payload: Bytes::from(payload.into()),
         }
     }
-    pub fn read(qos: QoS, retain: bool, buf: &mut Bytes) -> Result<Self, DeserializeError>{
+    pub fn read(qos: QoS, retain: bool, buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let last_will_properties = LastWillProperties::read(buf)?;
         let topic = String::read(buf)?;
         let payload = Bytes::read(buf)?;
-        
-        Ok(Self{
+
+        Ok(Self {
             qos,
             retain,
             topic,
@@ -549,7 +535,7 @@ impl LastWill {
     }
 }
 
-impl MqttWrite for LastWill{
+impl MqttWrite for LastWill {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         self.last_will_properties.write(buf)?;
         self.topic.write(buf)?;
@@ -558,15 +544,14 @@ impl MqttWrite for LastWill{
     }
 }
 
-impl WireLength for LastWill{
-    fn wire_len(&self) -> usize{
+impl WireLength for LastWill {
+    fn wire_len(&self) -> usize {
         self.topic.wire_len() + self.payload.wire_len() + self.last_will_properties.wire_len()
     }
 }
 
-
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub struct LastWillProperties{
+pub struct LastWillProperties {
     /// 3.1.3.2.2 Will Delay Interval
     delay_interval: Option<u32>,
     /// 3.1.3.2.3 Payload Format Indicator
@@ -580,68 +565,84 @@ pub struct LastWillProperties{
     /// 3.1.3.2.7 Correlation Data
     correlation_data: Option<Bytes>,
     /// 3.1.3.2.8 User Property
-    user_properties: Vec::<(String, String)>,
+    user_properties: Vec<(String, String)>,
 }
 
-impl MqttRead for LastWillProperties{
+impl MqttRead for LastWillProperties {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let (len, _) = read_variable_integer(buf)?;
-        
+
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len{
-            return Err(DeserializeError::InsufficientData("LastWillProperties".to_string(), buf.len(), len));
+        } else if buf.len() < len {
+            return Err(DeserializeError::InsufficientData(
+                "LastWillProperties".to_string(),
+                buf.len(),
+                len,
+            ));
         }
 
-        let mut property_data =  buf.split_to(len);
+        let mut property_data = buf.split_to(len);
 
-        loop{
+        loop {
             match PropertyType::read(&mut property_data)? {
                 PropertyType::WillDelayInterval => {
-                    if properties.delay_interval.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::WillDelayInterval));
+                    if properties.delay_interval.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::WillDelayInterval,
+                        ));
                     }
                     properties.delay_interval = Some(u32::read(&mut property_data)?);
-                },
+                }
                 PropertyType::PayloadFormatIndicator => {
-                    if properties.payload_format_indicator.is_none(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator));
+                    if properties.payload_format_indicator.is_none() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::PayloadFormatIndicator,
+                        ));
                     }
                     properties.payload_format_indicator = Some(u8::read(&mut property_data)?);
-                },
+                }
                 PropertyType::MessageExpiryInterval => {
-                    if properties.message_expiry_interval.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval));
+                    if properties.message_expiry_interval.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::MessageExpiryInterval,
+                        ));
                     }
                     properties.message_expiry_interval = Some(u32::read(&mut property_data)?);
-                },
+                }
                 PropertyType::ContentType => {
-                    if properties.content_type.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ContentType));
+                    if properties.content_type.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ContentType,
+                        ));
                     }
                     properties.content_type = Some(String::read(&mut property_data)?);
-                },
+                }
                 PropertyType::ResponseTopic => {
-                    if properties.response_topic.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic));
+                    if properties.response_topic.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::ResponseTopic,
+                        ));
                     }
                     properties.response_topic = Some(String::read(&mut property_data)?);
-                },
+                }
                 PropertyType::CorrelationData => {
-                    if properties.correlation_data.is_some(){
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::CorrelationData));
+                    if properties.correlation_data.is_some() {
+                        return Err(DeserializeError::DuplicateProperty(
+                            PropertyType::CorrelationData,
+                        ));
                     }
                     properties.correlation_data = Some(Bytes::read(&mut property_data)?);
-                },
-                PropertyType::UserProperty => {
-                    properties.user_properties.push((String::read(&mut property_data)?,String::read(&mut property_data)?))
-                },
+                }
+                PropertyType::UserProperty => properties.user_properties.push((
+                    String::read(&mut property_data)?,
+                    String::read(&mut property_data)?,
+                )),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
             }
-        
-            if property_data.is_empty(){
+
+            if property_data.is_empty() {
                 break;
             }
         }
@@ -650,71 +651,83 @@ impl MqttRead for LastWillProperties{
     }
 }
 
-impl MqttWrite for LastWillProperties{
+impl MqttWrite for LastWillProperties {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         write_variable_integer(buf, self.wire_len())?;
 
-        if let Some(delay_interval) = self.delay_interval{
+        if let Some(delay_interval) = self.delay_interval {
             PropertyType::WillDelayInterval.write(buf)?;
             buf.put_u32(delay_interval);
         }
-        if let Some(payload_format_indicator) = self.payload_format_indicator{
+        if let Some(payload_format_indicator) = self.payload_format_indicator {
             PropertyType::PayloadFormatIndicator.write(buf)?;
             buf.put_u8(payload_format_indicator);
         }
-        if let Some(message_expiry_interval) = self.message_expiry_interval{
+        if let Some(message_expiry_interval) = self.message_expiry_interval {
             PropertyType::MessageExpiryInterval.write(buf)?;
             buf.put_u32(message_expiry_interval);
         }
-        if let Some(content_type) = &self.content_type{
+        if let Some(content_type) = &self.content_type {
             PropertyType::ContentType.write(buf)?;
             content_type.write(buf)?;
         }
-        if let Some(response_topic) = &self.response_topic{
+        if let Some(response_topic) = &self.response_topic {
             PropertyType::ResponseTopic.write(buf)?;
             response_topic.write(buf)?;
         }
-        if let Some(correlation_data) = &self.correlation_data{
+        if let Some(correlation_data) = &self.correlation_data {
             PropertyType::CorrelationData.write(buf)?;
             correlation_data.write(buf)?;
         }
-        if !self.user_properties.is_empty(){
-            for (key, value) in &self.user_properties{
+        if !self.user_properties.is_empty() {
+            for (key, value) in &self.user_properties {
                 PropertyType::UserProperty.write(buf)?;
                 key.write(buf)?;
                 value.write(buf)?;
-            } 
+            }
         }
         Ok(())
     }
 }
 
-impl WireLength for LastWillProperties{
-    fn wire_len(&self) -> usize{
-        let mut len:usize = 0;
+impl WireLength for LastWillProperties {
+    fn wire_len(&self) -> usize {
+        let mut len: usize = 0;
 
         len += self.delay_interval.map_or(0, |_| 5);
         len += self.payload_format_indicator.map_or(0, |_| 2);
         len += self.message_expiry_interval.map_or(0, |_| 5);
-        len += self.content_type.as_ref().map_or_else(|| 0, |s| s.wire_len());
-        len += self.response_topic.as_ref().map_or_else(|| 0, |s| s.wire_len());
-        len += self.correlation_data.as_ref().map_or_else(|| 0, |b| b.wire_len());
-        for (key, value) in &self.user_properties{
+        len += self
+            .content_type
+            .as_ref()
+            .map_or_else(|| 0, |s| s.wire_len());
+        len += self
+            .response_topic
+            .as_ref()
+            .map_or_else(|| 0, |s| s.wire_len());
+        len += self
+            .correlation_data
+            .as_ref()
+            .map_or_else(|| 0, |b| b.wire_len());
+        for (key, value) in &self.user_properties {
             len += key.wire_len() + value.wire_len();
         }
-        
+
         len
     }
 }
 
 #[cfg(test)]
-mod tests{
-    use crate::packets::{QoS, mqtt_traits::{VariableHeaderRead, VariableHeaderWrite, MqttWrite}};
+mod tests {
+    use crate::packets::{
+        mqtt_traits::{MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        QoS,
+    };
 
     use super::{Connect, LastWill};
 
     #[test]
-    fn read_connect(){
+    fn read_connect() {
         let mut buf = bytes::BytesMut::new();
         let packet = &[
             // 0x10,
@@ -727,22 +740,22 @@ mod tests{
             b'T',
             0x05,
             0b1100_1110, // Connect Flags, username, password, will retain=false, will qos=1, last_will, clean_session
-            0x00, // Keep alive = 10 sec
-            0x0a, 
+            0x00,        // Keep alive = 10 sec
+            0x0a,
             0x00, // Length of Connect properties
             0x00, // client_id length
-            0x04, 
+            0x04,
             b't', // client_id
-            b'e', 
-            b's', 
-            b't', 
+            b'e',
+            b's',
+            b't',
             0x00, // Will properties length
             0x00, // length topic
-            0x02, 
+            0x02,
             b'/', // Will topic = '/a'
-            b'a', 
-            0x00, // Will payload length 
-            0x0B, 
+            b'a',
+            0x00, // Will payload length
+            0x0B,
             b'h', // Will payload = 'hello world'
             b'e',
             b'l',
@@ -759,27 +772,26 @@ mod tests{
             b'u', // username = 'user'
             b's',
             b'e',
-            b'r', 
+            b'r',
             0x00, // length password
             0x04,
             b'p', // Password = 'pass'
-            b'a', 
-            b's', 
-            b's', 
+            b'a',
+            b's',
+            b's',
             0xAB, // extra packets in the stream
             0xCD,
             0xEF,
         ];
 
         buf.extend_from_slice(packet);
-        let c = Connect::read(0, 0,  buf.into()).unwrap();
+        let c = Connect::read(0, 0, buf.into()).unwrap();
 
         dbg!(c);
-
     }
 
     #[test]
-    fn read_and_write_connect(){
+    fn read_and_write_connect() {
         let mut buf = bytes::BytesMut::new();
         let packet = &[
             // 0x10,
@@ -792,22 +804,22 @@ mod tests{
             b'T',
             0x05,        // variable header
             0b1100_1110, // variable header. +username, +password, -will retain, will qos=1, +last_will, +clean_session
-            0x00, // Keep alive = 10 sec
-            0x0a, 
+            0x00,        // Keep alive = 10 sec
+            0x0a,
             0x00, // Length of Connect properties
             0x00, // client_id length
-            0x04, 
+            0x04,
             b't', // client_id
-            b'e', 
-            b's', 
-            b't', 
+            b'e',
+            b's',
+            b't',
             0x00, // Will properties length
             0x00, // length topic
-            0x02, 
+            0x02,
             b'/', // Will topic = '/a'
-            b'a', 
-            0x00, // Will payload length 
-            0x0B, 
+            b'a',
+            0x00, // Will payload length
+            0x0B,
             b'h', // Will payload = 'hello world'
             b'e',
             b'l',
@@ -824,17 +836,17 @@ mod tests{
             b'u', // username
             b's',
             b'e',
-            b'r', 
+            b'r',
             0x00, // length password
             0x04,
             b'p', // payload. password = 'pass'
-            b'a', 
-            b's', 
-            b's', 
+            b'a',
+            b's',
+            b's',
         ];
 
         buf.extend_from_slice(packet);
-        let c = Connect::read(0, 0,  buf.into()).unwrap();
+        let c = Connect::read(0, 0, buf.into()).unwrap();
 
         let mut write_buf = bytes::BytesMut::new();
         c.write(&mut write_buf).unwrap();
@@ -842,49 +854,41 @@ mod tests{
         assert_eq!(packet.to_vec(), write_buf.to_vec());
 
         dbg!(c);
-
     }
 
     #[test]
-    fn parsing_last_will(){
+    fn parsing_last_will() {
         let last_will = &[
             0x00, // Will properties length
             0x00, // length topic
-            0x02, 
-            b'/', // Will topic = '/a'
-            b'a', 
-            0x00, // Will payload length 
-            0x0B, 
-            b'h', // Will payload = 'hello world'
-            b'e',
-            b'l',
-            b'l',
-            b'o',
-            b' ',
-            b'w',
-            b'o',
-            b'r',
-            b'l',
-            b'd',
+            0x02, b'/', // Will topic = '/a'
+            b'a', 0x00, // Will payload length
+            0x0B, b'h', // Will payload = 'hello world'
+            b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd',
         ];
         let mut buf = bytes::Bytes::from_static(last_will);
 
         dbg!(LastWill::read(QoS::AtLeastOnce, false, &mut buf));
-
     }
 
     #[test]
-    fn read_and_write_connect2(){
-        let _packet = [0x10, 0x1d, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff,
-        0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73, 0x74];
+    fn read_and_write_connect2() {
+        let _packet = [
+            0x10, 0x1d, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11,
+            0xff, 0xff, 0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54,
+            0x65, 0x73, 0x74,
+        ];
 
-        let data = [0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff,
-        0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73, 0x74];
+        let data = [
+            0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff,
+            0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73,
+            0x74,
+        ];
 
         let mut buf = bytes::BytesMut::new();
         buf.extend_from_slice(&data);
 
-        let c = Connect::read(0, 0,  buf.into()).unwrap();
+        let c = Connect::read(0, 0, buf.into()).unwrap();
 
         dbg!(c.clone());
 
@@ -895,26 +899,14 @@ mod tests{
     }
 
     #[test]
-    fn parsing_and_writing_last_will(){
+    fn parsing_and_writing_last_will() {
         let last_will = &[
             0x00, // Will properties length
             0x00, // length topic
-            0x02, 
-            b'/', // Will topic = '/a'
-            b'a', 
-            0x00, // Will payload length 
-            0x0B, 
-            b'h', // Will payload = 'hello world'
-            b'e',
-            b'l',
-            b'l',
-            b'o',
-            b' ',
-            b'w',
-            b'o',
-            b'r',
-            b'l',
-            b'd',
+            0x02, b'/', // Will topic = '/a'
+            b'a', 0x00, // Will payload length
+            0x0B, b'h', // Will payload = 'hello world'
+            b'e', b'l', b'l', b'o', b' ', b'w', b'o', b'r', b'l', b'd',
         ];
         let mut buf = bytes::Bytes::from_static(last_will);
 

@@ -1,2 +1,2 @@
-pub mod timeout;
 pub mod constants;
+pub mod timeout;

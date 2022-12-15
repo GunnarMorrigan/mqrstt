@@ -1,12 +1,12 @@
-use bytes::{BytesMut, Bytes};
+use bytes::{Bytes, BytesMut};
 
 use super::error::{DeserializeError, SerializeError};
 
 pub trait VariableHeaderRead: Sized {
-    fn read(flags: u8, remaining_length: usize,  buf: Bytes) -> Result<Self, DeserializeError>;
+    fn read(flags: u8, remaining_length: usize, buf: Bytes) -> Result<Self, DeserializeError>;
 }
 
-pub trait VariableHeaderWrite: Sized{
+pub trait VariableHeaderWrite: Sized {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 
@@ -14,11 +14,11 @@ pub trait WireLength {
     fn wire_len(&self) -> usize;
 }
 
-pub trait MqttRead: Sized{
+pub trait MqttRead: Sized {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>;
 }
 
-pub trait MqttWrite: Sized{
+pub trait MqttWrite: Sized {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 
@@ -28,4 +28,3 @@ pub trait SimpleSerialize: Sized {
 
     fn write(&self, buf: &mut BytesMut);
 }
-
