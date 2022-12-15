@@ -53,7 +53,7 @@ pub struct Hello{}
 
 impl EventHandler for Hello{
 
-    fn handle<'a> (&mut self, event: &'a Packet) -> impl core::future::Future<Output = ()> + Send + 'a{
+    fn handle<'a> (&mut self, _event: &'a Packet) -> impl core::future::Future<Output = ()> + Send + 'a{
         async move {
             // tracing::warn!("Received event {:?}", event);
         }
@@ -62,13 +62,13 @@ impl EventHandler for Hello{
 
 #[cfg(test)]
 mod tests {
-    use async_channel::Receiver;
+    
     use futures_concurrency::future::Join;
-    use tokio::{net::TcpStream, join};
-    use tracing::{Level, warn, info, debug};
+    
+    use tracing::{Level};
     use tracing_subscriber::FmtSubscriber;
 
-    use crate::{connect_options::ConnectOptions, create_new_tcp, Hello, error::{ClientError, MqttError}, packets::QoS};
+    use crate::{connect_options::ConnectOptions, create_new_tcp, Hello, error::{ClientError}, packets::QoS};
 
     #[tokio::test(flavor = "multi_thread")]
     async fn create(){
@@ -89,7 +89,7 @@ mod tests {
         // let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
         let opt = ConnectOptions::new("azurewe1576.azureexternal.dnvgl.com".to_string(), 1883, "test123123".to_string());
 
-        let (mut mqtt_network, mut handler, client, r) = create_new_tcp(opt);
+        let (mut mqtt_network, handler, client, _r) = create_new_tcp(opt);
     
         let network = tokio::task::spawn(async move{
             dbg!(mqtt_network.run_with_shutdown_signal().await)
@@ -116,7 +116,7 @@ mod tests {
         });
 
         // dbg!(network.await);
-        let a = dbg!((network, event_handler, sender).join().await);
+        let _a = dbg!((network, event_handler, sender).join().await);
         // println!("Hello {:?}", a);
     }
 }

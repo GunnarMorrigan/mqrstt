@@ -1,6 +1,6 @@
 use bytes::BufMut;
 
-use super::{reason_codes::{PubRecReasonCode, self}, mqtt_traits::{MqttRead, MqttWrite, WireLength, VariableHeaderRead, VariableHeaderWrite}, read_variable_integer, error::DeserializeError, PropertyType, PacketType, variable_integer_len, write_variable_integer};
+use super::{reason_codes::{PubRecReasonCode}, mqtt_traits::{MqttRead, MqttWrite, WireLength, VariableHeaderRead, VariableHeaderWrite}, read_variable_integer, error::DeserializeError, PropertyType, PacketType, write_variable_integer};
 
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -171,7 +171,7 @@ mod tests{
             0x00, // Reason code success
             0x00, // no properties
         ];
-        let mut buf = Bytes::from(&stream[..]);
+        let buf = Bytes::from(&stream[..]);
         let p_ack = PubRec::read(0, 4, buf).unwrap();
 
         let expected = PubRec{

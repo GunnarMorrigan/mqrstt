@@ -1,16 +1,16 @@
-use std::{io::{self, ErrorKind, Error}, sync::Arc};
+use std::{io::{self, ErrorKind, Error}};
 
 use bytes::{BytesMut, Buf};
-use tokio::net::tcp::{ReadHalf, OwnedReadHalf};
+use tokio::net::tcp::{OwnedReadHalf};
 #[cfg(feature = "tokio")]
-use tokio::{io::{AsyncWriteExt, AsyncReadExt}, net::TcpStream, sync::Mutex};
+use tokio::{io::{AsyncWriteExt, AsyncReadExt}, net::TcpStream};
 #[cfg(feature = "smol")]
 use smol::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 
-use tracing::debug;
+
 
 use crate::{error::ConnectionError, connect_options::ConnectOptions, network::Incoming, connections::{tcp_tokio::AsyncMqttNetworkWrite, create_connect_from_options}};
-use crate::packets::{connect::Connect, error::ReadBytes, packets::{Packet, FixedHeader}};
+use crate::packets::{error::ReadBytes, packets::{Packet, FixedHeader}};
 
 use super::{AsyncMqttNetworkRead, tcp_writer::TcpWriter};
 

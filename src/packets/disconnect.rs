@@ -1,4 +1,4 @@
-use super::{reason_codes::{DisconnectReasonCode, self}, mqtt_traits::{VariableHeaderRead, WireLength, VariableHeaderWrite, MqttRead, MqttWrite}, error::DeserializeError, PropertyType, PacketType, read_variable_integer};
+use super::{reason_codes::{DisconnectReasonCode}, mqtt_traits::{VariableHeaderRead, WireLength, VariableHeaderWrite, MqttRead, MqttWrite}, error::DeserializeError, PropertyType, PacketType, read_variable_integer};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Disconnect{
@@ -108,7 +108,7 @@ impl MqttRead for DisconnectProperties{
 }
 
 impl MqttWrite for DisconnectProperties{
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+    fn write(&self, _buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         todo!()
     }
 }

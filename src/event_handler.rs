@@ -11,7 +11,7 @@ use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
 use crate::packets::packets::{Packet, PacketType};
 use crate::state::State;
 
-use futures_concurrency::future::{Race, Join};
+use futures_concurrency::future::{Join};
 
 // use crate::{Incoming, MqttOptions, MqttState, Outgoing, Packet, Request, StateError, Transport};
 
@@ -110,7 +110,7 @@ impl EventHandlerTask {
         // We do not use an select! because that has a high possibility of data loss.
         // Instead, we use a endless loop of which both are polled.
         // Nevertheless, they are raced because they only return if there is a fatel error
-        let r: (Result<(), MqttError>, Result<(), MqttError>) = (a,b).join().await;
+        let _r: (Result<(), MqttError>, Result<(), MqttError>) = (a,b).join().await;
         error!("Ending event_handler.handle()");
         todo!()
     }
@@ -239,7 +239,7 @@ impl EventHandlerTask {
             Packet::Publish(publish) => self.handle_outgoing_publish(publish).await,
             Packet::Subscribe(sub) => self.handle_outgoing_subscribe(sub).await,
             Packet::Unsubscribe(unsub) => self.handle_outgoing_unsubscribe(unsub).await,
-            Packet::Disconnect(p) => todo!(),
+            Packet::Disconnect(_p) => todo!(),
             Packet::Auth(_) => todo!(),
 
             _ => unreachable!()

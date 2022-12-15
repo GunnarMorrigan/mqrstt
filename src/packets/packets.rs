@@ -1,7 +1,7 @@
 use core::slice::Iter;
-use std::io;
 
-use bytes::{BytesMut, BufMut, Bytes, Buf};
+
+use bytes::{BytesMut, BufMut, Bytes};
 
 use super::error::{SerializeError, DeserializeError, ReadBytes};
 use super::mqtt_traits::{VariableHeaderWrite, WireLength, VariableHeaderRead};
@@ -246,7 +246,7 @@ impl PacketType{
 
 #[cfg(test)]
 mod tests{
-    use crate::packets::packets::Packet;
+    
 
     #[test]
     fn connect_read_write(){

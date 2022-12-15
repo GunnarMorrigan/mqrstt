@@ -20,7 +20,7 @@ pub mod packets;
 use bytes::{BufMut, Bytes, BytesMut, Buf};
 use core::slice::Iter;
 
-use self::mqtt_traits::{WireLength, MqttRead, MqttWrite, VariableHeaderWrite};
+use self::mqtt_traits::{WireLength, MqttRead, MqttWrite};
 use self::error::{DeserializeError, SerializeError, ReadBytes};
 
 use self::connect::ConnectFlags;

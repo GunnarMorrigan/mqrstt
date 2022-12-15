@@ -1,6 +1,6 @@
 use bytes::BufMut;
 
-use super::{reason_codes::{UnsubAckReasonCode}, read_variable_integer, PropertyType, PacketType, write_variable_integer, variable_integer_len};
+use super::{reason_codes::{UnsubAckReasonCode}, read_variable_integer, PropertyType, PacketType, write_variable_integer};
 use super::error::{DeserializeError, SerializeError};
 use super::mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite};
 

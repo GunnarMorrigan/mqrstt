@@ -1,6 +1,6 @@
 use async_channel::{Receiver, Sender};
 use bytes::Bytes;
-use tracing::{debug, info};
+use tracing::{info};
 
 use crate::{packets::{packets::Packet, subscribe::{Subscribe, Subscription, SubscribeProperties}, QoS, publish::{Publish, PublishProperties}, unsubscribe::{Unsubscribe, UnsubscribeTopics, UnsubscribeProperties}}, error::ClientError};
 

@@ -1,4 +1,4 @@
-use super::{error::DeserializeError, read_variable_integer, reason_codes::ConAckReasonCode, QoS, PropertyType, PacketType, mqtt_traits::{MqttRead, VariableHeaderRead, SimpleSerialize, VariableHeaderWrite}};
+use super::{error::DeserializeError, read_variable_integer, reason_codes::ConAckReasonCode, QoS, PropertyType, PacketType, mqtt_traits::{MqttRead, VariableHeaderRead, SimpleSerialize}};
 use bitflags::bitflags;
 use bytes::{Buf, Bytes};
 

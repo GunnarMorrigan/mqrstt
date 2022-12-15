@@ -1,4 +1,4 @@
-use super::{mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite}, QoS, read_variable_integer, PropertyType, error::DeserializeError, PacketType, variable_integer_len, write_variable_integer};
+use super::{mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite}, read_variable_integer, PropertyType, error::DeserializeError, PacketType, write_variable_integer};
 use bytes::{BufMut};
 
 

@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_channel::{Sender, Receiver};
 use async_mutex::Mutex;
-use bytes::{BytesMut};
+
 #[cfg(feature = "smol")]
 use smol::net::TcpStream;
 use std::time::Instant;
@@ -98,7 +98,7 @@ impl<R,W> MqttNetwork<R,W>
                 }
             };
 
-            let res: (Result<(), ConnectionError>, Result<(), ConnectionError>) = (a,b).join().await;
+            let _res: (Result<(), ConnectionError>, Result<(), ConnectionError>) = (a,b).join().await;
         }
         Ok(())
     }

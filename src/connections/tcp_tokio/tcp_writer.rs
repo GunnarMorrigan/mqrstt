@@ -1,8 +1,8 @@
 use async_channel::Receiver;
 use bytes::BytesMut;
-use tokio::net::tcp::{WriteHalf, OwnedWriteHalf};
+use tokio::net::tcp::{OwnedWriteHalf};
 #[cfg(feature = "tokio")]
-use tokio::{io::{AsyncWriteExt,}, net::TcpStream};
+use tokio::{io::{AsyncWriteExt,}};
 #[cfg(feature = "smol")]
 use smol::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpStream};
 use tracing::trace;

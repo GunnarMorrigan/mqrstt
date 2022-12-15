@@ -1,4 +1,4 @@
-use super::{mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite}, QoS, read_variable_integer, PropertyType, error::DeserializeError, PacketType, variable_integer_len, write_variable_integer};
+use super::{mqtt_traits::{VariableHeaderRead, MqttRead, MqttWrite, WireLength, VariableHeaderWrite}, read_variable_integer, PropertyType, error::DeserializeError, PacketType, variable_integer_len, write_variable_integer};
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 
@@ -243,7 +243,7 @@ impl From<&[&str]> for Subscription{
 mod tests{
     use bytes::{BufMut, Bytes, BytesMut};
 
-    use crate::packets::{mqtt_traits::{MqttRead, VariableHeaderRead, VariableHeaderWrite}, read_variable_integer, packets::Packet};
+    use crate::packets::{mqtt_traits::{MqttRead, VariableHeaderRead, VariableHeaderWrite}, packets::Packet};
 
     use super::{WireLength, MqttWrite};
 
@@ -252,7 +252,7 @@ mod tests{
     #[test]
     fn test_read_write_subscribe(){
 
-        let entire_sub_packet = [0x82, 0x1e, 0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69,
+        let _entire_sub_packet = [0x82, 0x1e, 0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69,
         0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x15];
         
         let sub_data = [0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69,
