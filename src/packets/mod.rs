@@ -70,7 +70,7 @@ impl QoS {
             _ => Err(DeserializeError::UnknownQoS(value)),
         }
     }
-    pub fn into_u8(&self) -> u8 {
+    pub fn into_u8(self) -> u8 {
         match self {
             QoS::AtMostOnce => 0,
             QoS::AtLeastOnce => 1,
@@ -212,9 +212,11 @@ impl MqttRead for bool {
 impl MqttWrite for bool {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         if *self {
-            Ok(buf.put_u8(1))
+            buf.put_u8(1);
+            Ok(())
         } else {
-            Ok(buf.put_u8(0))
+            buf.put_u8(0);
+            Ok(())
         }
     }
 }

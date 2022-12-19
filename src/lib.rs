@@ -86,7 +86,7 @@ pub fn create_new(
         &options,
         network_to_handler_r,
         to_network_s.clone(),
-        client_to_handler_r.clone(),
+        client_to_handler_r,
         last_network_action.clone(),
     );
 

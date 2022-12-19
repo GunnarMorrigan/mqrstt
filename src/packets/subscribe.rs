@@ -38,7 +38,7 @@ impl VariableHeaderRead for Subscribe {
 
             topics.push((topic, options));
 
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }
@@ -133,7 +133,7 @@ impl MqttRead for SubscribeProperties {
                 }
             }
 
-            if properties_data.len() == 0 {
+            if properties_data.is_empty() {
                 break;
             }
         }

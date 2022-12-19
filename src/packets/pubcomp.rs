@@ -137,7 +137,7 @@ impl MqttRead for PubCompProperties {
                     .push((String::read(buf)?, String::read(buf)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubComp)),
             }
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }

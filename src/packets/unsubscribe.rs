@@ -26,7 +26,7 @@ impl VariableHeaderRead for Unsubscribe {
 
             topics.push(topic);
 
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }
@@ -97,7 +97,7 @@ impl MqttRead for UnsubscribeProperties {
                 }
             }
 
-            if properties_data.len() == 0 {
+            if properties_data.is_empty() {
                 break;
             }
         }

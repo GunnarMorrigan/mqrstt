@@ -30,7 +30,7 @@ impl VariableHeaderRead for UnsubAck {
 
             reason_codes.push(reason_code);
 
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }
@@ -106,7 +106,7 @@ impl MqttRead for UnsubAckProperties {
                 }
             }
 
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }

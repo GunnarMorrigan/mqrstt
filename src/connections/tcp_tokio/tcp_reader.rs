@@ -108,8 +108,7 @@ impl TcpReader {
 impl AsyncMqttNetworkRead for TcpReader {
     type W = TcpWriter;
 
-    fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_
-    {
+    fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_ {
         async {
             let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
             // debug!("Created TCP connection");

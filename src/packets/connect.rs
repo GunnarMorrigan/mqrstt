@@ -126,18 +126,16 @@ impl VariableHeaderRead for Connect {
             last_will = Some(LastWill::read(qos, retain, &mut buf)?);
         }
 
-        let username;
-        let password;
-        if connect_flags.contains(ConnectFlags::USERNAME) {
-            username = Some(String::read(&mut buf)?);
+        let username = if connect_flags.contains(ConnectFlags::USERNAME) {
+            Some(String::read(&mut buf)?)
         } else {
-            username = None;
-        }
-        if connect_flags.contains(ConnectFlags::PASSWORD) {
-            password = Some(String::read(&mut buf)?);
+            None
+        };
+        let password = if connect_flags.contains(ConnectFlags::PASSWORD) {
+            Some(String::read(&mut buf)?)
         } else {
-            password = None;
-        }
+            None
+        };
 
         let connect = Connect {
             protocol_version,

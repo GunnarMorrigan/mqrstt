@@ -63,19 +63,16 @@ impl VariableHeaderWrite for PubRel {
         if self.reason_code == PubRelReasonCode::Success
             && self.properties.reason_string.is_none()
             && self.properties.user_properties.is_empty(){
-            return Ok(());
         }
         else if self.properties.reason_string.is_none()
             && self.properties.user_properties.is_empty(){
             self.reason_code.write(buf)?;
-            return Ok(());
         }
         else{
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
-    
-            Ok(())
         }
+        Ok(())
     }
 }
 
@@ -96,7 +93,7 @@ impl WireLength for PubRel {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
 pub struct PubRelProperties {
     pub reason_string: Option<String>,
     pub user_properties: Vec<(String, String)>,
@@ -105,15 +102,6 @@ pub struct PubRelProperties {
 impl PubRelProperties {
     pub fn is_empty(&self) -> bool {
         self.reason_string.is_none() && self.user_properties.is_empty()
-    }
-}
-
-impl Default for PubRelProperties {
-    fn default() -> Self {
-        Self {
-            reason_string: Default::default(),
-            user_properties: Default::default(),
-        }
     }
 }
 
@@ -149,7 +137,7 @@ impl MqttRead for PubRelProperties {
                     .push((String::read(buf)?, String::read(buf)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubRel)),
             }
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }

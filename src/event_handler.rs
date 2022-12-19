@@ -150,6 +150,8 @@ impl EventHandlerTask {
             Packet::PubRec(pubrec) => self.handle_incoming_pubrec(&pubrec).await?,
             Packet::PubRel(pubrel) => self.handle_incoming_pubrel(&pubrel).await?,
             Packet::PubComp(pubcomp) => self.handle_incoming_pubcomp(&pubcomp).await?,
+            Packet::SubAck(suback) => todo!("Implement these functions"),
+            Packet::UnsubAck(unsuback) => todo!("Implement these functions"),
             Packet::PingResp => self.handle_incoming_pingresp().await,
             _ => unreachable!(),
         };
@@ -330,7 +332,7 @@ impl EventHandlerTask {
 
     async fn handle_outgoing_subscribe(&self, sub: Subscribe) -> Result<(), MqttError> {
         let mut outgoing_sub = self.state.outgoing_sub.lock().await;
-        if let Some(_) = outgoing_sub.insert(sub.packet_identifier, sub.clone()) {
+        if outgoing_sub.insert(sub.packet_identifier, sub.clone()).is_some() {
             error!(
                 "Encountered a colliding packet ID ({}) in a subscribe packet",
                 sub.packet_identifier,
@@ -343,7 +345,7 @@ impl EventHandlerTask {
 
     async fn handle_outgoing_unsubscribe(&self, unsub: Unsubscribe) -> Result<(), MqttError> {
         let mut outgoing_unsub = self.state.outgoing_unsub.lock().await;
-        if let Some(_) = outgoing_unsub.insert(unsub.packet_identifier, unsub.clone()) {
+        if outgoing_unsub.insert(unsub.packet_identifier, unsub.clone()).is_some() {
             error!(
                 "Encountered a colliding packet ID ({}) in a unsubscribe packet",
                 unsub.packet_identifier,
@@ -374,7 +376,7 @@ mod HandlerTests{
     use async_channel::{Receiver, Sender};
     use async_mutex::Mutex;
 
-    use crate::{event_handler::{EventHandlerTask, EventHandler}, connect_options::ConnectOptions, packets::{packets::{Packet, PacketType}, QoS, pubrel::{PubRel, PubRelProperties}, reason_codes::{PubRelReasonCode, PubRecReasonCode, PubCompReasonCode}, pubrec::{PubRec, PubRecProperties}, pubcomp::{self, PubComp, PubCompProperties}}, tests::resources::test_packets::{create_publish_packet, create_puback_packet, create_disconnect_packet}, client::AsyncClient};
+    use crate::{event_handler::{EventHandlerTask, EventHandler}, connect_options::ConnectOptions, packets::{packets::{Packet, PacketType}, QoS, pubrel::{PubRel, PubRelProperties}, reason_codes::{PubRelReasonCode, PubRecReasonCode, PubCompReasonCode, SubAckReasonCode}, pubrec::{PubRec, PubRecProperties}, pubcomp::{self, PubComp, PubCompProperties}, suback::{SubAck, SubAckProperties}}, tests::resources::test_packets::{create_publish_packet, create_puback_packet, create_disconnect_packet, create_subscribe_packet}, client::AsyncClient};
 
 
     pub struct Nop {}
@@ -439,6 +441,7 @@ mod HandlerTests{
         assert!(handler.state.incoming_pub.lock().await.is_empty());
         assert!(handler.state.outgoing_pub.lock().await.is_empty());
         assert!(handler.state.outgoing_rel.lock().await.is_empty());
+        assert!(handler.state.outgoing_sub.lock().await.is_empty());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -491,7 +494,7 @@ mod HandlerTests{
         
         let publish = to_network_r.recv().await.unwrap();
         
-        assert_eq!(publish, pub_packet);
+        assert_eq!(pub_packet, publish);
 
         let puback = create_puback_packet(1);
 
@@ -507,6 +510,7 @@ mod HandlerTests{
         assert!(handler.state.incoming_pub.lock().await.is_empty());
         assert!(handler.state.outgoing_pub.lock().await.is_empty());
         assert!(handler.state.outgoing_rel.lock().await.is_empty());
+        assert!(handler.state.outgoing_sub.lock().await.is_empty());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -567,7 +571,7 @@ mod HandlerTests{
         
         let publish = to_network_r.recv().await.unwrap();
         
-        assert_eq!(publish, pub_packet);
+        assert_eq!(pub_packet, publish);
 
         let pubrec = Packet::PubRec(PubRec{
             packet_identifier: 1,
@@ -603,5 +607,44 @@ mod HandlerTests{
         assert!(handler.state.incoming_pub.lock().await.is_empty());
         assert!(handler.state.outgoing_pub.lock().await.is_empty());
         assert!(handler.state.outgoing_rel.lock().await.is_empty());
+        assert!(handler.state.outgoing_sub.lock().await.is_empty());
     }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn outgoing_subscribe(){
+        
+        let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
+        
+        let mut nop = Nop{};
+        
+        let handler_task = tokio::task::spawn(async move {
+            handler.handle(&mut nop).await;
+            return handler;
+        });
+
+        let sub_packet = create_subscribe_packet(1);
+        
+        client_to_handler_s.send(sub_packet.clone()).await.unwrap();
+        
+        let sub_result = to_network_r.recv().await.unwrap();
+        
+        assert_eq!(sub_packet, sub_result);
+
+        let suback = Packet::SubAck(SubAck{
+            packet_identifier: 1,
+            reason_codes: vec![SubAckReasonCode::GrantedQoS0],
+            properties: SubAckProperties::default(),
+        });
+
+        network_to_handler_s.send(suback).await.unwrap();
+
+        drop(client_to_handler_s);
+        
+        let handler = handler_task.await.unwrap();
+        assert!(handler.state.incoming_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_rel.lock().await.is_empty());
+        assert!(handler.state.outgoing_sub.lock().await.is_empty());
+    }
+
 }

@@ -71,7 +71,8 @@ impl VariableHeaderRead for Publish {
         }
 
         let publish_properties = PublishProperties::read(&mut buf)?;
-
+        
+        todo!("Fix this below");
         let payload_len = remaining_length - remaining_length;
         if buf.len() < payload_len {
             return Err(DeserializeError::InsufficientData(
@@ -124,7 +125,7 @@ impl WireLength for Publish {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct PublishProperties {
     /// 3.3.2.3.2 Payload Format Indicator
     /// 1 (0x01) Byte, Identifier of the Payload Format Indicator.
@@ -157,21 +158,6 @@ pub struct PublishProperties {
     /// 3.3.2.3.9 Content Type
     /// 3 (0x03) Identifier of the Content Type
     pub(crate) content_type: Option<String>,
-}
-
-impl Default for PublishProperties {
-    fn default() -> Self {
-        Self {
-            payload_format_indicator: Default::default(),
-            message_expiry_interval: Default::default(),
-            topic_alias: Default::default(),
-            response_topic: Default::default(),
-            correlation_data: Default::default(),
-            subscription_identifier: Default::default(),
-            user_properties: Default::default(),
-            content_type: Default::default(),
-        }
-    }
 }
 
 impl MqttRead for PublishProperties {

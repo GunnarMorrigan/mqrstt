@@ -87,7 +87,7 @@ where
 
             let incoming = async {
                 loop {
-                    let local_disconnect = reader.read_direct(&network_to_handler_s).await?;
+                    let local_disconnect = reader.read_direct(network_to_handler_s).await?;
                     *(last_network_action.lock().await) = std::time::Instant::now();
                     if local_disconnect{
                         disconnect.store(true, Ordering::Release);
@@ -101,7 +101,7 @@ where
 
             let outgoing = async {
                 loop {
-                    let local_disconnect = writer.write(&to_network_r).await?;
+                    let local_disconnect = writer.write(to_network_r).await?;
                     *(last_network_action.lock().await) = std::time::Instant::now();
                     if local_disconnect{
                         disconnect.store(true, Ordering::Release);

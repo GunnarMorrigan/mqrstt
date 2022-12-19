@@ -200,12 +200,6 @@ impl Packet {
         };
         Ok(packet)
     }
-    pub fn is_connack(&self) -> bool {
-        match self {
-            Packet::ConnAck(_) => true,
-            _ => false,
-        }
-    }
 }
 
 impl Display for Packet{
@@ -259,7 +253,7 @@ impl FixedHeader {
         let first_byte = header.next().unwrap();
 
         let (packet_type, flags) =
-            PacketType::from_first_byte(*first_byte).map_err(|err| ReadBytes::Err(err))?;
+            PacketType::from_first_byte(*first_byte).map_err(ReadBytes::Err)?;
 
         let (remaining_length, length) = read_fixed_header_rem_len(header)?;
 

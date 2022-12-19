@@ -32,7 +32,7 @@ impl VariableHeaderRead for SubAck {
 
             reason_codes.push(reason_code);
 
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }
@@ -109,7 +109,7 @@ impl MqttRead for SubAckProperties {
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::SubAck)),
             }
 
-            if buf.len() == 0 {
+            if buf.is_empty() {
                 break;
             }
         }

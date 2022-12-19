@@ -1,6 +1,6 @@
 use bytes::Bytes;
 
-use crate::packets::{packets::Packet, publish::{Publish, PublishProperties}, QoS, puback::{PubAck, PubAckProperties}, reason_codes::{PubAckReasonCode, DisconnectReasonCode}, disconnect::{Disconnect, DisconnectProperties}, pubrel::PubRel};
+use crate::packets::{packets::Packet, publish::{Publish, PublishProperties}, QoS, puback::{PubAck, PubAckProperties}, reason_codes::{PubAckReasonCode, DisconnectReasonCode}, disconnect::{Disconnect, DisconnectProperties}, pubrel::PubRel, subscribe::{Subscription, Subscribe}};
 
 
 pub fn publish_packets() -> Vec::<Packet>{
@@ -90,6 +90,13 @@ pub fn publish_packets() -> Vec::<Packet>{
     ret.push(packet);
 
     ret
+}
+
+
+pub fn create_subscribe_packet(packet_identifier: u16) -> Packet{
+        let subscription: Subscription = "test/topic".into();
+        let sub = Subscribe::new(packet_identifier, subscription.0);
+        Packet::Subscribe(sub)
 }
 
 pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifier: Option<u16>) -> Packet{
