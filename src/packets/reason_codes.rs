@@ -4,7 +4,7 @@ use super::error::DeserializeError;
 use super::mqtt_traits::{MqttRead, MqttWrite};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ConAckReasonCode {
+pub enum ConnAckReasonCode {
     Success,
     UnspecifiedError,
     MalformedPacket,
@@ -29,7 +29,7 @@ pub enum ConAckReasonCode {
     ConnectionRateExceeded,
 }
 
-impl MqttRead for ConAckReasonCode {
+impl MqttRead for ConnAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
             return Err(DeserializeError::InsufficientData(
@@ -40,58 +40,58 @@ impl MqttRead for ConAckReasonCode {
         }
 
         match buf.get_u8() {
-            0x00 => Ok(ConAckReasonCode::Success),
-            0x80 => Ok(ConAckReasonCode::UnspecifiedError),
-            0x81 => Ok(ConAckReasonCode::MalformedPacket),
-            0x82 => Ok(ConAckReasonCode::ProtocolError),
-            0x83 => Ok(ConAckReasonCode::ImplementationSpecificError),
-            0x84 => Ok(ConAckReasonCode::UnsupportedProtocolVersion),
-            0x85 => Ok(ConAckReasonCode::ClientIdentifierNotValid),
-            0x86 => Ok(ConAckReasonCode::BadUsernameOrPassword),
-            0x87 => Ok(ConAckReasonCode::NotAuthorized),
-            0x88 => Ok(ConAckReasonCode::ServerUnavailable),
-            0x89 => Ok(ConAckReasonCode::ServerBusy),
-            0x8A => Ok(ConAckReasonCode::Banned),
-            0x8C => Ok(ConAckReasonCode::BadAuthenticationMethod),
-            0x90 => Ok(ConAckReasonCode::TopicNameInvalid),
-            0x95 => Ok(ConAckReasonCode::PacketTooLarge),
-            0x97 => Ok(ConAckReasonCode::QuotaExceeded),
-            0x99 => Ok(ConAckReasonCode::PayloadFormatInvalid),
-            0x9A => Ok(ConAckReasonCode::RetainNotSupported),
-            0x9B => Ok(ConAckReasonCode::QosNotSupported),
-            0x9C => Ok(ConAckReasonCode::UseAnotherServer),
-            0x9D => Ok(ConAckReasonCode::ServerMoved),
-            0x9F => Ok(ConAckReasonCode::ConnectionRateExceeded),
+            0x00 => Ok(ConnAckReasonCode::Success),
+            0x80 => Ok(ConnAckReasonCode::UnspecifiedError),
+            0x81 => Ok(ConnAckReasonCode::MalformedPacket),
+            0x82 => Ok(ConnAckReasonCode::ProtocolError),
+            0x83 => Ok(ConnAckReasonCode::ImplementationSpecificError),
+            0x84 => Ok(ConnAckReasonCode::UnsupportedProtocolVersion),
+            0x85 => Ok(ConnAckReasonCode::ClientIdentifierNotValid),
+            0x86 => Ok(ConnAckReasonCode::BadUsernameOrPassword),
+            0x87 => Ok(ConnAckReasonCode::NotAuthorized),
+            0x88 => Ok(ConnAckReasonCode::ServerUnavailable),
+            0x89 => Ok(ConnAckReasonCode::ServerBusy),
+            0x8A => Ok(ConnAckReasonCode::Banned),
+            0x8C => Ok(ConnAckReasonCode::BadAuthenticationMethod),
+            0x90 => Ok(ConnAckReasonCode::TopicNameInvalid),
+            0x95 => Ok(ConnAckReasonCode::PacketTooLarge),
+            0x97 => Ok(ConnAckReasonCode::QuotaExceeded),
+            0x99 => Ok(ConnAckReasonCode::PayloadFormatInvalid),
+            0x9A => Ok(ConnAckReasonCode::RetainNotSupported),
+            0x9B => Ok(ConnAckReasonCode::QosNotSupported),
+            0x9C => Ok(ConnAckReasonCode::UseAnotherServer),
+            0x9D => Ok(ConnAckReasonCode::ServerMoved),
+            0x9F => Ok(ConnAckReasonCode::ConnectionRateExceeded),
             t => Err(DeserializeError::UnknownProperty(t)),
         }
     }
 }
 
-impl MqttWrite for ConAckReasonCode {
+impl MqttWrite for ConnAckReasonCode {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let val = match self {
-            ConAckReasonCode::Success => 0x00,
-            ConAckReasonCode::UnspecifiedError => 0x80,
-            ConAckReasonCode::MalformedPacket => 0x81,
-            ConAckReasonCode::ProtocolError => 0x82,
-            ConAckReasonCode::ImplementationSpecificError => 0x83,
-            ConAckReasonCode::UnsupportedProtocolVersion => 0x84,
-            ConAckReasonCode::ClientIdentifierNotValid => 0x85,
-            ConAckReasonCode::BadUsernameOrPassword => 0x86,
-            ConAckReasonCode::NotAuthorized => 0x87,
-            ConAckReasonCode::ServerUnavailable => 0x88,
-            ConAckReasonCode::ServerBusy => 0x89,
-            ConAckReasonCode::Banned => 0x8A,
-            ConAckReasonCode::BadAuthenticationMethod => 0x8C,
-            ConAckReasonCode::TopicNameInvalid => 0x90,
-            ConAckReasonCode::PacketTooLarge => 0x95,
-            ConAckReasonCode::QuotaExceeded => 0x97,
-            ConAckReasonCode::PayloadFormatInvalid => 0x99,
-            ConAckReasonCode::RetainNotSupported => 0x9A,
-            ConAckReasonCode::QosNotSupported => 0x9B,
-            ConAckReasonCode::UseAnotherServer => 0x9C,
-            ConAckReasonCode::ServerMoved => 0x9D,
-            ConAckReasonCode::ConnectionRateExceeded => 0x9F,
+            ConnAckReasonCode::Success => 0x00,
+            ConnAckReasonCode::UnspecifiedError => 0x80,
+            ConnAckReasonCode::MalformedPacket => 0x81,
+            ConnAckReasonCode::ProtocolError => 0x82,
+            ConnAckReasonCode::ImplementationSpecificError => 0x83,
+            ConnAckReasonCode::UnsupportedProtocolVersion => 0x84,
+            ConnAckReasonCode::ClientIdentifierNotValid => 0x85,
+            ConnAckReasonCode::BadUsernameOrPassword => 0x86,
+            ConnAckReasonCode::NotAuthorized => 0x87,
+            ConnAckReasonCode::ServerUnavailable => 0x88,
+            ConnAckReasonCode::ServerBusy => 0x89,
+            ConnAckReasonCode::Banned => 0x8A,
+            ConnAckReasonCode::BadAuthenticationMethod => 0x8C,
+            ConnAckReasonCode::TopicNameInvalid => 0x90,
+            ConnAckReasonCode::PacketTooLarge => 0x95,
+            ConnAckReasonCode::QuotaExceeded => 0x97,
+            ConnAckReasonCode::PayloadFormatInvalid => 0x99,
+            ConnAckReasonCode::RetainNotSupported => 0x9A,
+            ConnAckReasonCode::QosNotSupported => 0x9B,
+            ConnAckReasonCode::UseAnotherServer => 0x9C,
+            ConnAckReasonCode::ServerMoved => 0x9D,
+            ConnAckReasonCode::ConnectionRateExceeded => 0x9F,
         };
 
         buf.put_u8(val);

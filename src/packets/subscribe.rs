@@ -270,7 +270,7 @@ mod tests {
         packets::Packet,
     };
 
-    use super::{MqttWrite, WireLength};
+    use super::{WireLength};
 
     use super::{Subscribe, SubscribeProperties, SubscriptionOptions};
 

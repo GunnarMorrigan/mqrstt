@@ -2,7 +2,7 @@ use super::{
     error::DeserializeError,
     mqtt_traits::{MqttRead, VariableHeaderRead},
     read_variable_integer,
-    reason_codes::ConAckReasonCode,
+    reason_codes::ConnAckReasonCode,
     PacketType, PropertyType, QoS,
 };
 use bitflags::bitflags;
@@ -15,7 +15,7 @@ pub struct ConnAck {
 
     /// 3.2.2.2 Connect Reason Code
     /// Byte 2 in the Variable Header is the Connect Reason Code.
-    pub reason_code: ConAckReasonCode,
+    pub reason_code: ConnAckReasonCode,
 
     /// 3.2.2.3 CONNACK Properties
     pub connack_properties: ConnAckProperties,
@@ -36,7 +36,7 @@ impl VariableHeaderRead for ConnAck {
         let connack_flags = ConnAckFlags::from_bits(buf.get_u8()).ok_or(
             DeserializeError::MalformedPacketWithInfo("Can't read ConnAckFlags".to_string()),
         )?;
-        let reason_code = ConAckReasonCode::read(&mut buf)?;
+        let reason_code = ConnAckReasonCode::read(&mut buf)?;
         let connack_properties = ConnAckProperties::read(&mut buf)?;
 
         Ok(Self {

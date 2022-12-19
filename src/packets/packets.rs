@@ -1,4 +1,5 @@
 use core::slice::Iter;
+use std::fmt::Display;
 
 use bytes::{BufMut, Bytes, BytesMut};
 
@@ -40,6 +41,26 @@ pub enum Packet {
 }
 
 impl Packet {
+    pub fn packet_type(&self) -> PacketType{
+        match self{
+            Packet::Connect(_) => PacketType::Connect,
+            Packet::ConnAck(_) => PacketType::ConnAck,
+            Packet::Publish(_) => PacketType::Publish,
+            Packet::PubAck(_) => PacketType::PubAck,
+            Packet::PubRec(_) => PacketType::PubRec,
+            Packet::PubRel(_) => PacketType::PubRel,
+            Packet::PubComp(_) => PacketType::PubComp,
+            Packet::Subscribe(_) => PacketType::Subscribe,
+            Packet::SubAck(_) => PacketType::SubAck,
+            Packet::Unsubscribe(_) => PacketType::Unsubscribe,
+            Packet::UnsubAck(_) => PacketType::UnsubAck,
+            Packet::PingReq => PacketType::PingReq,
+            Packet::PingResp => PacketType::PingResp,
+            Packet::Disconnect(_) => PacketType::Disconnect,
+            Packet::Auth(_) => PacketType::Auth,
+        }
+    }
+
     pub fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         match self {
             Packet::Connect(p) => {
@@ -50,7 +71,6 @@ impl Packet {
             }
             Packet::ConnAck(_) => {
                 buf.put_u8(0b0010_0000);
-                // write_variable_integer(buf, c.wire_len())?;
                 todo!();
             }
             Packet::Publish(p) => {
@@ -110,9 +130,11 @@ impl Packet {
             }
             Packet::PingReq => {
                 buf.put_u8(0b1100_0000);
+                buf.put_u8(0); // Variable header length.
             }
             Packet::PingResp => {
                 buf.put_u8(0b1101_0000);
+                buf.put_u8(0); // Variable header length.
             }
             Packet::Disconnect(p) => {
                 buf.put_u8(0b1110_0000);
@@ -182,6 +204,28 @@ impl Packet {
         match self {
             Packet::ConnAck(_) => true,
             _ => false,
+        }
+    }
+}
+
+impl Display for Packet{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self{
+            Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_session, c.username, c.password, c.keep_alive, c.client_id),
+            Packet::ConnAck(c) => write!(f, "ConnAck(session:{:?}, reason code{:?})", c.connack_flags, c.reason_code),
+            Packet::Publish(p) => write!(f, "Publish(topic: {}, qos: {:?}, dup: {:?}, retain: {:?}, packet id: {:?})", &p.topic, p.qos, p.dup, p.retain, p.packet_identifier),
+            Packet::PubAck(_) => todo!(),
+            Packet::PubRec(_) => todo!(),
+            Packet::PubRel(_) => todo!(),
+            Packet::PubComp(_) => todo!(),
+            Packet::Subscribe(_) => todo!(),
+            Packet::SubAck(_) => todo!(),
+            Packet::Unsubscribe(_) => todo!(),
+            Packet::UnsubAck(_) => todo!(),
+            Packet::PingReq => write!(f, "PingReq"),
+            Packet::PingResp => write!(f, "PingResp"),
+            Packet::Disconnect(_) => todo!(),
+            Packet::Auth(_) => todo!(),
         }
     }
 }
@@ -272,29 +316,229 @@ impl PacketType {
     }
 }
 
+
 #[cfg(test)]
 mod tests {
+    use bytes::{Buf, Bytes, BytesMut};
+
+    use crate::packets::connack::{ConnAck, ConnAckFlags, ConnAckProperties};
+    use crate::packets::disconnect::{Disconnect, DisconnectProperties};
+    use crate::packets::QoS;
+
+    use crate::packets::error::{DeserializeError, ReadBytes};
+    use crate::packets::packets::{FixedHeader, Packet};
+    use crate::packets::publish::{Publish, PublishProperties};
+    use crate::packets::pubrel::{PubRel, PubRelProperties};
+    use crate::packets::reason_codes::{ConnAckReasonCode, DisconnectReasonCode, PubRelReasonCode};
+
+    pub fn read(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
+        let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
+
+        if header.remaining_length + header_length > buffer.len() {
+            return Err(ReadBytes::InsufficientBytes(
+                header.remaining_length - buffer.len(),
+            ));
+        }
+        buffer.advance(header_length);
+
+        let buf = buffer.split_to(header.remaining_length);
+
+        return Ok(Packet::read(header, buf.into())?);
+    }
 
     #[test]
-    fn connect_read_write() {
-        #[test]
-        fn read_and_write_connect2() {
-            let packet = [
-                0x10, 0x1d, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11,
-                0xff, 0xff, 0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54,
-                0x65, 0x73, 0x74,
-            ];
+    fn test_connack_read() {
+        let connack = [
+            0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01,
+            0x29, 0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
+        ];
+        let mut buf = BytesMut::new();
+        buf.extend(connack);
 
-            let mut buf = bytes::BytesMut::new();
-            buf.extend_from_slice(&packet);
+        let res = read(&mut buf);
+        assert!(res.is_ok());
+        let res = res.unwrap();
 
-            // let c = Packet::read(buf.into()).unwrap();
+        let expected = ConnAck {
+            connack_flags: ConnAckFlags::SESSION_PRESENT,
+            reason_code: ConnAckReasonCode::Success,
+            connack_properties: ConnAckProperties {
+                session_expiry_interval: None,
+                receive_maximum: None,
+                maximum_qos: None,
+                retain_available: Some(true),
+                maximum_packet_size: Some(1048576),
+                assigned_client_id: None,
+                topic_alias_maximum: Some(65535),
+                reason_string: None,
+                user_properties: vec![],
+                wildcards_available: Some(true),
+                subscription_ids_available: Some(true),
+                shared_subscription_available: Some(true),
+                server_keep_alive: None,
+                response_info: None,
+                server_reference: None,
+                authentication_method: None,
+                authentication_data: None,
+            },
+        };
 
-            // let mut write_buf = bytes::BytesMut::new();
+        assert_eq!(Packet::ConnAck(expected), res);
+    }
 
-            // Packet::Connect(c).write(&mut write_buf).unwrap();
+    #[test]
+    fn test_disconnect_read() {
+        let packet = [0xe0, 0x02, 0x8e, 0x00];
+        let mut buf = BytesMut::new();
+        buf.extend(packet);
 
-            // assert_eq!(packet.to_vec(), write_buf.to_vec());
-        }
+        let res = read(&mut buf);
+        assert!(res.is_ok());
+        let res = res.unwrap();
+
+        let expected = Disconnect {
+            reason_code: DisconnectReasonCode::SessionTakenOver,
+            properties: DisconnectProperties {
+                session_expiry_interval: None,
+                reason_string: None,
+                user_properties: vec![],
+                server_reference: None,
+            },
+        };
+
+        assert_eq!(Packet::Disconnect(expected), res);
+    }
+
+    #[test]
+    fn test_pingreq_read_write() {
+        let packet = [0xc0, 0x00];
+        let mut buf = BytesMut::new();
+        buf.extend(packet);
+
+        let res = read(&mut buf);
+        assert!(res.is_ok());
+        let res = res.unwrap();
+
+        assert_eq!(Packet::PingReq, res);
+
+        buf.clear();
+        Packet::PingReq.write(&mut buf).unwrap();
+        assert_eq!(buf.to_vec(), packet);
+    }
+
+    #[test]
+    fn test_pingresp_read_write() {
+        let packet = [0xd0, 0x00];
+        let mut buf = BytesMut::new();
+        buf.extend(packet);
+
+        let res = read(&mut buf);
+        assert!(res.is_ok());
+        let res = res.unwrap();
+
+        assert_eq!(Packet::PingResp, res);
+
+        buf.clear();
+        Packet::PingResp.write(&mut buf).unwrap();
+        assert_eq!(buf.to_vec(), packet);
+    }
+
+    #[test]
+    fn test_publish_read() {
+        let packet = [
+            0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74,
+            0x65, 0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01,
+            0x01, 0x09, 0x00, 0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
+        ];
+
+        let mut buf = BytesMut::new();
+        buf.extend(packet);
+
+        let res = read(&mut buf);
+        assert!(res.is_ok());
+        let res = res.unwrap();
+
+        let expected = Publish {
+            dup: false,
+            qos: QoS::ExactlyOnce,
+            retain: true,
+            topic: "test/123/test/blabla".to_string(),
+            packet_identifier: Some(13779),
+            publish_properties: PublishProperties {
+                payload_format_indicator: Some(1),
+                message_expiry_interval: None,
+                topic_alias: None,
+                response_topic: None,
+                correlation_data: Some(Bytes::from_static(b"1212")),
+                subscription_identifier: vec![1],
+                user_properties: vec![],
+                content_type: None,
+            },
+            payload: Bytes::from_static(b""),
+        };
+
+        assert_eq!(Packet::Publish(expected), res);
+    }
+
+    #[test]
+    fn test_pubrel_read_write(){
+        let bytes = [0x62, 0x03, 0x35, 0xd3, 0x00];
+
+        let mut buffer = BytesMut::from_iter(&bytes);
+
+        let res = read(&mut buffer);
+        
+        assert!(res.is_ok());
+
+        let packet = res.unwrap();
+
+        let expected = PubRel { 
+            packet_identifier: 13779, 
+            reason_code: PubRelReasonCode::Success, 
+            properties: PubRelProperties { 
+                reason_string: None, 
+                user_properties: vec![],
+            } 
+        };
+
+        assert_eq!(packet, Packet::PubRel(expected));
+
+        buffer.clear();
+
+        packet.write(&mut buffer).unwrap();
+
+        // The input is not in the smallest possible format but when writing we do expect it to be in the smallest possible format.
+        assert_eq!(buffer.to_vec(), [0x62, 0x02, 0x35, 0xd3].to_vec())
+    }
+
+    #[test]
+    fn test_pubrel_read_smallest_format(){
+        let bytes = [0x62, 0x02, 0x35, 0xd3];
+
+        let mut buffer = BytesMut::from_iter(&bytes);
+
+        let res = read(&mut buffer);
+        
+        assert!(res.is_ok());
+
+        let packet = res.unwrap();
+
+        let expected = PubRel { 
+            packet_identifier: 13779, 
+            reason_code: PubRelReasonCode::Success, 
+            properties: PubRelProperties { 
+                reason_string: None, 
+                user_properties: vec![],
+            } 
+        };
+
+        assert_eq!(packet, Packet::PubRel(expected));
+
+        buffer.clear();
+
+        packet.write(&mut buffer).unwrap();
+
+        // The input is not in the smallest possible format but when writing we do expect it to be in the smallest possible format.
+        assert_eq!(buffer.to_vec(), bytes.to_vec())
     }
 }

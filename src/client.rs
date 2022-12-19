@@ -9,7 +9,7 @@ use crate::{
         publish::{Publish, PublishProperties},
         subscribe::{Subscribe, SubscribeProperties, Subscription},
         unsubscribe::{Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
-        QoS,
+        QoS, disconnect::{Disconnect, DisconnectProperties}, reason_codes::DisconnectReasonCode,
     },
 };
 
@@ -56,7 +56,7 @@ impl AsyncClient {
         Ok(())
     }
 
-    pub async fn subscribe_options<S: Into<Subscription>>(
+    pub async fn subscribe_with_properties<S: Into<Subscription>>(
         &self,
         properties: SubscribeProperties,
         into_sub: S,
@@ -182,6 +182,53 @@ impl AsyncClient {
         };
         self.client_to_handler_s
             .send(Packet::Unsubscribe(unsub))
+            .await
+            .map_err(|_| ClientError::NoHandler)?;
+        Ok(())
+    }
+
+    pub async fn unsubscribe_with_properties<T: Into<UnsubscribeTopics>>(
+        &self,
+        into_topics: T,
+        properties: UnsubscribeProperties,
+    ) -> Result<(), ClientError> {
+        let pkid = self
+            .available_packet_ids
+            .recv()
+            .await
+            .map_err(|_| ClientError::NoHandler)?;
+        let unsub = Unsubscribe {
+            packet_identifier: pkid,
+            properties,
+            topics: into_topics.into().0,
+        };
+        self.client_to_handler_s
+            .send(Packet::Unsubscribe(unsub))
+            .await
+            .map_err(|_| ClientError::NoHandler)?;
+        Ok(())
+    }
+
+
+    pub async fn disconnect(&self) -> Result<(), ClientError> {
+        let disconnect = Disconnect {
+            reason_code: DisconnectReasonCode::NormalDisconnection,
+            properties: DisconnectProperties::default(),
+        };
+        self.client_to_handler_s
+            .send(Packet::Disconnect(disconnect))
+            .await
+            .map_err(|_| ClientError::NoHandler)?;
+        Ok(())
+    }
+
+    pub async fn disconnect_with_properties(&self, reason_code: DisconnectReasonCode, properties: DisconnectProperties) -> Result<(), ClientError> {
+        let disconnect = Disconnect {
+            reason_code,
+            properties,
+        };
+        self.client_to_handler_s
+            .send(Packet::Disconnect(disconnect))
             .await
             .map_err(|_| ClientError::NoHandler)?;
         Ok(())

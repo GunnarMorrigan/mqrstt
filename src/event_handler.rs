@@ -1,4 +1,6 @@
+use crate::connect_options::ConnectOptions;
 use crate::error::MqttError;
+use crate::packets::disconnect::Disconnect;
 use crate::packets::packets::{Packet, PacketType};
 use crate::packets::puback::{PubAck, PubAckProperties};
 use crate::packets::pubcomp::PubComp;
@@ -11,19 +13,16 @@ use crate::packets::unsubscribe::Unsubscribe;
 use crate::packets::QoS;
 use crate::state::State;
 
-use futures_concurrency::future::Join;
-
-// use crate::{Incoming, MqttOptions, MqttState, Outgoing, Packet, Request, StateError, Transport};
+use futures_concurrency::future::{TryJoin, Join, Race};
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
 // use futures::{select, FutureExt};
-use tracing::{debug, error};
+use tracing::{debug, error, info, warn};
 
 use std::future::Future;
-#[cfg(unix)]
-use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Instant;
 
 /// Eventloop with all the state of a connection
@@ -40,6 +39,9 @@ pub struct EventHandlerTask {
     client_to_handler_r: Receiver<Packet>,
 
     last_network_action: Arc<Mutex<Instant>>,
+    waiting_for_pingresp: AtomicBool,
+    keep_alive_s: u64,
+    disconnect: AtomicBool,
 }
 
 impl EventHandlerTask {
@@ -48,13 +50,13 @@ impl EventHandlerTask {
     /// When connection encounters critical errors (like auth failure), user has a choice to
     /// access and update `options`, `state` and `requests`.
     pub(crate) fn new(
-        receive_maximum: u16,
+        options: &ConnectOptions,
         network_receiver: Receiver<Packet>,
         network_sender: Sender<Packet>,
         client_to_handler_r: Receiver<Packet>,
         last_network_action: Arc<Mutex<Instant>>,
     ) -> (Self, Receiver<u16>) {
-        let (state, packet_id_channel) = State::new(receive_maximum);
+        let (state, packet_id_channel) = State::new(options.receive_maximum());
 
         let task = EventHandlerTask {
             state,
@@ -65,6 +67,9 @@ impl EventHandlerTask {
             client_to_handler_r,
 
             last_network_action,
+            waiting_for_pingresp: AtomicBool::new(false),
+            keep_alive_s: options.keep_alive_interval_s,
+            disconnect: AtomicBool::new(false),
         };
         (task, packet_id_channel)
     }
@@ -73,49 +78,63 @@ impl EventHandlerTask {
         &self,
         handler: &mut H,
     ) -> Result<(), MqttError> {
-        let a = async {
+        self.disconnect.store(false, Ordering::Release);
+
+        let incoming = async {
             loop {
-                debug!(
-                    "Event Handler, network receiver len {:?}",
-                    self.network_receiver.len()
-                );
-                let network_event = self.network_receiver.recv().await;
-                match network_event {
+                match self.network_receiver.recv().await {
                     Ok(event) => {
-                        debug!("Event Handler, handling incoming packet: {:?}", event);
+                        debug!("Event Handler, handling incoming packet: {}", event);
+                        if event.packet_type() == PacketType::Disconnect{
+                            self.disconnect.store(true, Ordering::Release);
+                        }
                         self.handle_incoming_packet(handler, event).await?
                     }
-                    Err(err) => Err(MqttError::IncomingNetworkChannelClosed(err))?,
+                    Err(err) => return Err(MqttError::IncomingNetworkChannelClosed(err)),
+                }
+                if self.disconnect.load(Ordering::Acquire){
+                    return Ok::<(), MqttError>(());
                 }
             }
         };
-
-        let b = async {
+        let outgoing = async {
             loop {
-                debug!(
-                    "Event Handler, client receiver len {:?}",
-                    self.client_to_handler_r.len()
-                );
-                let client_event = self.client_to_handler_r.recv().await;
-                let ret = match client_event {
+                match self.client_to_handler_r.recv().await {
                     Ok(event) => {
-                        debug!("Event Handler, handling outgoing packet: {:?}", event);
-                        self.handle_outgoing_packet(event).await
+                        debug!("Event Handler, handling outgoing packet: {}", event);
+                        self.handle_outgoing_packet(event).await?
                     }
-                    Err(err) => Err(MqttError::ClientChannelClosed(err)),
-                };
-                if ret.is_err() {
-                    return ret;
+                    Err(err) => return Err(MqttError::ClientChannelClosed(err)),
+                }
+                if self.disconnect.load(Ordering::Acquire){
+                    return Ok::<(), MqttError>(());
+                }
+            }
+        };
+        let keepalive = async{
+            let initial_keep_alive_duration = tokio::time::Duration::new(self.keep_alive_s, 0);
+            let mut keep_alive_duration = tokio::time::Duration::new(self.keep_alive_s, 0);
+            loop{
+                warn!("Awaiting PING sleep");
+                tokio::time::sleep(keep_alive_duration).await;
+                if (!self.waiting_for_pingresp.load(Ordering::Acquire)) && self.last_network_action.lock().await.elapsed() >= initial_keep_alive_duration{
+                    self.network_sender.send(Packet::PingReq).await?;
+                    self.waiting_for_pingresp.store(true, Ordering::Release);
+                    keep_alive_duration = initial_keep_alive_duration;
+                }
+                else{
+                    keep_alive_duration = initial_keep_alive_duration - self.last_network_action.lock().await.elapsed();
+                }
+                if self.disconnect.load(Ordering::Acquire){
+                    return Ok::<(), MqttError>(());
                 }
             }
         };
 
-        // We do not use an select! because that has a high possibility of data loss.
-        // Instead, we use a endless loop of which both are polled.
-        // Nevertheless, they are raced because they only return if there is a fatel error
-        let _r: (Result<(), MqttError>, Result<(), MqttError>) = (a, b).join().await;
-        error!("Ending event_handler.handle()");
-        todo!()
+        // We do not use an select! because that has a high possibility of data loss due to cancel safety of the futures.
+        // Instead, we use endless loops of which are both polled.
+        // Nevertheless, they are raced because they only return if there is a fatal error or disconnect
+        (incoming, outgoing, keepalive).race().await
     }
 
     async fn handle_incoming_packet<H: EventHandler + Send + Sized + 'static>(
@@ -131,8 +150,8 @@ impl EventHandlerTask {
             Packet::PubRec(pubrec) => self.handle_incoming_pubrec(&pubrec).await?,
             Packet::PubRel(pubrel) => self.handle_incoming_pubrel(&pubrel).await?,
             Packet::PubComp(pubcomp) => self.handle_incoming_pubcomp(&pubcomp).await?,
-            Packet::PingResp => todo!(),
-            _ => (),
+            Packet::PingResp => self.handle_incoming_pingresp().await,
+            _ => unreachable!(),
         };
         Ok(())
     }
@@ -256,12 +275,16 @@ impl EventHandlerTask {
         }
     }
 
+    async fn handle_incoming_pingresp(&self) {
+        self.waiting_for_pingresp.store(false, Ordering::Release);
+    }
+
     async fn handle_outgoing_packet(&self, packet: Packet) -> Result<(), MqttError> {
         match packet {
             Packet::Publish(publish) => self.handle_outgoing_publish(publish).await,
             Packet::Subscribe(sub) => self.handle_outgoing_subscribe(sub).await,
             Packet::Unsubscribe(unsub) => self.handle_outgoing_unsubscribe(unsub).await,
-            Packet::Disconnect(_p) => todo!(),
+            Packet::Disconnect(d) => self.handle_outgoing_disconnect(d).await,
             Packet::Auth(_) => todo!(),
 
             _ => unreachable!(),
@@ -330,8 +353,255 @@ impl EventHandlerTask {
         }
         Ok(())
     }
+
+    async fn handle_outgoing_disconnect(&self, disconnect: Disconnect) -> Result<(), MqttError> {
+        self.disconnect.store(true, Ordering::Release);
+        self.network_sender.send(Packet::Disconnect(disconnect)).await?;
+        Ok(())
+    }
+
 }
 
 pub trait EventHandler: Sized + Sync + 'static {
-    fn handle<'a>(&mut self, event: &'a Packet) -> impl Future<Output = ()> + Send + 'a;
+    fn handle<'a>(&'a mut self, event: &'a Packet) -> impl Future<Output = ()> + Send + 'a;
+}
+
+
+#[cfg(test)]
+mod HandlerTests{
+    use std::{time::Duration, sync::Arc};
+
+    use async_channel::{Receiver, Sender};
+    use async_mutex::Mutex;
+
+    use crate::{event_handler::{EventHandlerTask, EventHandler}, connect_options::ConnectOptions, packets::{packets::{Packet, PacketType}, QoS, pubrel::{PubRel, PubRelProperties}, reason_codes::{PubRelReasonCode, PubRecReasonCode, PubCompReasonCode}, pubrec::{PubRec, PubRecProperties}, pubcomp::{self, PubComp, PubCompProperties}}, tests::resources::test_packets::{create_publish_packet, create_puback_packet, create_disconnect_packet}, client::AsyncClient};
+
+
+    pub struct Nop {}
+    impl EventHandler for Nop {
+        fn handle<'a>(
+            &'a mut self,
+            event: &'a Packet,
+        ) -> impl core::future::Future<Output = ()> + Send + 'a {
+            async move {
+                ()
+            }
+        }
+    }
+
+
+    fn handler() -> (EventHandlerTask, Receiver<Packet>, Sender<Packet>, Sender<Packet>){
+        let opt = ConnectOptions::new(
+            "127.0.0.1".to_string(),
+            1883,
+            "test123123".to_string(),
+        );
+
+        let (to_network_s, to_network_r) = async_channel::bounded(100);
+        let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);
+        let (client_to_handler_s, client_to_handler_r) =
+            async_channel::bounded(100);
+            
+        let (handler, apkid) = EventHandlerTask::new(
+            &opt,
+            network_to_handler_r,
+            to_network_s,
+            client_to_handler_r,
+            Arc::new(Mutex::new(std::time::Instant::now() + Duration::new(600, 0))),
+        );
+        (handler, to_network_r, network_to_handler_s, client_to_handler_s)
+    }
+    
+    #[tokio::test(flavor = "multi_thread")]
+    async fn outgoing_publish_qos_0(){
+
+        let mut nop = Nop{};
+
+        let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
+        
+        let handler_task = tokio::task::spawn(async move {
+            dbg!(handler.handle(&mut nop).await);
+            return handler;
+        });
+        let pub_packet = create_publish_packet(QoS::AtMostOnce, false, false, None);
+        
+        client_to_handler_s.send(pub_packet.clone()).await.unwrap();
+        
+        let packet = to_network_r.recv().await.unwrap();
+        
+        assert_eq!(packet, pub_packet);
+
+        // If we drop the client to handler channel the handler will stop executing and we can inspect its internals.
+        drop(client_to_handler_s);
+
+        let handler = handler_task.await.unwrap();
+
+        assert!(handler.state.incoming_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_rel.lock().await.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn outgoing_publish_qos_1(){
+
+        pub struct TestPubQoS1 {
+            stage: StagePubQoS1,
+        }
+        pub enum StagePubQoS1{
+            PubAck,
+            Done,
+        }
+        impl TestPubQoS1{
+            fn new() -> Self{
+                TestPubQoS1 {
+                    stage: StagePubQoS1::PubAck,
+                }
+            }
+        }
+        impl EventHandler for TestPubQoS1 {
+            fn handle<'a>(
+                &'a mut self,
+                event: &'a Packet,
+            ) -> impl core::future::Future<Output = ()> + Send + 'a {
+                async move {
+                    match self.stage{
+                        StagePubQoS1::PubAck => {
+                                assert_eq!(event.packet_type(), PacketType::PubAck);
+                                self.stage = StagePubQoS1::Done;
+                        },
+                        StagePubQoS1::Done => {
+                            ()
+                        },
+                    }
+                }
+            }
+        }
+
+        let mut nop = TestPubQoS1::new();
+
+        let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
+        
+        let handler_task = tokio::task::spawn(async move {
+            dbg!(handler.handle(&mut nop).await);
+            return handler;
+        });
+        let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
+        
+        client_to_handler_s.send(pub_packet.clone()).await.unwrap();
+        
+        let publish = to_network_r.recv().await.unwrap();
+        
+        assert_eq!(publish, pub_packet);
+
+        let puback = create_puback_packet(1);
+
+        network_to_handler_s.send(puback).await.unwrap();
+
+        tokio::time::sleep(Duration::new(5, 0)).await;
+
+        // If we drop the client_to_handler channel the handler will stop executing and we can inspect its internals.
+        drop(client_to_handler_s);
+
+        let handler = handler_task.await.unwrap();
+
+        assert!(handler.state.incoming_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_rel.lock().await.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn outgoing_publish_qos_2(){
+        pub struct TestPubQoS2 {
+            stage: StagePubQoS2,
+            client_to_handler_s: Sender<Packet>
+        }
+        pub enum StagePubQoS2{
+            PubRec,
+            PubComp,
+            Done,
+        }
+        impl TestPubQoS2{
+            fn new(client_to_handler_s: Sender<Packet>) -> Self{
+                TestPubQoS2 {
+                    stage: StagePubQoS2::PubRec,
+                    client_to_handler_s,
+                }
+            }
+        }
+        impl EventHandler for TestPubQoS2 {
+            fn handle<'a>(
+                &'a mut self,
+                event: &'a Packet,
+            ) -> impl core::future::Future<Output = ()> + Send + 'a {
+                async move {
+                    match self.stage{
+                        StagePubQoS2::PubRec => {
+                            assert_eq!(event.packet_type(), PacketType::PubRec);
+                            self.stage = StagePubQoS2::PubComp;
+                        },
+                        StagePubQoS2::PubComp => {
+                                assert_eq!(event.packet_type(), PacketType::PubComp);
+                                self.stage = StagePubQoS2::Done;
+                                self.client_to_handler_s.send(create_disconnect_packet()).await.unwrap();
+                        },
+                        StagePubQoS2::Done => {
+                            ()
+                        },
+                    }
+                }
+            }
+        }
+
+        
+        let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
+        
+        let mut nop = TestPubQoS2::new(client_to_handler_s.clone());
+        
+        let handler_task = tokio::task::spawn(async move {
+            dbg!(handler.handle(&mut nop).await);
+            return handler;
+        });
+        let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
+        
+        client_to_handler_s.send(pub_packet.clone()).await.unwrap();
+        
+        let publish = to_network_r.recv().await.unwrap();
+        
+        assert_eq!(publish, pub_packet);
+
+        let pubrec = Packet::PubRec(PubRec{
+            packet_identifier: 1,
+            reason_code: PubRecReasonCode::Success,
+            properties: PubRecProperties::default(),
+        });
+        
+        network_to_handler_s.send(pubrec).await.unwrap();
+
+        let packet = to_network_r.recv().await.unwrap();
+
+        let expected_pubrel = Packet::PubRel(PubRel{
+            packet_identifier: 1,
+            reason_code: PubRelReasonCode::Success,
+            properties: PubRelProperties::default(),
+        });
+
+
+        assert_eq!(expected_pubrel, packet);
+
+
+        let pubcomp = Packet::PubComp(PubComp{
+            packet_identifier: 1,
+            reason_code: PubCompReasonCode::Success,
+            properties: PubCompProperties::default(),
+        });
+        
+        network_to_handler_s.send(pubcomp).await.unwrap();
+
+
+        let handler = handler_task.await.unwrap();
+
+        assert!(handler.state.incoming_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_rel.lock().await.is_empty());
+    }
 }

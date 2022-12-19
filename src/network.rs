@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
@@ -60,11 +61,7 @@ where
         self.network = None;
     }
 
-    // pub async fn run(&mut self) -> Result<(), ConnectionError>{
-    //     self.run_with_shutdown_signal(smol::future::pending()).await
-    // }
-
-    pub async fn run_with_shutdown_signal(&mut self) -> Result<(), ConnectionError> {
+    pub async fn run(&mut self) -> Result<(), ConnectionError> {
         if self.network.is_none() {
             trace!("Creating network");
 
@@ -76,39 +73,52 @@ where
             self.network = Some((reader, writer));
             self.network_to_handler_s.send(connack).await?;
         }
-        // let shutdown_process = shutdown_handler(shutdown_signal);
+        let MqttNetwork {
+            network,
+            options: _,
+            last_network_action,
+            network_to_handler_s,
+            to_network_r,
+        } = self;
 
-        if let Some((reader, writer)) = self.network.as_mut() {
-            let to_network_r = self.to_network_r.clone();
-            let network_to_handler_s = self.network_to_handler_s.clone();
 
-            let a = async move {
+        if let Some((reader, writer)) = network {
+            let disconnect = AtomicBool::new(false);
+
+            let incoming = async {
                 loop {
-                    match reader.read_many(&network_to_handler_s).await {
-                        Ok(_) => (),
-                        Err(err) => {
-                            return Err(err);
-                        }
+                    let local_disconnect = reader.read_direct(&network_to_handler_s).await?;
+                    *(last_network_action.lock().await) = std::time::Instant::now();
+                    if local_disconnect{
+                        disconnect.store(true, Ordering::Release);
+                        return Ok(());
+                    }
+                    else if disconnect.load(Ordering::Acquire){
+                        return Ok(());
                     }
                 }
             };
 
-            let b = async move {
+            let outgoing = async {
                 loop {
-                    trace!(
-                        "There are {} messages in ougoing channel",
-                        to_network_r.len()
-                    );
-                    writer.write(&to_network_r).await?;
-
-                    // let mut lock = self.last_network_action.lock().await;
-                    // *lock = Instant::now();
+                    let local_disconnect = writer.write(&to_network_r).await?;
+                    *(last_network_action.lock().await) = std::time::Instant::now();
+                    if local_disconnect{
+                        disconnect.store(true, Ordering::Release);
+                        return Ok(());
+                    }
+                    else if disconnect.load(Ordering::Acquire){
+                        return Ok(());
+                    }
                 }
             };
 
-            let _res: (Result<(), ConnectionError>, Result<(), ConnectionError>) =
-                (a, b).join().await;
+            let res: (Result<(), ConnectionError>, Result<(), ConnectionError>) = (incoming, outgoing).join().await;
+            res.0?;
+            res.1
         }
-        Ok(())
+        else{
+            Ok(())
+        }
     }
 }

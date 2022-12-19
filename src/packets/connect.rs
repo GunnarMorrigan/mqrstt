@@ -868,7 +868,7 @@ mod tests {
         ];
         let mut buf = bytes::Bytes::from_static(last_will);
 
-        dbg!(LastWill::read(QoS::AtLeastOnce, false, &mut buf));
+        assert!(LastWill::read(QoS::AtLeastOnce, false, &mut buf).is_ok());
     }
 
     #[test]

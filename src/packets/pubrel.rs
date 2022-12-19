@@ -33,30 +33,26 @@ impl VariableHeaderRead for PubRel {
     ) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2 {
-            return Ok(Self {
+            Ok(Self {
                 packet_identifier: u16::read(&mut buf)?,
                 reason_code: PubRelReasonCode::Success,
                 properties: PubRelProperties::default(),
-            });
+            })
         }
-        // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
-        else if remaining_length < 4 {
-            return Err(DeserializeError::InsufficientData(
-                "PubRel".to_string(),
-                buf.len(),
-                4,
-            ));
+        else if remaining_length == 3 {
+            Ok(Self {
+                packet_identifier: u16::read(&mut buf)?,
+                reason_code: PubRelReasonCode::read(&mut buf)?,
+                properties: PubRelProperties::default(),
+            })
         }
-
-        let packet_identifier = u16::read(&mut buf)?;
-        let reason_code = PubRelReasonCode::read(&mut buf)?;
-        let properties = PubRelProperties::read(&mut buf)?;
-
-        Ok(Self {
-            packet_identifier,
-            reason_code,
-            properties,
-        })
+        else{
+            Ok(Self {
+                packet_identifier: u16::read(&mut buf)?,
+                reason_code: PubRelReasonCode::read(&mut buf)?,
+                properties: PubRelProperties::read(&mut buf)?,
+            })
+        }
     }
 }
 
@@ -66,21 +62,37 @@ impl VariableHeaderWrite for PubRel {
 
         if self.reason_code == PubRelReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+            && self.properties.user_properties.is_empty(){
             return Ok(());
         }
-
-        self.reason_code.write(buf)?;
-        self.properties.write(buf)?;
-
-        Ok(())
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            self.reason_code.write(buf)?;
+            return Ok(());
+        }
+        else{
+            self.reason_code.write(buf)?;
+            self.properties.write(buf)?;
+    
+            Ok(())
+        }
     }
 }
 
 impl WireLength for PubRel {
     fn wire_len(&self) -> usize {
-        2 + 1 + self.properties.wire_len()
+        if self.reason_code == PubRelReasonCode::Success
+            && self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            2
+        }
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            3
+        }
+        else{
+            2 + 1 + self.properties.wire_len()
+        }
     }
 }
 

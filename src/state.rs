@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::{collections::{BTreeMap, BTreeSet}, sync::atomic::AtomicBool};
 
 use async_channel::Receiver;
 use async_mutex::Mutex;
@@ -10,9 +10,6 @@ use crate::{
 
 #[derive(Debug)]
 pub struct State {
-    /// Status of last ping
-    pub await_ping_resp: bool,
-
     pub(crate) apkid: AvailablePacketIds,
 
     /// Outgoing Subcribe requests which aren't acked yet
@@ -33,20 +30,12 @@ impl State {
         let (apkid, r) = AvailablePacketIds::new(receive_maximum);
 
         let state = Self {
-            await_ping_resp: false,
-            // last_incoming: Instant::now(),
-            // last_outgoing: Instant::now(),
             apkid,
-
-            // inflight: 0,
-            // max_inflight: receive_maximum,
             outgoing_sub: Mutex::new(BTreeMap::new()),
             outgoing_unsub: Mutex::new(BTreeMap::new()),
             outgoing_pub: Mutex::new(BTreeMap::new()),
             outgoing_rel: Mutex::new(BTreeSet::new()),
             incoming_pub: Mutex::new(BTreeSet::new()),
-            // write: BytesMut::with_capacity(1024 * 100),
-            // manual_acks: todo!(),
         };
 
         (state, r)
