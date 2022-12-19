@@ -22,11 +22,10 @@ pub mod event_handler;
 mod network;
 mod packets;
 mod state;
-mod util;
 pub mod transport;
+mod util;
 
 mod tests;
-
 
 pub fn create_new_tcp(
     options: ConnectOptions,
@@ -67,11 +66,11 @@ pub fn create_new_tcp(
 
 pub fn create_new(
     options: ConnectOptions,
-    transport: Transport
+    transport: Transport,
 ) -> (
     MqttNetwork<TcpReader, TcpWriter>,
     EventHandlerTask,
-    AsyncClient
+    AsyncClient,
 ) {
     let receive_maximum = options.receive_maximum();
 

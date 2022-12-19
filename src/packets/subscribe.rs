@@ -270,7 +270,7 @@ mod tests {
         packets::Packet,
     };
 
-    use super::{WireLength};
+    use super::WireLength;
 
     use super::{Subscribe, SubscribeProperties, SubscriptionOptions};
 

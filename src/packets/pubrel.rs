@@ -38,15 +38,13 @@ impl VariableHeaderRead for PubRel {
                 reason_code: PubRelReasonCode::Success,
                 properties: PubRelProperties::default(),
             })
-        }
-        else if remaining_length == 3 {
+        } else if remaining_length == 3 {
             Ok(Self {
                 packet_identifier: u16::read(&mut buf)?,
                 reason_code: PubRelReasonCode::read(&mut buf)?,
                 properties: PubRelProperties::default(),
             })
-        }
-        else{
+        } else {
             Ok(Self {
                 packet_identifier: u16::read(&mut buf)?,
                 reason_code: PubRelReasonCode::read(&mut buf)?,
@@ -62,13 +60,13 @@ impl VariableHeaderWrite for PubRel {
 
         if self.reason_code == PubRelReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
-        }
-        else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
+        } else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty()
+        {
             self.reason_code.write(buf)?;
-        }
-        else{
+        } else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
         }
@@ -80,14 +78,14 @@ impl WireLength for PubRel {
     fn wire_len(&self) -> usize {
         if self.reason_code == PubRelReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             2
-        }
-        else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+        } else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty()
+        {
             3
-        }
-        else{
+        } else {
             2 + 1 + self.properties.wire_len()
         }
     }

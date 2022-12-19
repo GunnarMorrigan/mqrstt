@@ -5,7 +5,8 @@ use async_channel::{RecvError, SendError};
 use crate::{
     packets::{
         error::{DeserializeError, SerializeError},
-        packets::{Packet, PacketType}, reason_codes::ConnAckReasonCode,
+        packets::{Packet, PacketType},
+        reason_codes::ConnAckReasonCode,
     },
     util::timeout::Timeout,
 };
@@ -66,11 +67,9 @@ pub enum ConnectionError {
 
     #[error("Connection refused, return code: {0:?}")]
     ConnectionRefused(ConnAckReasonCode),
-    
+
     #[error("Expected ConnAck packet, received: {0:?}")]
     NotConnAck(Packet),
-
-
 
     #[error("Requests done")]
     RequestsDone,

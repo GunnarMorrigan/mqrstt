@@ -41,8 +41,8 @@ pub enum Packet {
 }
 
 impl Packet {
-    pub fn packet_type(&self) -> PacketType{
-        match self{
+    pub fn packet_type(&self) -> PacketType {
+        match self {
             Packet::Connect(_) => PacketType::Connect,
             Packet::ConnAck(_) => PacketType::ConnAck,
             Packet::Publish(_) => PacketType::Publish,
@@ -202,7 +202,7 @@ impl Packet {
     }
 }
 
-impl Display for Packet{
+impl Display for Packet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self{
             Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_session, c.username, c.password, c.keep_alive, c.client_id),
@@ -309,7 +309,6 @@ impl PacketType {
         }
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -475,24 +474,24 @@ mod tests {
     }
 
     #[test]
-    fn test_pubrel_read_write(){
+    fn test_pubrel_read_write() {
         let bytes = [0x62, 0x03, 0x35, 0xd3, 0x00];
 
         let mut buffer = BytesMut::from_iter(&bytes);
 
         let res = read(&mut buffer);
-        
+
         assert!(res.is_ok());
 
         let packet = res.unwrap();
 
-        let expected = PubRel { 
-            packet_identifier: 13779, 
-            reason_code: PubRelReasonCode::Success, 
-            properties: PubRelProperties { 
-                reason_string: None, 
+        let expected = PubRel {
+            packet_identifier: 13779,
+            reason_code: PubRelReasonCode::Success,
+            properties: PubRelProperties {
+                reason_string: None,
                 user_properties: vec![],
-            } 
+            },
         };
 
         assert_eq!(packet, Packet::PubRel(expected));
@@ -506,24 +505,24 @@ mod tests {
     }
 
     #[test]
-    fn test_pubrel_read_smallest_format(){
+    fn test_pubrel_read_smallest_format() {
         let bytes = [0x62, 0x02, 0x35, 0xd3];
 
         let mut buffer = BytesMut::from_iter(&bytes);
 
         let res = read(&mut buffer);
-        
+
         assert!(res.is_ok());
 
         let packet = res.unwrap();
 
-        let expected = PubRel { 
-            packet_identifier: 13779, 
-            reason_code: PubRelReasonCode::Success, 
-            properties: PubRelProperties { 
-                reason_string: None, 
+        let expected = PubRel {
+            packet_identifier: 13779,
+            reason_code: PubRelReasonCode::Success,
+            properties: PubRelProperties {
+                reason_string: None,
                 user_properties: vec![],
-            } 
+            },
         };
 
         assert_eq!(packet, Packet::PubRel(expected));

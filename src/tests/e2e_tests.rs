@@ -3,28 +3,35 @@ mod e2e {
 
     use futures_concurrency::future::Join;
 
-    use tracing::{Level};
+    use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
 
     use crate::{
-        connect_options::ConnectOptions, create_new_tcp, error::ClientError, packets::{QoS, packets::{Packet, PacketType}}, event_handler::EventHandler, client::AsyncClient,
+        client::AsyncClient,
+        connect_options::ConnectOptions,
+        create_new_tcp,
+        error::ClientError,
+        event_handler::EventHandler,
+        packets::{
+            packets::{Packet, PacketType},
+            QoS,
+        },
     };
 
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_pub_qo_s2() {
-
         pub struct TestPubQoS2 {
             stage: StagePubQoS2,
-            client: AsyncClient
+            client: AsyncClient,
         }
-        pub enum StagePubQoS2{
+        pub enum StagePubQoS2 {
             ConnAck,
             PubRec,
             PubComp,
             Done,
         }
-        impl TestPubQoS2{
-            fn new(client: AsyncClient) -> Self{
+        impl TestPubQoS2 {
+            fn new(client: AsyncClient) -> Self {
                 TestPubQoS2 {
                     stage: StagePubQoS2::ConnAck,
                     client,
@@ -37,23 +44,21 @@ mod e2e {
                 event: &'a Packet,
             ) -> impl core::future::Future<Output = ()> + Send + 'a {
                 async move {
-                    match self.stage{
+                    match self.stage {
                         StagePubQoS2::ConnAck => {
                             assert_eq!(event.packet_type(), PacketType::ConnAck);
                             self.stage = StagePubQoS2::PubRec;
-                        },
+                        }
                         StagePubQoS2::PubRec => {
                             assert_eq!(event.packet_type(), PacketType::PubRec);
                             self.stage = StagePubQoS2::PubComp;
-                        },
+                        }
                         StagePubQoS2::PubComp => {
-                                assert_eq!(event.packet_type(), PacketType::PubComp);
-                                self.stage = StagePubQoS2::Done;
-                                self.client.disconnect().await.unwrap();
-                        },
-                        StagePubQoS2::Done => {
-                            ()
-                        },
+                            assert_eq!(event.packet_type(), PacketType::PubComp);
+                            self.stage = StagePubQoS2::Done;
+                            self.client.disconnect().await.unwrap();
+                        }
+                        StagePubQoS2::Done => (),
                     }
                 }
             }
@@ -71,17 +76,11 @@ mod e2e {
             .expect("setting default subscriber failed");
 
         // let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
-        let opt = ConnectOptions::new(
-            "127.0.0.1".to_string(),
-            1883,
-            "test123123".to_string(),
-        );
+        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string());
 
         let (mut mqtt_network, handler, client, _r) = create_new_tcp(opt);
 
-        let network =tokio::task::spawn(async move { 
-            dbg!(mqtt_network.run().await) 
-        });
+        let network = tokio::task::spawn(async move { dbg!(mqtt_network.run().await) });
 
         let client_cloned = client.clone();
         let event_handler = tokio::task::spawn(async move {

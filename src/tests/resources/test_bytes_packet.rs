@@ -1,14 +1,18 @@
 use bytes::Bytes;
 
-use crate::packets::{connack::{ConnAck, ConnAckFlags, ConnAckProperties}, reason_codes::{ConnAckReasonCode, DisconnectReasonCode}, packets::Packet, disconnect::{Disconnect, DisconnectProperties}, publish::{Publish, PublishProperties}, QoS};
+use crate::packets::{
+    connack::{ConnAck, ConnAckFlags, ConnAckProperties},
+    disconnect::{Disconnect, DisconnectProperties},
+    packets::Packet,
+    publish::{Publish, PublishProperties},
+    reason_codes::{ConnAckReasonCode, DisconnectReasonCode},
+    QoS,
+};
 
-
-
-
-pub fn connack_bytes_packet() -> ([u8; 21], Packet){
+pub fn connack_bytes_packet() -> ([u8; 21], Packet) {
     const CONNACK_BYTES: [u8; 21] = [
-        0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01,
-        0x29, 0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
+        0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01, 0x29,
+        0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
     ];
 
     let expected = ConnAck {
@@ -37,7 +41,7 @@ pub fn connack_bytes_packet() -> ([u8; 21], Packet){
     (CONNACK_BYTES, Packet::ConnAck(expected))
 }
 
-pub fn disconnect_bytes_packet() -> ([u8; 4], Packet){
+pub fn disconnect_bytes_packet() -> ([u8; 4], Packet) {
     const DISCONNECT_BYTES: [u8; 4] = [0xe0, 0x02, 0x8e, 0x00];
 
     let expected = Disconnect {
@@ -52,19 +56,19 @@ pub fn disconnect_bytes_packet() -> ([u8; 4], Packet){
     (DISCONNECT_BYTES, Packet::Disconnect(expected))
 }
 
-pub fn pingreq_bytes_packet() -> ([u8; 2], Packet){
+pub fn pingreq_bytes_packet() -> ([u8; 2], Packet) {
     ([0xc0, 0x00], Packet::PingReq)
 }
 
-pub fn pingresp_bytes_packet() -> ([u8; 2], Packet){
+pub fn pingresp_bytes_packet() -> ([u8; 2], Packet) {
     ([0xd0, 0x00], Packet::PingResp)
 }
 
-pub(crate) fn publish_bytes_packet_qos_2() -> ([u8; 38], Packet){
+pub(crate) fn publish_bytes_packet_qos_2() -> ([u8; 38], Packet) {
     const PUBLISH_BYTES: [u8; 38] = [
-        0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74,
-        0x65, 0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01,
-        0x01, 0x09, 0x00, 0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
+        0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74, 0x65,
+        0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01, 0x01, 0x09,
+        0x00, 0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
     ];
 
     let expected = Publish {

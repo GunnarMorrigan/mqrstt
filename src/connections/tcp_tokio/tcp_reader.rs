@@ -12,7 +12,8 @@ use tokio::{io::AsyncReadExt, net::TcpStream};
 
 use crate::packets::{
     error::ReadBytes,
-    packets::{FixedHeader, Packet, PacketType}, reason_codes::ConnAckReasonCode,
+    packets::{FixedHeader, Packet, PacketType},
+    reason_codes::ConnAckReasonCode,
 };
 use crate::{
     connect_options::ConnectOptions,
@@ -108,7 +109,10 @@ impl TcpReader {
 impl AsyncMqttNetworkRead for TcpReader {
     type W = TcpWriter;
 
-    fn connect(options: &ConnectOptions) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_ {
+    fn connect(
+        options: &ConnectOptions,
+    ) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_
+    {
         async {
             let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
             // debug!("Created TCP connection");
@@ -121,10 +125,9 @@ impl AsyncMqttNetworkRead for TcpReader {
 
             let packet = reader.read().await?;
             if let Packet::ConnAck(con) = packet {
-                if con.reason_code == ConnAckReasonCode::Success{
+                if con.reason_code == ConnAckReasonCode::Success {
                     Ok((reader, writer, Packet::ConnAck(con)))
-                }
-                else{
+                } else {
                     Err(ConnectionError::ConnectionRefused(con.reason_code))
                 }
             } else {
@@ -164,7 +167,7 @@ impl AsyncMqttNetworkRead for TcpReader {
             tracing::trace!("Read packet from network {}", read_packet);
             let disconnect = read_packet.packet_type() == PacketType::Disconnect;
             incoming_packet_sender.send(read_packet).await?;
-            if disconnect{
+            if disconnect {
                 return Ok(true);
             }
             read_packets += 1;

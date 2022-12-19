@@ -1,10 +1,10 @@
-pub enum Transport{
+pub enum Transport {
     TCP,
     TLS(TlsConfig),
     QUIC(),
-}   
+}
 
-pub enum TlsConfig{
+pub enum TlsConfig {
     TwoWay {
         ca: Vec<u8>,
         alpn: Option<Vec<Vec<u8>>>,

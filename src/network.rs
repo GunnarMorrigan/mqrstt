@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
@@ -81,7 +81,6 @@ where
             to_network_r,
         } = self;
 
-
         if let Some((reader, writer)) = network {
             let disconnect = AtomicBool::new(false);
 
@@ -89,11 +88,10 @@ where
                 loop {
                     let local_disconnect = reader.read_direct(network_to_handler_s).await?;
                     *(last_network_action.lock().await) = std::time::Instant::now();
-                    if local_disconnect{
+                    if local_disconnect {
                         disconnect.store(true, Ordering::Release);
                         return Ok(());
-                    }
-                    else if disconnect.load(Ordering::Acquire){
+                    } else if disconnect.load(Ordering::Acquire) {
                         return Ok(());
                     }
                 }
@@ -103,21 +101,20 @@ where
                 loop {
                     let local_disconnect = writer.write(to_network_r).await?;
                     *(last_network_action.lock().await) = std::time::Instant::now();
-                    if local_disconnect{
+                    if local_disconnect {
                         disconnect.store(true, Ordering::Release);
                         return Ok(());
-                    }
-                    else if disconnect.load(Ordering::Acquire){
+                    } else if disconnect.load(Ordering::Acquire) {
                         return Ok(());
                     }
                 }
             };
 
-            let res: (Result<(), ConnectionError>, Result<(), ConnectionError>) = (incoming, outgoing).join().await;
+            let res: (Result<(), ConnectionError>, Result<(), ConnectionError>) =
+                (incoming, outgoing).join().await;
             res.0?;
             res.1
-        }
-        else{
+        } else {
             Ok(())
         }
     }

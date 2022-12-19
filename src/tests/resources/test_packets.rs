@@ -1,9 +1,17 @@
 use bytes::Bytes;
 
-use crate::packets::{packets::Packet, publish::{Publish, PublishProperties}, QoS, puback::{PubAck, PubAckProperties}, reason_codes::{PubAckReasonCode, DisconnectReasonCode}, disconnect::{Disconnect, DisconnectProperties}, pubrel::PubRel, subscribe::{Subscription, Subscribe}};
+use crate::packets::{
+    disconnect::{Disconnect, DisconnectProperties},
+    packets::Packet,
+    puback::{PubAck, PubAckProperties},
+    publish::{Publish, PublishProperties},
+    pubrel::PubRel,
+    reason_codes::{DisconnectReasonCode, PubAckReasonCode},
+    subscribe::{Subscribe, Subscription},
+    QoS,
+};
 
-
-pub fn publish_packets() -> Vec::<Packet>{
+pub fn publish_packets() -> Vec<Packet> {
     let mut ret = vec![];
 
     let packet = Packet::Publish(Publish {
@@ -26,7 +34,6 @@ pub fn publish_packets() -> Vec::<Packet>{
     });
     ret.push(packet);
 
-
     let packet = Packet::Publish(Publish {
         dup: true,
         qos: QoS::AtMostOnce,
@@ -47,7 +54,6 @@ pub fn publish_packets() -> Vec::<Packet>{
     });
     ret.push(packet);
 
-
     let packet = Packet::Publish(Publish {
         dup: true,
         qos: QoS::AtMostOnce,
@@ -67,7 +73,6 @@ pub fn publish_packets() -> Vec::<Packet>{
         payload: Bytes::from_static(b""),
     });
     ret.push(packet);
-
 
     let packet = Packet::Publish(Publish {
         dup: true,
@@ -92,14 +97,18 @@ pub fn publish_packets() -> Vec::<Packet>{
     ret
 }
 
-
-pub fn create_subscribe_packet(packet_identifier: u16) -> Packet{
-        let subscription: Subscription = "test/topic".into();
-        let sub = Subscribe::new(packet_identifier, subscription.0);
-        Packet::Subscribe(sub)
+pub fn create_subscribe_packet(packet_identifier: u16) -> Packet {
+    let subscription: Subscription = "test/topic".into();
+    let sub = Subscribe::new(packet_identifier, subscription.0);
+    Packet::Subscribe(sub)
 }
 
-pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifier: Option<u16>) -> Packet{
+pub fn create_publish_packet(
+    qos: QoS,
+    dup: bool,
+    retain: bool,
+    packet_identifier: Option<u16>,
+) -> Packet {
     Packet::Publish(Publish {
         dup,
         qos,
@@ -120,8 +129,8 @@ pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifie
     })
 }
 
-pub fn create_puback_packet(packet_identifier: u16) -> Packet{
-    Packet::PubAck(PubAck{
+pub fn create_puback_packet(packet_identifier: u16) -> Packet {
+    Packet::PubAck(PubAck {
         packet_identifier,
         reason_code: PubAckReasonCode::Success,
         properties: PubAckProperties::default(),
@@ -136,8 +145,8 @@ pub fn create_puback_packet(packet_identifier: u16) -> Packet{
 //     })
 // }
 
-pub fn create_disconnect_packet() -> Packet{
-    Packet::Disconnect(Disconnect{
+pub fn create_disconnect_packet() -> Packet {
+    Packet::Disconnect(Disconnect {
         reason_code: DisconnectReasonCode::NormalDisconnection,
         properties: DisconnectProperties::default(),
     })

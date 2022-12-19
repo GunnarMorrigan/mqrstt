@@ -71,7 +71,7 @@ impl VariableHeaderRead for Publish {
         }
 
         let publish_properties = PublishProperties::read(&mut buf)?;
-        
+
         todo!("Fix this below");
         let payload_len = remaining_length - remaining_length;
         if buf.len() < payload_len {

@@ -5,11 +5,13 @@ use tracing::info;
 use crate::{
     error::ClientError,
     packets::{
+        disconnect::{Disconnect, DisconnectProperties},
         packets::Packet,
         publish::{Publish, PublishProperties},
+        reason_codes::DisconnectReasonCode,
         subscribe::{Subscribe, SubscribeProperties, Subscription},
         unsubscribe::{Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
-        QoS, disconnect::{Disconnect, DisconnectProperties}, reason_codes::DisconnectReasonCode,
+        QoS,
     },
 };
 
@@ -209,7 +211,6 @@ impl AsyncClient {
         Ok(())
     }
 
-
     pub async fn disconnect(&self) -> Result<(), ClientError> {
         let disconnect = Disconnect {
             reason_code: DisconnectReasonCode::NormalDisconnection,
@@ -222,7 +223,11 @@ impl AsyncClient {
         Ok(())
     }
 
-    pub async fn disconnect_with_properties(&self, reason_code: DisconnectReasonCode, properties: DisconnectProperties) -> Result<(), ClientError> {
+    pub async fn disconnect_with_properties(
+        &self,
+        reason_code: DisconnectReasonCode,
+        properties: DisconnectProperties,
+    ) -> Result<(), ClientError> {
         let disconnect = Disconnect {
             reason_code,
             properties,
