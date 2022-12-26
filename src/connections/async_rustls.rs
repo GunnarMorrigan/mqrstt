@@ -1,51 +1,72 @@
 use std::io::{self, Error, ErrorKind};
 
+use async_channel::Receiver;
+
+use async_rustls::TlsConnector;
+use async_rustls::client::TlsStream;
 use bytes::{Buf, BytesMut};
-#[cfg(feature = "smol")]
+use rustls::ServerName;
+use smol::io::{ReadHalf, WriteHalf};
 use smol::{
-    io::{AsyncReadExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncWriteExt, split},
     net::TcpStream,
 };
-use tokio::net::tcp::OwnedReadHalf;
-#[cfg(feature = "tokio")]
-use tokio::{io::AsyncReadExt, net::TcpStream};
 
-use crate::packets::{
+use tracing::trace;
+
+use crate::error::TlsError;
+use crate::{packets::{
     error::ReadBytes,
     packets::{FixedHeader, Packet, PacketType},
     reason_codes::ConnAckReasonCode,
-};
+}, connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite}};
 use crate::{
     connect_options::ConnectOptions,
-    connections::{create_connect_from_options, tcp_tokio::AsyncMqttNetworkWrite},
+    connections::{create_connect_from_options},
     error::ConnectionError,
     network::Incoming,
 };
 
-use super::{tcp_writer::TcpWriter, AsyncMqttNetworkRead};
+use super::transport::TlsConfig;
+use super::util::smol_simple_rust_tls;
 
 #[derive(Debug)]
-pub struct TcpReader {
-    readhalf: OwnedReadHalf,
+pub struct TlsReader {
+    readhalf: ReadHalf<TlsStream<TcpStream>>,
 
     /// Buffered reads
     buffer: BytesMut,
 }
 
-impl TcpReader {
-    pub async fn new_tcp(
+impl TlsReader {
+    pub async fn new(
         options: &ConnectOptions,
-    ) -> Result<(TcpReader, TcpWriter), ConnectionError> {
-        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port))
-            .await?
-            .into_split();
-        let reader = TcpReader {
-            readhalf,
-            buffer: BytesMut::with_capacity(20 * 1024),
-            // max_incoming_size: u32::MAX as usize,
-        };
-        let writer = TcpWriter::new(writehalf);
-        Ok((reader, writer))
+    ) -> Result<(TlsReader, TlsWriter), TlsError> {
+        if let Some(tls_config) = &options.tls_config{
+            match tls_config{
+                TlsConfig::Simple { ca, alpn, client_auth } => {
+                    let connector = TlsConnector::from(smol_simple_rust_tls(ca.clone(), alpn.clone(), client_auth.clone())?);
+                    let domain = ServerName::try_from(options.address.as_str())?;
+                    let stream = TcpStream::connect((options.address.as_str(), options.port)).await?;
+
+                    let connection = connector.connect(domain, stream).await?;
+            
+                    let (readhalf, writehalf) = split(connection);
+            
+                    let reader = Self {
+                        readhalf,
+                        buffer: BytesMut::with_capacity(20 * 1024),
+                    };
+                    let writer = TlsWriter::new(writehalf);
+            
+                    Ok((reader, writer))
+                },
+                _ => unreachable!(),
+            }
+        }
+        else{
+            Err(TlsError::NoTlsConfig)
+        }
     }
 
     pub async fn read(&mut self) -> io::Result<Packet> {
@@ -81,7 +102,7 @@ impl TcpReader {
             #[cfg(feature = "tokio")]
             let read = self.readhalf.read_buf(&mut self.buffer).await?;
             #[cfg(feature = "smol")]
-            let read = self.connection.read(&mut self.buffer).await?;
+            let read = self.readhalf.read(&mut self.buffer).await?;
             if 0 == read {
                 return if self.buffer.is_empty() {
                     Err(io::Error::new(
@@ -104,16 +125,15 @@ impl TcpReader {
     }
 }
 
-impl AsyncMqttNetworkRead for TcpReader {
-    type W = TcpWriter;
+impl AsyncMqttNetworkRead for TlsReader {
+    type W = TlsWriter;
 
     fn connect(
         options: &ConnectOptions,
     ) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_
     {
         async {
-            let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
-            // debug!("Created TCP connection");
+            let (mut reader, mut writer) = TlsReader::new(options).await?;
 
             let mut buf_out = BytesMut::new();
 
@@ -175,16 +195,14 @@ impl AsyncMqttNetworkRead for TcpReader {
         }
     }
 }
-
-
-pub struct TcpWriter {
-    writehalf: OwnedWriteHalf,
+pub struct TlsWriter {
+    writehalf: WriteHalf<TlsStream<TcpStream>>,
 
     buffer: BytesMut,
 }
 
-impl TcpWriter {
-    pub fn new(writehalf: OwnedWriteHalf) -> Self {
+impl TlsWriter {
+    pub fn new(writehalf: WriteHalf<TlsStream<TcpStream>>) -> Self {
         Self {
             writehalf,
             buffer: BytesMut::with_capacity(20 * 1024),
@@ -192,7 +210,7 @@ impl TcpWriter {
     }
 }
 
-impl AsyncMqttNetworkWrite for TcpWriter {
+impl AsyncMqttNetworkWrite for TlsWriter {
     async fn write_buffer(&mut self, buffer: &mut BytesMut) -> Result<(), ConnectionError> {
         if buffer.is_empty() {
             return Ok(());

@@ -1,3 +1,4 @@
+#[cfg(feature = "tokio")]
 #[cfg(test)]
 mod e2e {
 
@@ -9,7 +10,7 @@ mod e2e {
     use crate::{
         client::AsyncClient,
         connect_options::ConnectOptions,
-        create_new_tcp,
+        create_new_tokio_tcp,
         error::ClientError,
         event_handler::EventHandler,
         packets::{
@@ -76,7 +77,7 @@ mod e2e {
             .expect("setting default subscriber failed");
 
         // let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
-        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string());
+        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
 
         let (mut mqtt_network, handler, client, _r) = create_new_tcp(opt);
 
@@ -90,7 +91,7 @@ mod e2e {
 
         let sender = tokio::task::spawn(async move {
             client
-                .publish(QoS::ExactlyOnce, false, "test/123".to_string(), "123456789")
+                .publish(QoS::ExactlyOnce, false, "test".to_string(), "123456789")
                 .await?;
 
             let lol = smol::future::pending::<Result<(), ClientError>>();

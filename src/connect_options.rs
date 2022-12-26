@@ -1,14 +1,17 @@
 use bytes::Bytes;
 
+use crate::connections::transport::TlsConfig;
 use crate::packets::connect::LastWill;
 use crate::util::constants::RECEIVE_MAXIMUM_DEFAULT;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct ConnectOptions {
     /// broker address that you want to connect to
     pub(crate) address: String,
     /// broker port
     pub(crate) port: u16,
+
+    pub(crate) tls_config: Option<TlsConfig>,
 
     // /// What transport protocol to use
     // transport: Transport,
@@ -48,10 +51,12 @@ pub struct ConnectOptions {
 }
 
 impl ConnectOptions {
-    pub fn new(address: String, port: u16, client_id: String) -> Self {
+    pub fn new(address: String, port: u16, client_id: String, tls_config: Option<TlsConfig>) -> Self {
         Self {
             address,
             port,
+            tls_config,
+
             keep_alive_interval_s: 60,
             connection_timeout_s: 30,
             clean_session: false,

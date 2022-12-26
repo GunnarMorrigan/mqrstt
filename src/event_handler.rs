@@ -112,11 +112,13 @@ impl EventHandlerTask {
             }
         };
         let keepalive = async {
-            let initial_keep_alive_duration = tokio::time::Duration::new(self.keep_alive_s, 0);
-            let mut keep_alive_duration = tokio::time::Duration::new(self.keep_alive_s, 0);
+            let initial_keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
+            let mut keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
             loop {
                 warn!("Awaiting PING sleep");
+                #[cfg(feature = "tokio")]
                 tokio::time::sleep(keep_alive_duration).await;
+                
                 if (!self.waiting_for_pingresp.load(Ordering::Acquire))
                     && self.last_network_action.lock().await.elapsed()
                         >= initial_keep_alive_duration
@@ -422,7 +424,7 @@ mod HandlerTests {
         Sender<Packet>,
         Sender<Packet>,
     ) {
-        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string());
+        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
 
         let (to_network_s, to_network_r) = async_channel::bounded(100);
         let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);

@@ -11,7 +11,7 @@ use std::time::Instant;
 use tracing::trace;
 
 use crate::connect_options::ConnectOptions;
-use crate::connections::tcp_tokio::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
+use crate::connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 use crate::error::ConnectionError;
 use crate::packets::packets::Packet;
 use crate::util::timeout;
@@ -73,6 +73,7 @@ where
             self.network = Some((reader, writer));
             self.network_to_handler_s.send(connack).await?;
         }
+
         let MqttNetwork {
             network,
             options: _,

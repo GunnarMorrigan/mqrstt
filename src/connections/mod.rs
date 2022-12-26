@@ -1,9 +1,25 @@
-// pub mod tcp;
+
+#[cfg(all(feature = "tokio", feature = "tcp"))]
 pub mod tcp_tokio;
+
+#[cfg(all(feature = "smol", feature = "tcp"))]
+pub mod tcp_smol;
+
+#[cfg(all(feature = "smol", feature = "native-tls"))]
+pub mod async_native_tls;
+
+#[cfg(all(feature = "smol", feature = "rust-tls"))]
+pub mod async_rustls;
+
+#[cfg(all(feature = "quic"))]
+pub mod quic;
+
+pub mod transport;
+mod util;
 
 use std::future::Future;
 
-use async_channel::Sender;
+use async_channel::{Sender, Receiver};
 use bytes::BytesMut;
 
 use crate::connect_options::ConnectOptions;
@@ -33,4 +49,22 @@ pub trait AsyncMqttNetwork: Sized + Sync + 'static {
     async fn read_many(&self, receiver: &Sender<Packet>) -> Result<(), ConnectionError>;
 
     async fn write(&self, write_buf: &mut BytesMut) -> Result<(), ConnectionError>;
+}
+
+pub trait AsyncMqttNetworkRead: Sized + Sync {
+    type W;
+
+    fn connect(
+        options: &ConnectOptions,
+    ) -> impl Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_;
+
+    async fn read(&mut self) -> Result<Packet, ConnectionError>;
+
+    async fn read_direct(&mut self, sender: &Sender<Packet>) -> Result<bool, ConnectionError>;
+}
+
+pub trait AsyncMqttNetworkWrite: Sized + Sync {
+    async fn write_buffer(&mut self, buffer: &mut BytesMut) -> Result<(), ConnectionError>;
+
+    async fn write(&mut self, outgoing: &Receiver<Packet>) -> Result<bool, ConnectionError>;
 }

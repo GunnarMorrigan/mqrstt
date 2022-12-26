@@ -73,4 +73,28 @@ pub enum ConnectionError {
 
     #[error("Requests done")]
     RequestsDone,
+
+    #[error("TLS Error")]
+    TLS(#[from] TlsError)
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum TlsError {
+    #[error("There is no TLS configuration for a TLS connection")]
+    NoTlsConfig,
+
+    #[error("Io error")]
+    TlsIoError(#[from] io::Error),
+
+    #[error("Could no construct a valid root certificate")]
+    NoValidRootCertInChain,
+
+    #[error("Could not construct a valid private key")]
+    NoValidPrivateKey,
+
+    #[error("{0}")]
+    RustlsError(#[from] rustls::Error),
+    
+    #[error("{0}")]
+    RustlsInvalidDnsNameError(#[from] rustls::client::InvalidDnsNameError),
 }
