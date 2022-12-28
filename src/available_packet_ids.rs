@@ -5,9 +5,7 @@ use tracing::{debug, error};
 
 #[derive(Debug, Clone)]
 pub struct AvailablePacketIds {
-    max_inflight: u16,
     sender: Sender<u16>,
-    receiver: Receiver<u16>,
 }
 
 impl AvailablePacketIds {
@@ -19,15 +17,9 @@ impl AvailablePacketIds {
         }
 
         let apkid = Self {
-            max_inflight,
             sender: s,
-            receiver: r.clone(),
         };
         (apkid, r)
-    }
-
-    pub fn get_receiver(&self) -> Receiver<u16> {
-        self.receiver.clone()
     }
 
     pub async fn mark_available(&self, pkid: u16) {
