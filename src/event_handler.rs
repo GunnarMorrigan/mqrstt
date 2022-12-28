@@ -288,13 +288,15 @@ impl EventHandlerTask {
         self.waiting_for_pingresp.store(false, Ordering::Release);
     }
 
-    async fn handle_incoming_suback(&self, suback: SubAck) -> Result<(), MqttError>{
+    async fn handle_incoming_suback(&self, suback: SubAck) -> Result<(), MqttError> {
         let mut subs = self.state.outgoing_sub.lock().await;
-        if subs.remove(&suback.packet_identifier).is_some(){
-            self.state.apkid.mark_available(suback.packet_identifier).await;
+        if subs.remove(&suback.packet_identifier).is_some() {
+            self.state
+                .apkid
+                .mark_available(suback.packet_identifier)
+                .await;
             Ok(())
-        }
-        else{
+        } else {
             error!(
                 "Sub {} was not found, while receiving a SubAck for it",
                 suback.packet_identifier,
@@ -305,14 +307,16 @@ impl EventHandlerTask {
             ))
         }
     }
-    
-    async fn handle_incoming_unsuback(&self, unsuback: UnsubAck) -> Result<(), MqttError>{
+
+    async fn handle_incoming_unsuback(&self, unsuback: UnsubAck) -> Result<(), MqttError> {
         let mut unsubs = self.state.outgoing_unsub.lock().await;
-        if unsubs.remove(&unsuback.packet_identifier).is_some(){
-            self.state.apkid.mark_available(unsuback.packet_identifier).await;
+        if unsubs.remove(&unsuback.packet_identifier).is_some() {
+            self.state
+                .apkid
+                .mark_available(unsuback.packet_identifier)
+                .await;
             Ok(())
-        }
-        else{
+        } else {
             error!(
                 "Unsub {} was not found, while receiving a unsuback for it",
                 unsuback.packet_identifier,

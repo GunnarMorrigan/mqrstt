@@ -14,9 +14,7 @@ impl AvailablePacketIds {
             s.send_blocking(pkid).unwrap();
         }
 
-        let apkid = Self {
-            sender: s,
-        };
+        let apkid = Self { sender: s };
         (apkid, r)
     }
 
