@@ -1,7 +1,4 @@
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    sync::atomic::AtomicBool,
-};
+use std::collections::{BTreeMap, BTreeSet};
 
 use async_channel::Receiver;
 use async_mutex::Mutex;

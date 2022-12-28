@@ -5,7 +5,7 @@ use super::{
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::AuthReasonCode,
-    write_variable_integer, PacketType, PropertyType,
+    write_variable_integer, PacketType, PropertyType, variable_integer_len,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -36,7 +36,7 @@ impl VariableHeaderWrite for Auth {
 
 impl WireLength for Auth {
     fn wire_len(&self) -> usize {
-        1 + self.properties.wire_len()
+        1 + variable_integer_len(self.properties.wire_len()) + self.properties.wire_len()
     }
 }
 
@@ -143,6 +143,19 @@ impl MqttWrite for AuthProperties {
 
 impl WireLength for AuthProperties {
     fn wire_len(&self) -> usize {
-        todo!()
+        let mut len = 0;
+        if let Some(authentication_method) = &self.authentication_method {
+           len += authentication_method.wire_len();
+        }
+        if !self.authentication_data.is_empty() && self.authentication_method.is_some() {
+            len += self.authentication_data.wire_len();
+        }
+        if let Some(reason_string) = &self.reason_string {
+            len += reason_string.wire_len();
+        }
+        for (key, value) in &self.user_properties {
+            len += key.wire_len() + value.wire_len();
+        }
+        len
     }
 }

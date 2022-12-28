@@ -55,11 +55,7 @@ impl Publish {
 }
 
 impl VariableHeaderRead for Publish {
-    fn read(
-        flags: u8,
-        _: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, DeserializeError> {
+    fn read(flags: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         let dup = flags & 0b1000 != 0;
         let qos = QoS::from_u8((flags & 0b110) >> 1)?;
         let retain = flags & 0b1 != 0;

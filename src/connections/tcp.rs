@@ -7,9 +7,12 @@ use bytes::{Buf, BytesMut};
 //     io::{AsyncReadExt, AsyncWriteExt},
 //     net::TcpStream,
 // };
-use tokio::{net::tcp::{OwnedReadHalf, OwnedWriteHalf}, io::AsyncWriteExt};
 #[cfg(feature = "tokio")]
 use tokio::{io::AsyncReadExt, net::TcpStream};
+use tokio::{
+    io::AsyncWriteExt,
+    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
+};
 use tracing::trace;
 
 use crate::packets::{
@@ -24,7 +27,7 @@ use crate::{
     network::Incoming,
 };
 
-use super::{AsyncMqttNetworkRead};
+use super::AsyncMqttNetworkRead;
 
 #[derive(Debug)]
 pub struct TcpReader {
@@ -176,7 +179,6 @@ impl AsyncMqttNetworkRead for TcpReader {
         }
     }
 }
-
 
 pub struct TcpWriter {
     writehalf: OwnedWriteHalf,

@@ -75,7 +75,7 @@ pub enum ConnectionError {
     RequestsDone,
 
     #[error("TLS Error")]
-    TLS(#[from] TlsError)
+    TLS(#[from] TlsError),
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -95,7 +95,7 @@ pub enum TlsError {
     #[cfg(any(feature = "tokio-rustls", feature = "smol-rustls"))]
     #[error("{0}")]
     RustlsError(#[from] rustls::Error),
-    
+
     #[cfg(any(feature = "tokio-rustls", feature = "smol-rustls"))]
     #[error("{0}")]
     RustlsInvalidDnsNameError(#[from] rustls::client::InvalidDnsNameError),

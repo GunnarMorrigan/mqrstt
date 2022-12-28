@@ -1,7 +1,7 @@
 use super::{
     error::DeserializeError,
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
-    read_variable_integer, write_variable_integer, PacketType, PropertyType,
+    read_variable_integer, write_variable_integer, PacketType, PropertyType, variable_integer_len,
 };
 use bytes::BufMut;
 
@@ -54,7 +54,11 @@ impl VariableHeaderWrite for Unsubscribe {
 
 impl WireLength for Unsubscribe {
     fn wire_len(&self) -> usize {
-        todo!()
+        let mut len = 2+variable_integer_len(self.properties.wire_len())+self.properties.wire_len();
+        for topic in &self.topics{
+            len += topic.wire_len();
+        }
+        len
     }
 }
 

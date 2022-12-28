@@ -1,7 +1,7 @@
 use core::slice::Iter;
 use std::fmt::Display;
 
-use bytes::{BufMut, Bytes, BytesMut, Buf};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use super::error::{DeserializeError, ReadBytes, SerializeError};
 use super::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite, WireLength};
@@ -70,8 +70,7 @@ impl Packet {
                 p.write(buf)?;
             }
             Packet::ConnAck(_) => {
-                buf.put_u8(0b0010_0000);
-                todo!();
+                unreachable!()
             }
             Packet::Publish(p) => {
                 let mut first_byte = 0b0011_0000u8;
@@ -114,9 +113,7 @@ impl Packet {
                 p.write(buf)?;
             }
             Packet::SubAck(_) => {
-                buf.put_u8(0b1001_0000);
-                // write_variable_integer(buf, p.wire_len())?;
-                todo!()
+                unreachable!()
             }
             Packet::Unsubscribe(p) => {
                 buf.put_u8(0b1010_0010);
@@ -125,8 +122,7 @@ impl Packet {
             }
             Packet::UnsubAck(_) => {
                 buf.put_u8(0b1011_0000);
-                // write_variable_integer(buf, p.wire_len())?;
-                todo!()
+                unreachable!()
             }
             Packet::PingReq => {
                 buf.put_u8(0b1100_0000);
@@ -327,14 +323,13 @@ impl PacketType {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{Buf, Bytes, BytesMut};
+    use bytes::{Bytes, BytesMut};
 
     use crate::packets::connack::{ConnAck, ConnAckFlags, ConnAckProperties};
     use crate::packets::disconnect::{Disconnect, DisconnectProperties};
     use crate::packets::QoS;
 
-    use crate::packets::error::{DeserializeError, ReadBytes};
-    use crate::packets::packets::{FixedHeader, Packet};
+    use crate::packets::packets::Packet;
     use crate::packets::publish::{Publish, PublishProperties};
     use crate::packets::pubrel::{PubRel, PubRelProperties};
     use crate::packets::reason_codes::{ConnAckReasonCode, DisconnectReasonCode, PubRelReasonCode};

@@ -8,12 +8,14 @@ use crate::packets::publish::Publish;
 use crate::packets::pubrec::PubRec;
 use crate::packets::pubrel::PubRel;
 use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
+use crate::packets::suback::{SubAck, self};
 use crate::packets::subscribe::Subscribe;
+use crate::packets::unsuback::UnsubAck;
 use crate::packets::unsubscribe::Unsubscribe;
 use crate::packets::QoS;
 use crate::state::State;
 
-use futures_concurrency::future::{Race};
+use futures_concurrency::future::Race;
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
@@ -117,7 +119,7 @@ impl EventHandlerTask {
         //         warn!("Awaiting PING sleep");
         //         #[cfg(feature = "tokio")]
         //         tokio::time::sleep(keep_alive_duration).await;
-                
+
         //         if (!self.waiting_for_pingresp.load(Ordering::Acquire))
         //             && self.last_network_action.lock().await.elapsed()
         //                 >= initial_keep_alive_duration
@@ -154,8 +156,8 @@ impl EventHandlerTask {
             Packet::PubRec(pubrec) => self.handle_incoming_pubrec(&pubrec).await?,
             Packet::PubRel(pubrel) => self.handle_incoming_pubrel(&pubrel).await?,
             Packet::PubComp(pubcomp) => self.handle_incoming_pubcomp(&pubcomp).await?,
-            Packet::SubAck(suback) => todo!("Implement these functions"),
-            Packet::UnsubAck(unsuback) => todo!("Implement these functions"),
+            Packet::SubAck(suback) => self.handle_incoming_suback(suback).await?,
+            Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback).await?,
             Packet::PingResp => self.handle_incoming_pingresp().await,
             Packet::ConnAck(_) => (),
             _ => unreachable!(),
@@ -286,14 +288,48 @@ impl EventHandlerTask {
         self.waiting_for_pingresp.store(false, Ordering::Release);
     }
 
+    async fn handle_incoming_suback(&self, suback: SubAck) -> Result<(), MqttError>{
+        let mut subs = self.state.outgoing_sub.lock().await;
+        if subs.remove(&suback.packet_identifier).is_some(){
+            self.state.apkid.mark_available(suback.packet_identifier).await;
+            Ok(())
+        }
+        else{
+            error!(
+                "Sub {} was not found, while receiving a SubAck for it",
+                suback.packet_identifier,
+            );
+            Err(MqttError::Unsolicited(
+                suback.packet_identifier,
+                PacketType::SubAck,
+            ))
+        }
+    }
+    
+    async fn handle_incoming_unsuback(&self, unsuback: UnsubAck) -> Result<(), MqttError>{
+        let mut unsubs = self.state.outgoing_unsub.lock().await;
+        if unsubs.remove(&unsuback.packet_identifier).is_some(){
+            self.state.apkid.mark_available(unsuback.packet_identifier).await;
+            Ok(())
+        }
+        else{
+            error!(
+                "Unsub {} was not found, while receiving a unsuback for it",
+                unsuback.packet_identifier,
+            );
+            Err(MqttError::Unsolicited(
+                unsuback.packet_identifier,
+                PacketType::UnsubAck,
+            ))
+        }
+    }
+
     async fn handle_outgoing_packet(&self, packet: Packet) -> Result<(), MqttError> {
         match packet {
             Packet::Publish(publish) => self.handle_outgoing_publish(publish).await,
             Packet::Subscribe(sub) => self.handle_outgoing_subscribe(sub).await,
             Packet::Unsubscribe(unsub) => self.handle_outgoing_unsubscribe(unsub).await,
             Packet::Disconnect(d) => self.handle_outgoing_disconnect(d).await,
-            Packet::Auth(_) => todo!(),
-
             _ => unreachable!(),
         }
     }
@@ -381,19 +417,18 @@ pub trait EventHandler: Sized + Sync + 'static {
 }
 
 #[cfg(test)]
-mod HandlerTests {
+mod handler_tests {
     use std::{sync::Arc, time::Duration};
 
     use async_channel::{Receiver, Sender};
     use async_mutex::Mutex;
 
     use crate::{
-        client::AsyncClient,
         connect_options::ConnectOptions,
         event_handler::{EventHandler, EventHandlerTask},
         packets::{
             packets::{Packet, PacketType},
-            pubcomp::{self, PubComp, PubCompProperties},
+            pubcomp::{PubComp, PubCompProperties},
             pubrec::{PubRec, PubRecProperties},
             pubrel::{PubRel, PubRelProperties},
             reason_codes::{
@@ -412,7 +447,7 @@ mod HandlerTests {
     impl EventHandler for Nop {
         fn handle<'a>(
             &'a mut self,
-            event: &'a Packet,
+            _event: &'a Packet,
         ) -> impl core::future::Future<Output = ()> + Send + 'a {
             async move { () }
         }
@@ -430,7 +465,7 @@ mod HandlerTests {
         let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);
         let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
 
-        let (handler, apkid) = EventHandlerTask::new(
+        let (handler, _apkid) = EventHandlerTask::new(
             &opt,
             network_to_handler_r,
             to_network_s,
@@ -451,10 +486,10 @@ mod HandlerTests {
     async fn outgoing_publish_qos_0() {
         let mut nop = Nop {};
 
-        let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
+        let (handler, to_network_r, _network_to_handler_s, client_to_handler_s) = handler();
 
         let handler_task = tokio::task::spawn(async move {
-            dbg!(handler.handle(&mut nop).await);
+            dbg!(handler.handle(&mut nop).await).unwrap();
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtMostOnce, false, false, None);
@@ -514,7 +549,7 @@ mod HandlerTests {
         let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
 
         let handler_task = tokio::task::spawn(async move {
-            dbg!(handler.handle(&mut nop).await);
+            dbg!(handler.handle(&mut nop).await).unwrap();
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
@@ -643,7 +678,7 @@ mod HandlerTests {
         let mut nop = Nop {};
 
         let handler_task = tokio::task::spawn(async move {
-            handler.handle(&mut nop).await;
+            handler.handle(&mut nop).await.unwrap();
             return handler;
         });
 

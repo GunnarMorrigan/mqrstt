@@ -79,8 +79,12 @@ impl ConnectOptions {
         }
     }
 
-
-    pub(crate) fn new_with_tls_config(address: String, port: u16, client_id: String, tls_config: Option<TlsConfig>) -> Self {
+    pub(crate) fn new_with_tls_config(
+        address: String,
+        port: u16,
+        client_id: String,
+        tls_config: Option<TlsConfig>,
+    ) -> Self {
         Self {
             address,
             port,

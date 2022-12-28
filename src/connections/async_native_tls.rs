@@ -1,27 +1,28 @@
 use std::io::{self, Error, ErrorKind};
 
 use async_channel::Receiver;
-use async_native_tls::{TlsStream, TlsConnector};
+use async_native_tls::{TlsConnector, TlsStream};
 use bytes::{Buf, BytesMut};
 use smol::io::{ReadHalf, WriteHalf};
 use smol::{
-    io::{AsyncReadExt, AsyncWriteExt, split},
+    io::{split, AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
 };
 
 use tracing::trace;
 
 use crate::error::TlsError;
-use crate::{packets::{
-    error::ReadBytes,
-    packets::{FixedHeader, Packet, PacketType},
-    reason_codes::ConnAckReasonCode,
-}, connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite}};
 use crate::{
-    connect_options::ConnectOptions,
-    connections::{create_connect_from_options},
-    error::ConnectionError,
-    network::Incoming,
+    connect_options::ConnectOptions, connections::create_connect_from_options,
+    error::ConnectionError, network::Incoming,
+};
+use crate::{
+    connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite},
+    packets::{
+        error::ReadBytes,
+        packets::{FixedHeader, Packet, PacketType},
+        reason_codes::ConnAckReasonCode,
+    },
 };
 
 #[derive(Debug)]
@@ -33,29 +34,25 @@ pub struct TlsReader {
 }
 
 impl TlsReader {
-    pub async fn new(
-        options: &ConnectOptions,
-    ) -> Result<(TlsReader, TlsWriter), ConnectionError> {
-        if let Some(tls_config) = &options.tls_config{
+    pub async fn new(options: &ConnectOptions) -> Result<(TlsReader, TlsWriter), ConnectionError> {
+        if let Some(tls_config) = &options.tls_config {
             let addr = options.address.clone();
             let tcp = TcpStream::connect((addr.as_str(), options.port)).await?;
-            
+
             let connector = TlsConnector::new().use_sni(true);
 
-
             let mut connection = async_native_tls::connect("google.com", tcp).await.unwrap();
-    
+
             let (readhalf, writehalf) = split(connection);
-    
+
             let reader = Self {
                 readhalf,
                 buffer: BytesMut::with_capacity(20 * 1024),
             };
             let writer = TlsWriter::new(writehalf);
-    
+
             Ok((reader, writer))
-        }
-        else{
+        } else {
             Err(ConnectionError::TLS(TlsError::NoTlsConfig))
         }
     }

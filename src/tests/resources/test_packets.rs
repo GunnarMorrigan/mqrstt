@@ -1,3 +1,4 @@
+#[allow(dead_code)]
 use bytes::Bytes;
 
 use crate::packets::{
@@ -5,7 +6,6 @@ use crate::packets::{
     packets::Packet,
     puback::{PubAck, PubAckProperties},
     publish::{Publish, PublishProperties},
-    pubrel::PubRel,
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
     subscribe::{Subscribe, Subscription},
     QoS,

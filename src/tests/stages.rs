@@ -1,5 +1,9 @@
-pub mod qos_2{
-    use crate::{client::AsyncClient, event_handler::EventHandler, packets::packets::{Packet, PacketType}};
+pub mod qos_2 {
+    use crate::{
+        client::AsyncClient,
+        event_handler::EventHandler,
+        packets::packets::{Packet, PacketType},
+    };
 
     pub struct TestPubQoS2 {
         stage: StagePubQoS2,
@@ -12,6 +16,7 @@ pub mod qos_2{
         Done,
     }
     impl TestPubQoS2 {
+        #[allow(dead_code)]
         pub fn new(client: AsyncClient) -> Self {
             TestPubQoS2 {
                 stage: StagePubQoS2::ConnAck,

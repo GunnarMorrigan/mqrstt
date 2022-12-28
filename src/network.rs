@@ -63,15 +63,15 @@ where
             trace!("Creating network");
 
             let con = R::connect(&self.options).await;
-            
-            if let Err(err) = con.as_ref(){
+
+            if let Err(err) = con.as_ref() {
                 dbg!(err);
             }
 
             let (reader, writer, connack) = con?;
 
-                // timeout::timeout(R::connect(&self.options), self.options.connection_timeout_s)
-                //     .await??;
+            // timeout::timeout(R::connect(&self.options), self.options.connection_timeout_s)
+            //     .await??;
 
             trace!("Succesfully created network");
             self.network = Some((reader, writer));

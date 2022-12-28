@@ -8,15 +8,8 @@ mod tokio_e2e {
     use tracing_subscriber::FmtSubscriber;
 
     use crate::{
-        client::AsyncClient,
-        connect_options::ConnectOptions,
-        create_tokio_tcp,
-        error::ClientError,
-        event_handler::EventHandler,
-        packets::{
-            packets::{Packet, PacketType},
-            QoS,
-        },
+        connect_options::ConnectOptions, create_tokio_tcp, error::ClientError,
+        event_handler::EventHandler, packets::QoS,
     };
 
     use crate::tests::stages::qos_2::TestPubQoS2;
@@ -34,7 +27,12 @@ mod tokio_e2e {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        let opt = ConnectOptions::new_with_tls_config("broker.emqx.io".to_string(), 1883, "test123123".to_string(), None);
+        let opt = ConnectOptions::new_with_tls_config(
+            "broker.emqx.io".to_string(),
+            1883,
+            "test123123".to_string(),
+            None,
+        );
         // let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
 
         let (mut mqtt_network, handler, client) = create_tokio_tcp(opt);
@@ -64,20 +62,13 @@ mod tokio_e2e {
 #[cfg(test)]
 mod smol_rustls_e2e {
 
-    use futures_concurrency::future::Join;
-
     use tracing::Level;
     use tracing_subscriber::FmtSubscriber;
 
     use crate::{
-        connect_options::ConnectOptions,
-        create_smol_tls,
-        packets::{
-            QoS,
-        }, connections::transport::{TlsConfig, RustlsConfig}, tests::resources::EMQX_CERT,
+        connect_options::ConnectOptions, connections::transport::RustlsConfig, create_smol_rustls,
+        tests::resources::EMQX_CERT,
     };
-
-    use crate::tests::stages::qos_2::TestPubQoS2;
 
     #[test]
     fn test_pub_tcp_qos_2() {
@@ -100,7 +91,7 @@ mod smol_rustls_e2e {
 
         let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string());
 
-        let (mut mqtt_network, handler, client) = create_smol_tls(opt, config);
+        let (mut mqtt_network, _handler, _client) = create_smol_rustls(opt, config);
 
         smol::block_on(mqtt_network.run()).unwrap()
     }

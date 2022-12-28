@@ -5,7 +5,7 @@ use super::{
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::DisconnectReasonCode,
-    PacketType, PropertyType, write_variable_integer,
+    write_variable_integer, PacketType, PropertyType,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,8 +62,7 @@ impl WireLength for Disconnect {
             || self.properties.wire_len() != 0
         {
             self.properties.wire_len() + 1
-        }
-        else {
+        } else {
             0
         }
     }
@@ -151,7 +150,7 @@ impl MqttWrite for DisconnectProperties {
         if let Some(reason_string) = &self.reason_string {
             reason_string.write(buf)?;
         }
-        for (key, val) in self.user_properties.iter(){
+        for (key, val) in self.user_properties.iter() {
             key.write(buf)?;
             val.write(buf)?;
         }
@@ -165,13 +164,13 @@ impl MqttWrite for DisconnectProperties {
 impl WireLength for DisconnectProperties {
     fn wire_len(&self) -> usize {
         let mut len = 0;
-        if self.session_expiry_interval.is_some(){
+        if self.session_expiry_interval.is_some() {
             len += 4;
         }
         if let Some(reason_string) = &self.reason_string {
             len += reason_string.wire_len();
         }
-        for (key, val) in self.user_properties.iter(){
+        for (key, val) in self.user_properties.iter() {
             len += key.wire_len() + val.wire_len();
         }
         if let Some(server_refrence) = &self.server_reference {

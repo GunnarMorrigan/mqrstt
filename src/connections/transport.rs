@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use rustls::ClientConfig;
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub enum TlsConfig {
@@ -15,7 +15,7 @@ pub enum TlsConfig {
 
 #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 #[derive(Debug, Clone)]
-pub enum RustlsConfig{
+pub enum RustlsConfig {
     Simple {
         ca: Vec<u8>,
         alpn: Option<Vec<Vec<u8>>>,

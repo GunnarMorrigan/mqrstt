@@ -44,16 +44,3 @@ impl AvailablePacketIds {
         }
     }
 }
-
-pub struct PacketId {}
-
-impl Future for PacketId {
-    type Output = u16;
-
-    fn poll(
-        self: std::pin::Pin<&mut Self>,
-        _cx: &mut std::task::Context<'_>,
-    ) -> std::task::Poll<Self::Output> {
-        todo!()
-    }
-}

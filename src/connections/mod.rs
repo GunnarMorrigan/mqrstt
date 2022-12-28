@@ -1,4 +1,3 @@
-
 #[cfg(all(feature = "tokio", feature = "tcp"))]
 pub mod tcp;
 
@@ -23,7 +22,7 @@ mod util;
 
 use std::future::Future;
 
-use async_channel::{Sender, Receiver};
+use async_channel::{Receiver, Sender};
 use bytes::BytesMut;
 
 use crate::connect_options::ConnectOptions;
