@@ -34,7 +34,7 @@ mod tokio_e2e {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string(), None);
+        let opt = ConnectOptions::new_with_tls_config("broker.emqx.io".to_string(), 1883, "test123123".to_string(), None);
         // let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
 
         let (mut mqtt_network, handler, client) = create_tokio_tcp(opt);
@@ -70,15 +70,11 @@ mod smol_rustls_e2e {
     use tracing_subscriber::FmtSubscriber;
 
     use crate::{
-        client::AsyncClient,
         connect_options::ConnectOptions,
         create_smol_tls,
-        error::ClientError,
-        event_handler::EventHandler,
         packets::{
-            packets::{Packet, PacketType},
             QoS,
-        }, connections::transport::TlsConfig, tests::resources::EMQX,
+        }, connections::transport::{TlsConfig, RustlsConfig}, tests::resources::EMQX_CERT,
     };
 
     use crate::tests::stages::qos_2::TestPubQoS2;
@@ -96,15 +92,15 @@ mod smol_rustls_e2e {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        let config = TlsConfig::Simple{
-            ca: EMQX.to_vec(),
+        let config = RustlsConfig::Simple {
+            ca: EMQX_CERT.to_vec(),
             alpn: None,
             client_auth: None,
         };
 
-        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string(), Some(config));
+        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string());
 
-        let (mut mqtt_network, handler, client) = create_smol_tls(opt);
+        let (mut mqtt_network, handler, client) = create_smol_tls(opt, config);
 
         smol::block_on(mqtt_network.run()).unwrap()
     }

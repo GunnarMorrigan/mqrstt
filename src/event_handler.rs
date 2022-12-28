@@ -13,12 +13,11 @@ use crate::packets::unsubscribe::Unsubscribe;
 use crate::packets::QoS;
 use crate::state::State;
 
-use futures_concurrency::future::{Join, Race, TryJoin};
+use futures_concurrency::future::{Race};
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
-// use futures::{select, FutureExt};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error};
 
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -425,7 +424,7 @@ mod HandlerTests {
         Sender<Packet>,
         Sender<Packet>,
     ) {
-        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
+        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string());
 
         let (to_network_s, to_network_r) = async_channel::bounded(100);
         let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);

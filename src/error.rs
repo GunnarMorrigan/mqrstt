@@ -80,7 +80,7 @@ pub enum ConnectionError {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TlsError {
-    #[error("There is no TLS configuration for a TLS connection")]
+    #[error("There is no or an incorrect TLS configuration for the requested TLS connection")]
     NoTlsConfig,
 
     #[error("Io error")]

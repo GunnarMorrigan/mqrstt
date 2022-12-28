@@ -12,6 +12,7 @@ use connections::tcp::{TcpReader, TcpWriter};
 #[cfg(all(feature = "smol", feature = "rust-tls"))]
 use connections::async_rustls::{TlsReader, TlsWriter};
 
+use connections::transport::RustlsConfig;
 
 use event_handler::{EventHandlerTask};
 use network::MqttNetwork;
@@ -27,14 +28,18 @@ mod packets;
 mod state;
 mod util;
 
+
 mod tests;
 
-#[cfg(all(feature = "smol", feature = "rust-tls"))]
-pub fn create_smol_tls(options: ConnectOptions) -> (
-    MqttNetwork<TlsReader, TlsWriter>,
-    EventHandlerTask,
-    AsyncClient,
-){
+#[cfg(all(feature = "smol", feature = "smol-rustls"))]
+pub fn create_smol_tls(mut options: ConnectOptions, tls_config: RustlsConfig) -> (
+        MqttNetwork<connections::async_rustls::TlsReader, connections::async_rustls::TlsWriter>,
+        EventHandlerTask,
+        AsyncClient)
+    {
+        use connections::transport::TlsConfig;
+
+    options.tls_config = Some(TlsConfig::Rustls(tls_config));
     new(options)
 }
 

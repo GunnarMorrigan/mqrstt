@@ -1,10 +1,5 @@
 use std::{io::{BufReader, Cursor}, sync::Arc};
 
-#[cfg(feature = "smol-rustls")]
-use async_rustls::webpki;
-#[cfg(feature = "tokio-rustls")]
-use tokio_rustls::webpki;
-
 use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate};
 
 use crate::error::TlsError;

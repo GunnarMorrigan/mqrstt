@@ -51,7 +51,36 @@ pub struct ConnectOptions {
 }
 
 impl ConnectOptions {
-    pub fn new(address: String, port: u16, client_id: String, tls_config: Option<TlsConfig>) -> Self {
+    pub fn new(address: String, port: u16, client_id: String) -> Self {
+        Self {
+            address,
+            port,
+            tls_config: None,
+
+            keep_alive_interval_s: 60,
+            connection_timeout_s: 30,
+            clean_session: false,
+            client_id,
+            credentials: None,
+            channel_capacity: 100,
+            pending_throttle_s: 30,
+            send_reason_messages: false,
+
+            session_expiry_interval: None,
+            receive_maximum: None,
+            maximum_packet_size: None,
+            topic_alias_maximum: None,
+            request_response_information: None,
+            request_problem_information: None,
+            user_properties: vec![],
+            authentication_method: None,
+            authentication_data: Bytes::new(),
+            last_will: None,
+        }
+    }
+
+
+    pub(crate) fn new_with_tls_config(address: String, port: u16, client_id: String, tls_config: Option<TlsConfig>) -> Self {
         Self {
             address,
             port,

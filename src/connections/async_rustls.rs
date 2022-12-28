@@ -27,13 +27,15 @@ use crate::{
     network::Incoming,
 };
 
-use super::transport::TlsConfig;
+use super::transport::{TlsConfig, RustlsConfig};
 use super::util::simple_rust_tls;
 
 #[derive(Debug)]
 pub struct TlsReader {
     readhalf: ReadHalf<TlsStream<TcpStream>>,
 
+    /// Input buffer
+    const_buffer: [u8;1000],
     /// Buffered reads
     buffer: BytesMut,
 }
@@ -43,28 +45,28 @@ impl TlsReader {
         options: &ConnectOptions,
     ) -> Result<(TlsReader, TlsWriter), TlsError> {
         if let Some(tls_config) = &options.tls_config{
-            match tls_config{
-                TlsConfig::Simple { ca, alpn, client_auth } => {
-                    let connector = TlsConnector::from(simple_rust_tls(ca.clone(), alpn.clone(), client_auth.clone())?);
-                    let domain = ServerName::try_from(options.address.as_str())?;
-                    let stream = TcpStream::connect((options.address.as_str(), options.port)).await?;
+            let arc_tls_config = match tls_config{
+                TlsConfig::Rustls(RustlsConfig::Simple { ca, alpn, client_auth }) => simple_rust_tls(ca.clone(), alpn.clone(), client_auth.clone())?,
+                TlsConfig::Rustls(RustlsConfig::Rustls(config)) => config.clone(),
+            };
 
-                    trace!("Connecting TLS");
-                    let connection = connector.connect(domain, stream).await?;
-                    trace!("Connected TLS");
-            
-                    let (readhalf, writehalf) = split(connection);
-            
-                    let reader = Self {
-                        readhalf,
-                        buffer: BytesMut::with_capacity(20 * 1024),
-                    };
-                    let writer = TlsWriter::new(writehalf);
-            
-                    Ok((reader, writer))
-                },
-                _ => unreachable!(),
-            }
+            let domain = ServerName::try_from(options.address.as_str())?;
+            let connector = TlsConnector::from(arc_tls_config);
+                        
+            let stream = TcpStream::connect((options.address.as_str(), options.port)).await?;
+            let connection = connector.connect(domain, stream).await?;
+
+            let (readhalf, writehalf) = split(connection);
+
+            let reader = Self {
+                readhalf,
+                const_buffer: [0;1000],
+                buffer: BytesMut::with_capacity(20 * 1024),
+            };
+            let writer = TlsWriter::new(writehalf);
+
+        Ok((reader, writer))
+
         }
         else{
             Err(TlsError::NoTlsConfig)
@@ -99,12 +101,11 @@ impl TlsReader {
     /// Reads more than 'required' bytes to frame a packet into self.read buffer
     async fn read_bytes(&mut self, required: usize) -> io::Result<usize> {
         let mut total_read = 0;
-        let mut counter = 0;
-        loop {
-            let read = self.readhalf.read(&mut self.buffer).await?;
-            counter += 1;
 
-            if counter == 10 {
+        loop {
+            let read = self.readhalf.read(&mut self.const_buffer).await?;
+
+            if read == 0 {
                 return if self.buffer.is_empty() {
                     Err(io::Error::new(
                         io::ErrorKind::ConnectionAborted,
@@ -116,6 +117,9 @@ impl TlsReader {
                         "Connection reset by peer",
                     ))
                 };
+            }
+            else{
+                self.buffer.extend_from_slice(&self.const_buffer[0..read]);
             }
 
             total_read += read;
@@ -141,10 +145,6 @@ impl AsyncMqttNetworkRead for TlsReader {
             create_connect_from_options(options).write(&mut buf_out)?;
 
             writer.write_buffer(&mut buf_out).await?;
-
-            if !buf_out.is_empty(){
-                panic!("Should be empty");
-            }
 
             let packet = reader.read().await?;
             if let Packet::ConnAck(con) = packet {
@@ -253,190 +253,31 @@ impl AsyncMqttNetworkWrite for TlsWriter {
         self.buffer.clear();
         Ok(disconnect)
     }
-
-    // async fn write(&mut self, outgoing: &Receiver<Packet>) -> Result<bool, ConnectionError> {
-    //     let mut disconnect = false;
-
-    //     let packet = outgoing.recv().await?;
-    //     packet.write(&mut self.buffer)?;
-    //     if packet.packet_type() == PacketType::Disconnect {
-    //         disconnect = true;
-    //     }
-
-    //     while !outgoing.is_empty() && !disconnect {
-    //         let packet = outgoing.recv().await?;
-    //         packet.write(&mut self.buffer)?;
-    //         if packet.packet_type() == PacketType::Disconnect {
-    //             disconnect = true;
-    //             break;
-    //         }
-    //         trace!("Going to write packet to network: {:?}", packet);
-    //     }
-
-    //     self.writehalf.write_all(&self.buffer[..]).await?;
-    //     self.writehalf.flush().await?;
-    //     self.buffer.clear();
-    //     Ok(disconnect)
-    // }
 }
 
 
 #[cfg(test)]
 mod test{
-    use core::panic;
-
-    use async_rustls::TlsConnector;
-    use bytes::BytesMut;
-    use rustls::ServerName;
-    use smol::{net::TcpStream, io::{AsyncWriteExt, AsyncReadExt, split}};
-    use tracing::{trace, Level};
-    use tracing_subscriber::FmtSubscriber;
-
-    use crate::{connections::{util::simple_rust_tls, create_connect_from_options, AsyncMqttNetworkRead, transport::TlsConfig, AsyncMqttNetworkWrite}, tests::resources::{google, EMQX}, connect_options::ConnectOptions, packets::packets::Packet};
+    use crate::{connections::{AsyncMqttNetworkRead, transport::{TlsConfig, RustlsConfig}}, tests::resources::{EMQX_CERT}, connect_options::ConnectOptions, packets::{packets::{Packet, PacketType}, reason_codes::ConnAckReasonCode}};
 
     use super::TlsReader;
 
     #[test]
-    fn connect_google_test(){
-        let fut = async {
-
-            let addr = "google.com";
-
-            let config = simple_rust_tls(google.to_vec(), None, None).unwrap();
-            let connector = TlsConnector::from(config);
-            let domain = ServerName::try_from(addr).unwrap();
-            let stream = TcpStream::connect((addr, 443)).await.unwrap();
-
-            trace!("Connecting TLS");
-            let connection = connector.connect(domain, stream).await.unwrap();
-            trace!("Connected TLS");
-        };
-
-        smol::block_on(fut)
-    }
-
-    #[test]
-    fn connect_emqx_custom_test(){
-        let subscriber = FmtSubscriber::builder()
-        // .with_env_filter(filter)
-            .with_max_level(Level::TRACE)
-            .with_line_number(true)
-            .finish();
-
-        tracing::subscriber::set_global_default(subscriber)
-            .expect("setting default subscriber failed");
-
-
-        let fut = async {
-            trace!("Starting test");
-
-            let addr = "broker.emqx.io";
-
-            let config = simple_rust_tls(EMQX.to_vec(), None, None).unwrap();
-            let connector = TlsConnector::from(config);
-            let domain = ServerName::try_from(addr).unwrap();
-            let stream = TcpStream::connect((addr, 8883)).await.unwrap();
-
-            trace!("Connecting TLS");
-            let connection = connector.connect(domain, stream).await.unwrap();
-            trace!("Connected TLS");
-
-            let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string(), None);
-
-            let mut buf_out = BytesMut::new();
-            let mut buf_in = BytesMut::with_capacity(20*1024); // Using buf_in for reading also breaks everything
-
-            let mut vec_in = Vec::<u8>::with_capacity(20*1024);
-
-            create_connect_from_options(&opt).write(&mut buf_out).unwrap();
-
-            let (mut read, mut write) = split(connection);
-
-            write.write_all(&buf_out).await.unwrap();
-            write.flush().await.unwrap();
-
-            // buf_out.clear(); Brakes everything
-
-            println!("{:?}", buf_out);
-
-            let mut len = 0;
-            loop {
-                // len += read.read_to_end(&mut vec_in).await.unwrap();
-                len += read.read(&mut buf_out).await.unwrap();
-                println!("Len: {}", len);
-                
-                if len != 0{
-                    break;
-                }
-            }
-            println!("{:?}", buf_out);
-            
-            println!("{:?}", Packet::read_from_buffer(&mut buf_out));
-        };
-
-        smol::block_on(fut)
-    }
-
-
-    #[test]
-    fn connect_emqx_less_custom_test(){
-        let subscriber = FmtSubscriber::builder()
-        // .with_env_filter(filter)
-            .with_max_level(Level::TRACE)
-            .with_line_number(true)
-            .finish();
-
-        tracing::subscriber::set_global_default(subscriber)
-            .expect("setting default subscriber failed");
-
-
-        let fut = async {
-            trace!("Starting test");
-
-            let config = TlsConfig::Simple{
-                ca: EMQX.to_vec(),
-                alpn: None,
-                client_auth: None,
-            };
-
-            let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string(), Some(config));
-
-            let mut buf_out = BytesMut::new();
-
-
-            let (mut reader, mut writer) = TlsReader::new(&opt).await.unwrap();
-
-            create_connect_from_options(&opt).write(&mut buf_out).unwrap();
-
-            writer.write_buffer(&mut buf_out).await.unwrap();
-
-            writer.writehalf.write_all(&buf_out).await.unwrap();
-            buf_out.clear();
-            
-            println!("{:?}", buf_out);
-
-            let packet = reader.read().await.unwrap();
-
-            println!("{}", packet);
-        };
-
-        smol::block_on(fut)
-    }
-
-
-
-    #[test]
     fn connect_emqx_test(){
-
-        let config = TlsConfig::Simple{
-            ca: EMQX.to_vec(),
+        let config = TlsConfig::Rustls(RustlsConfig::Simple {
+            ca: EMQX_CERT.to_vec(),
             alpn: None,
             client_auth: None,
-        };
+        });
 
-        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string(), Some(config));
+        let opt = ConnectOptions::new_with_tls_config("broker.emqx.io".to_string(), 8883, "test123123".to_string(), Some(config));
 
-        smol::block_on(TlsReader::connect(&opt)).unwrap();
+        let (_, _, packet) = smol::block_on(TlsReader::connect(&opt)).unwrap();
+
+        assert_eq!(PacketType::ConnAck, packet.packet_type());
+        if let Packet::ConnAck(conn) = packet{
+            assert_eq!(ConnAckReasonCode::Success, conn.reason_code);
+        }
     }
 
 }

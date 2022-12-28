@@ -5,8 +5,6 @@ use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
 
 use futures_concurrency::future::Join;
-#[cfg(feature = "smol")]
-use smol::net::TcpStream;
 use std::time::Instant;
 use tracing::trace;
 
@@ -14,7 +12,6 @@ use crate::connect_options::ConnectOptions;
 use crate::connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 use crate::error::ConnectionError;
 use crate::packets::packets::Packet;
-use crate::util::timeout;
 
 pub type Incoming = Packet;
 pub type Outgoing = Packet;

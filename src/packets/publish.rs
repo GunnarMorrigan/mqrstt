@@ -57,7 +57,7 @@ impl Publish {
 impl VariableHeaderRead for Publish {
     fn read(
         flags: u8,
-        remaining_length: usize,
+        _: usize,
         mut buf: bytes::Bytes,
     ) -> Result<Self, DeserializeError> {
         let dup = flags & 0b1000 != 0;
@@ -71,16 +71,6 @@ impl VariableHeaderRead for Publish {
         }
 
         let publish_properties = PublishProperties::read(&mut buf)?;
-
-        todo!("Fix this below");
-        let payload_len = remaining_length - remaining_length;
-        if buf.len() < payload_len {
-            return Err(DeserializeError::InsufficientData(
-                "Publish".to_string(),
-                buf.len(),
-                payload_len,
-            ));
-        }
 
         Ok(Self {
             dup,
