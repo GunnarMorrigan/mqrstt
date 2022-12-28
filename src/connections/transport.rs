@@ -1,7 +1,7 @@
 
 #[derive(Debug, Clone)]
 pub enum TlsConfig {
-    #[cfg(feature = "rust-tls")]
+    #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
     Simple {
         ca: Vec<u8>,
         alpn: Option<Vec<Vec<u8>>>,

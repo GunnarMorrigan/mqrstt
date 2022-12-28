@@ -60,9 +60,9 @@ mod tokio_e2e {
     }
 }
 
-#[cfg(feature = "smol")]
+#[cfg(all(feature = "smol", feature = "smol-rustls"))]
 #[cfg(test)]
-mod smol_e2e {
+mod smol_rustls_e2e {
 
     use futures_concurrency::future::Join;
 

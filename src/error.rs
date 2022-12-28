@@ -92,11 +92,11 @@ pub enum TlsError {
     #[error("Could not construct a valid private key")]
     NoValidPrivateKey,
 
-    #[cfg(feature = "rust-tls")]
+    #[cfg(any(feature = "tokio-rustls", feature = "smol-rustls"))]
     #[error("{0}")]
     RustlsError(#[from] rustls::Error),
     
-    #[cfg(feature = "rust-tls")]
+    #[cfg(any(feature = "tokio-rustls", feature = "smol-rustls"))]
     #[error("{0}")]
     RustlsInvalidDnsNameError(#[from] rustls::client::InvalidDnsNameError),
 }

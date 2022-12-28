@@ -2,16 +2,13 @@ use std::io::{self, Error, ErrorKind};
 
 use async_channel::Receiver;
 
-use async_rustls::TlsConnector;
-use async_rustls::client::TlsStream;
 use bytes::{Buf, BytesMut};
 use rustls::ServerName;
-use smol::io::{ReadHalf, WriteHalf};
-use smol::{
-    io::{AsyncReadExt, AsyncWriteExt, split},
-    net::TcpStream,
-};
 
+use tokio::io::{ReadHalf, AsyncReadExt, WriteHalf, AsyncWriteExt};
+use tokio::net::TcpStream;
+use tokio_rustls::TlsConnector;
+use tokio_rustls::client::TlsStream;
 use tracing::trace;
 
 use crate::error::TlsError;
@@ -53,7 +50,7 @@ impl TlsReader {
                     let connection = connector.connect(domain, stream).await?;
                     trace!("Connected TLS");
             
-                    let (readhalf, writehalf) = split(connection);
+                    let (readhalf, writehalf) = tokio::io::split(connection);
             
                     let reader = Self {
                         readhalf,
@@ -283,12 +280,10 @@ impl AsyncMqttNetworkWrite for TlsWriter {
 
 #[cfg(test)]
 mod test{
-    use core::panic;
-
-    use async_rustls::TlsConnector;
+    use tokio::{net::TcpStream, io::{AsyncWriteExt, AsyncReadExt}};
+    use tokio_rustls::TlsConnector;
     use bytes::BytesMut;
     use rustls::ServerName;
-    use smol::{net::TcpStream, io::{AsyncWriteExt, AsyncReadExt, split}};
     use tracing::{trace, Level};
     use tracing_subscriber::FmtSubscriber;
 
@@ -315,8 +310,8 @@ mod test{
         smol::block_on(fut)
     }
 
-    #[test]
-    fn connect_emqx_custom_test(){
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn connect_emqx_custom_test(){
         let subscriber = FmtSubscriber::builder()
         // .with_env_filter(filter)
             .with_max_level(Level::TRACE)
@@ -350,7 +345,7 @@ mod test{
 
             create_connect_from_options(&opt).write(&mut buf_out).unwrap();
 
-            let (mut read, mut write) = split(connection);
+            let (mut read, mut write) = tokio::io::split(connection);
 
             write.write_all(&buf_out).await.unwrap();
             write.flush().await.unwrap();
@@ -362,19 +357,19 @@ mod test{
             let mut len = 0;
             loop {
                 // len += read.read_to_end(&mut vec_in).await.unwrap();
-                len += read.read(&mut buf_out).await.unwrap();
-                println!("Len: {}", len);
+                len += read.read(&mut buf_in).await.unwrap();
                 
                 if len != 0{
+                    println!("Len: {}", len);
                     break;
                 }
             }
-            println!("{:?}", buf_out);
+            println!("{:?}", buf_in);
             
-            println!("{:?}", Packet::read_from_buffer(&mut buf_out));
+            println!("{:?}", Packet::read_from_buffer(&mut buf_in));
         };
 
-        smol::block_on(fut)
+        fut.await;
     }
 
 

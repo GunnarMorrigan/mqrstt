@@ -8,14 +8,17 @@ pub mod tcp_smol;
 #[cfg(all(feature = "smol", feature = "native-tls"))]
 pub mod async_native_tls;
 
-#[cfg(all(feature = "smol", feature = "rust-tls"))]
+#[cfg(all(feature = "smol", feature = "smol-rustls"))]
 pub mod async_rustls;
 
 #[cfg(all(feature = "quic"))]
 pub mod quic;
 
+#[cfg(all(feature = "tokio", feature = "tokio-rustls"))]
+pub mod tokio_rustls;
+
 pub mod transport;
-#[cfg(feature = "rust-tls")]
+#[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 mod util;
 
 use std::future::Future;

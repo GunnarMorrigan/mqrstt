@@ -1,6 +1,10 @@
 use std::{io::{BufReader, Cursor}, sync::Arc};
 
+#[cfg(feature = "smol-rustls")]
 use async_rustls::webpki;
+#[cfg(feature = "tokio-rustls")]
+use tokio_rustls::webpki;
+
 use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate};
 
 use crate::error::TlsError;
@@ -62,7 +66,6 @@ pub fn simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth: Opt
     if let Some(alpn) = alpn {
         config.alpn_protocols.extend(alpn)
     }
-    // config.enable_sni = false;
 
     Ok(Arc::new(config))
 }
