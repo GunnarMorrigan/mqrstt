@@ -111,35 +111,35 @@ impl EventHandlerTask {
                 }
             }
         };
-        let keepalive = async {
-            let initial_keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
-            let mut keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
-            loop {
-                warn!("Awaiting PING sleep");
-                #[cfg(feature = "tokio")]
-                tokio::time::sleep(keep_alive_duration).await;
+        // let keepalive = async {
+        //     let initial_keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
+        //     let mut keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
+        //     loop {
+        //         warn!("Awaiting PING sleep");
+        //         #[cfg(feature = "tokio")]
+        //         tokio::time::sleep(keep_alive_duration).await;
                 
-                if (!self.waiting_for_pingresp.load(Ordering::Acquire))
-                    && self.last_network_action.lock().await.elapsed()
-                        >= initial_keep_alive_duration
-                {
-                    self.network_sender.send(Packet::PingReq).await?;
-                    self.waiting_for_pingresp.store(true, Ordering::Release);
-                    keep_alive_duration = initial_keep_alive_duration;
-                } else {
-                    keep_alive_duration = initial_keep_alive_duration
-                        - self.last_network_action.lock().await.elapsed();
-                }
-                if self.disconnect.load(Ordering::Acquire) {
-                    return Ok::<(), MqttError>(());
-                }
-            }
-        };
+        //         if (!self.waiting_for_pingresp.load(Ordering::Acquire))
+        //             && self.last_network_action.lock().await.elapsed()
+        //                 >= initial_keep_alive_duration
+        //         {
+        //             self.network_sender.send(Packet::PingReq).await?;
+        //             self.waiting_for_pingresp.store(true, Ordering::Release);
+        //             keep_alive_duration = initial_keep_alive_duration;
+        //         } else {
+        //             keep_alive_duration = initial_keep_alive_duration
+        //                 - self.last_network_action.lock().await.elapsed();
+        //         }
+        //         if self.disconnect.load(Ordering::Acquire) {
+        //             return Ok::<(), MqttError>(());
+        //         }
+        //     }
+        // };
 
         // We do not use an select! because that has a high possibility of data loss due to cancel safety of the futures.
         // Instead, we use endless loops of which are both polled.
         // Nevertheless, they are raced because they only return if there is a fatal error or disconnect
-        (incoming, outgoing, keepalive).race().await
+        (incoming, outgoing).race().await
     }
 
     async fn handle_incoming_packet<H: EventHandler + Send + Sized + 'static>(
@@ -158,6 +158,7 @@ impl EventHandlerTask {
             Packet::SubAck(suback) => todo!("Implement these functions"),
             Packet::UnsubAck(unsuback) => todo!("Implement these functions"),
             Packet::PingResp => self.handle_incoming_pingresp().await,
+            Packet::ConnAck(_) => (),
             _ => unreachable!(),
         };
         Ok(())

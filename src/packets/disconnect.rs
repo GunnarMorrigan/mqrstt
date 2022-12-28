@@ -1,9 +1,11 @@
+use bytes::BufMut;
+
 use super::{
     error::DeserializeError,
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::DisconnectReasonCode,
-    PacketType, PropertyType,
+    PacketType, PropertyType, write_variable_integer,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -56,7 +58,14 @@ impl VariableHeaderWrite for Disconnect {
 }
 impl WireLength for Disconnect {
     fn wire_len(&self) -> usize {
-        todo!()
+        if self.reason_code != DisconnectReasonCode::NormalDisconnection
+            || self.properties.wire_len() != 0
+        {
+            self.properties.wire_len() + 1
+        }
+        else {
+            0
+        }
     }
 }
 
@@ -133,13 +142,41 @@ impl MqttRead for DisconnectProperties {
 }
 
 impl MqttWrite for DisconnectProperties {
-    fn write(&self, _buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        todo!()
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+        write_variable_integer(buf, self.wire_len())?;
+
+        if let Some(session_expiry_interval) = self.session_expiry_interval {
+            buf.put_u32(session_expiry_interval);
+        }
+        if let Some(reason_string) = &self.reason_string {
+            reason_string.write(buf)?;
+        }
+        for (key, val) in self.user_properties.iter(){
+            key.write(buf)?;
+            val.write(buf)?;
+        }
+        if let Some(server_refrence) = &self.server_reference {
+            server_refrence.write(buf)?;
+        }
+        Ok(())
     }
 }
 
 impl WireLength for DisconnectProperties {
     fn wire_len(&self) -> usize {
-        todo!()
+        let mut len = 0;
+        if self.session_expiry_interval.is_some(){
+            len += 4;
+        }
+        if let Some(reason_string) = &self.reason_string {
+            len += reason_string.wire_len();
+        }
+        for (key, val) in self.user_properties.iter(){
+            len += key.wire_len() + val.wire_len();
+        }
+        if let Some(server_refrence) = &self.server_reference {
+            len += server_refrence.wire_len();
+        }
+        len
     }
 }

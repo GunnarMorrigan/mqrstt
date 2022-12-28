@@ -1,7 +1,7 @@
 use core::slice::Iter;
 use std::fmt::Display;
 
-use bytes::{BufMut, Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut, Buf};
 
 use super::error::{DeserializeError, ReadBytes, SerializeError};
 use super::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite, WireLength};
@@ -200,6 +200,21 @@ impl Packet {
         };
         Ok(packet)
     }
+
+    pub fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
+        let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
+
+        if header.remaining_length + header_length > buffer.len() {
+            return Err(ReadBytes::InsufficientBytes(
+                header.remaining_length - buffer.len(),
+            ));
+        }
+        buffer.advance(header_length);
+
+        let buf = buffer.split_to(header.remaining_length);
+
+        return Ok(Packet::read(header, buf.into())?);
+    }
 }
 
 impl Display for Packet {
@@ -208,18 +223,18 @@ impl Display for Packet {
             Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_session, c.username, c.password, c.keep_alive, c.client_id),
             Packet::ConnAck(c) => write!(f, "ConnAck(session:{:?}, reason code{:?})", c.connack_flags, c.reason_code),
             Packet::Publish(p) => write!(f, "Publish(topic: {}, qos: {:?}, dup: {:?}, retain: {:?}, packet id: {:?})", &p.topic, p.qos, p.dup, p.retain, p.packet_identifier),
-            Packet::PubAck(_) => todo!(),
-            Packet::PubRec(_) => todo!(),
-            Packet::PubRel(_) => todo!(),
-            Packet::PubComp(_) => todo!(),
-            Packet::Subscribe(_) => todo!(),
-            Packet::SubAck(_) => todo!(),
-            Packet::Unsubscribe(_) => todo!(),
-            Packet::UnsubAck(_) => todo!(),
+            Packet::PubAck(p) => write!(f, "PubAck(id:{:?}, reason code{:?})", p.packet_identifier, p.reason_code),
+            Packet::PubRec(p) => write!(f, "PubRec(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
+            Packet::PubRel(p) => write!(f, "PubRel(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
+            Packet::PubComp(p) => write!(f, "PubComp(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
+            Packet::Subscribe(_) => write!(f, "Subscribe()"),
+            Packet::SubAck(_) => write!(f, "SubAck()"),
+            Packet::Unsubscribe(_) => write!(f, "Unsubscribe()"),
+            Packet::UnsubAck(_) => write!(f, "UnsubAck()"),
             Packet::PingReq => write!(f, "PingReq"),
             Packet::PingResp => write!(f, "PingResp"),
-            Packet::Disconnect(_) => todo!(),
-            Packet::Auth(_) => todo!(),
+            Packet::Disconnect(_) => write!(f, "Disconnect()"),
+            Packet::Auth(_) => write!(f, "Auth()"),
         }
     }
 }
@@ -324,21 +339,6 @@ mod tests {
     use crate::packets::pubrel::{PubRel, PubRelProperties};
     use crate::packets::reason_codes::{ConnAckReasonCode, DisconnectReasonCode, PubRelReasonCode};
 
-    pub fn read(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
-        let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
-
-        if header.remaining_length + header_length > buffer.len() {
-            return Err(ReadBytes::InsufficientBytes(
-                header.remaining_length - buffer.len(),
-            ));
-        }
-        buffer.advance(header_length);
-
-        let buf = buffer.split_to(header.remaining_length);
-
-        return Ok(Packet::read(header, buf.into())?);
-    }
-
     #[test]
     fn test_connack_read() {
         let connack = [
@@ -348,7 +348,7 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.extend(connack);
 
-        let res = read(&mut buf);
+        let res = Packet::read_from_buffer(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
 
@@ -385,7 +385,7 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.extend(packet);
 
-        let res = read(&mut buf);
+        let res = Packet::read_from_buffer(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
 
@@ -408,7 +408,7 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.extend(packet);
 
-        let res = read(&mut buf);
+        let res = Packet::read_from_buffer(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
 
@@ -425,7 +425,7 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.extend(packet);
 
-        let res = read(&mut buf);
+        let res = Packet::read_from_buffer(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
 
@@ -447,7 +447,7 @@ mod tests {
         let mut buf = BytesMut::new();
         buf.extend(packet);
 
-        let res = read(&mut buf);
+        let res = Packet::read_from_buffer(&mut buf);
         assert!(res.is_ok());
         let res = res.unwrap();
 
@@ -479,7 +479,7 @@ mod tests {
 
         let mut buffer = BytesMut::from_iter(&bytes);
 
-        let res = read(&mut buffer);
+        let res = Packet::read_from_buffer(&mut buffer);
 
         assert!(res.is_ok());
 
@@ -510,7 +510,7 @@ mod tests {
 
         let mut buffer = BytesMut::from_iter(&bytes);
 
-        let res = read(&mut buffer);
+        let res = Packet::read_from_buffer(&mut buffer);
 
         assert!(res.is_ok());
 

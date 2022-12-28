@@ -1,6 +1,6 @@
 
 #[cfg(all(feature = "tokio", feature = "tcp"))]
-pub mod tcp_tokio;
+pub mod tcp;
 
 #[cfg(all(feature = "smol", feature = "tcp"))]
 pub mod tcp_smol;
@@ -15,6 +15,7 @@ pub mod async_rustls;
 pub mod quic;
 
 pub mod transport;
+#[cfg(feature = "rust-tls")]
 mod util;
 
 use std::future::Future;

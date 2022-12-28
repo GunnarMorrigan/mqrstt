@@ -3,20 +3,18 @@
 
 use std::{sync::Arc, time::Instant};
 
-use async_channel::Receiver;
 use async_mutex::Mutex;
 use client::AsyncClient;
 use connect_options::ConnectOptions;
 use connections::{AsyncMqttNetworkWrite, AsyncMqttNetworkRead};
 #[cfg(feature = "tokio")]
-use connections::tcp_tokio::{tcp_reader::TcpReader, tcp_writer::TcpWriter};
+use connections::tcp::{TcpReader, TcpWriter};
 #[cfg(all(feature = "smol", feature = "rust-tls"))]
 use connections::async_rustls::{TlsReader, TlsWriter};
 
 
 use event_handler::{EventHandlerTask};
 use network::MqttNetwork;
-use packets::packets::Packet;
 
 mod available_packet_ids;
 pub mod client;
@@ -40,7 +38,7 @@ pub fn create_smol_tls(options: ConnectOptions) -> (
     new(options)
 }
 
-// #[cfg(all(feature = "tokio", feature = "tcp"))]
+#[cfg(all(feature = "tokio", feature = "tcp"))]
 pub fn create_tokio_tcp(options: ConnectOptions) -> (
     MqttNetwork<TcpReader, TcpWriter>,
     EventHandlerTask,

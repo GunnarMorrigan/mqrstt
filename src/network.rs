@@ -65,9 +65,16 @@ where
         if self.network.is_none() {
             trace!("Creating network");
 
-            let (reader, writer, connack) =
-                timeout::timeout(R::connect(&self.options), self.options.connection_timeout_s)
-                    .await??;
+            let con = R::connect(&self.options).await;
+            
+            if let Err(err) = con.as_ref(){
+                dbg!(err);
+            }
+
+            let (reader, writer, connack) = con?;
+
+                // timeout::timeout(R::connect(&self.options), self.options.connection_timeout_s)
+                //     .await??;
 
             trace!("Succesfully created network");
             self.network = Some((reader, writer));

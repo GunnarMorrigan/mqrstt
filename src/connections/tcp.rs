@@ -1,14 +1,16 @@
 use std::io::{self, Error, ErrorKind};
 
+use async_channel::Receiver;
 use bytes::{Buf, BytesMut};
-#[cfg(feature = "smol")]
-use smol::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
-};
-use tokio::net::tcp::OwnedReadHalf;
+// #[cfg(feature = "smol")]
+// use smol::{
+//     io::{AsyncReadExt, AsyncWriteExt},
+//     net::TcpStream,
+// };
+use tokio::{net::tcp::{OwnedReadHalf, OwnedWriteHalf}, io::AsyncWriteExt};
 #[cfg(feature = "tokio")]
 use tokio::{io::AsyncReadExt, net::TcpStream};
+use tracing::trace;
 
 use crate::packets::{
     error::ReadBytes,
@@ -17,12 +19,12 @@ use crate::packets::{
 };
 use crate::{
     connect_options::ConnectOptions,
-    connections::{create_connect_from_options, tcp_tokio::AsyncMqttNetworkWrite},
+    connections::{create_connect_from_options, AsyncMqttNetworkWrite},
     error::ConnectionError,
     network::Incoming,
 };
 
-use super::{tcp_writer::TcpWriter, AsyncMqttNetworkRead};
+use super::{AsyncMqttNetworkRead};
 
 #[derive(Debug)]
 pub struct TcpReader {
@@ -80,8 +82,8 @@ impl TcpReader {
         loop {
             #[cfg(feature = "tokio")]
             let read = self.readhalf.read_buf(&mut self.buffer).await?;
-            #[cfg(feature = "smol")]
-            let read = self.connection.read(&mut self.buffer).await?;
+            // #[cfg(feature = "smol")]
+            // let read = self.connection.read(&mut self.buffer).await?;
             if 0 == read {
                 return if self.buffer.is_empty() {
                     Err(io::Error::new(
@@ -113,7 +115,6 @@ impl AsyncMqttNetworkRead for TcpReader {
     {
         async {
             let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
-            // debug!("Created TCP connection");
 
             let mut buf_out = BytesMut::new();
 

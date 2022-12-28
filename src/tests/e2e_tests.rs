@@ -1,6 +1,6 @@
 #[cfg(feature = "tokio")]
 #[cfg(test)]
-mod e2e {
+mod tokio_e2e {
 
     use futures_concurrency::future::Join;
 
@@ -10,7 +10,7 @@ mod e2e {
     use crate::{
         client::AsyncClient,
         connect_options::ConnectOptions,
-        create_new_tokio_tcp,
+        create_tokio_tcp,
         error::ClientError,
         event_handler::EventHandler,
         packets::{
@@ -19,52 +19,10 @@ mod e2e {
         },
     };
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_pub_qo_s2() {
-        pub struct TestPubQoS2 {
-            stage: StagePubQoS2,
-            client: AsyncClient,
-        }
-        pub enum StagePubQoS2 {
-            ConnAck,
-            PubRec,
-            PubComp,
-            Done,
-        }
-        impl TestPubQoS2 {
-            fn new(client: AsyncClient) -> Self {
-                TestPubQoS2 {
-                    stage: StagePubQoS2::ConnAck,
-                    client,
-                }
-            }
-        }
-        impl EventHandler for TestPubQoS2 {
-            fn handle<'a>(
-                &'a mut self,
-                event: &'a Packet,
-            ) -> impl core::future::Future<Output = ()> + Send + 'a {
-                async move {
-                    match self.stage {
-                        StagePubQoS2::ConnAck => {
-                            assert_eq!(event.packet_type(), PacketType::ConnAck);
-                            self.stage = StagePubQoS2::PubRec;
-                        }
-                        StagePubQoS2::PubRec => {
-                            assert_eq!(event.packet_type(), PacketType::PubRec);
-                            self.stage = StagePubQoS2::PubComp;
-                        }
-                        StagePubQoS2::PubComp => {
-                            assert_eq!(event.packet_type(), PacketType::PubComp);
-                            self.stage = StagePubQoS2::Done;
-                            self.client.disconnect().await.unwrap();
-                        }
-                        StagePubQoS2::Done => (),
-                    }
-                }
-            }
-        }
+    use crate::tests::stages::qos_2::TestPubQoS2;
 
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn test_pub_qos_2() {
         let filter = tracing_subscriber::filter::EnvFilter::new("none,mqrstt=trace");
 
         let subscriber = FmtSubscriber::builder()
@@ -76,10 +34,10 @@ mod e2e {
         tracing::subscriber::set_global_default(subscriber)
             .expect("setting default subscriber failed");
 
-        // let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string());
-        let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
+        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 1883, "test123123".to_string(), None);
+        // let opt = ConnectOptions::new("127.0.0.1".to_string(), 1883, "test123123".to_string(), None);
 
-        let (mut mqtt_network, handler, client, _r) = create_new_tcp(opt);
+        let (mut mqtt_network, handler, client) = create_tokio_tcp(opt);
 
         let network = tokio::task::spawn(async move { dbg!(mqtt_network.run().await) });
 
@@ -99,5 +57,55 @@ mod e2e {
         });
 
         dbg!((network, event_handler, sender).join().await);
+    }
+}
+
+#[cfg(feature = "smol")]
+#[cfg(test)]
+mod smol_e2e {
+
+    use futures_concurrency::future::Join;
+
+    use tracing::Level;
+    use tracing_subscriber::FmtSubscriber;
+
+    use crate::{
+        client::AsyncClient,
+        connect_options::ConnectOptions,
+        create_smol_tls,
+        error::ClientError,
+        event_handler::EventHandler,
+        packets::{
+            packets::{Packet, PacketType},
+            QoS,
+        }, connections::transport::TlsConfig, tests::resources::EMQX,
+    };
+
+    use crate::tests::stages::qos_2::TestPubQoS2;
+
+    #[test]
+    fn test_pub_tcp_qos_2() {
+        let filter = tracing_subscriber::filter::EnvFilter::new("none,mqrstt=trace");
+
+        let subscriber = FmtSubscriber::builder()
+            .with_env_filter(filter)
+            .with_max_level(Level::TRACE)
+            .with_line_number(true)
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
+
+        let config = TlsConfig::Simple{
+            ca: EMQX.to_vec(),
+            alpn: None,
+            client_auth: None,
+        };
+
+        let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string(), Some(config));
+
+        let (mut mqtt_network, handler, client) = create_smol_tls(opt);
+
+        smol::block_on(mqtt_network.run()).unwrap()
     }
 }

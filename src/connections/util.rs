@@ -4,15 +4,14 @@ use async_rustls::webpki;
 use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate};
 
 use crate::error::TlsError;
-
 use super::transport::PrivateKey;
 
 pub fn native(){
 
 }
 
-pub fn smol_simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth: Option<(Vec<u8>, PrivateKey)>) -> Result<Arc<ClientConfig>, TlsError>{
 
+pub fn simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth: Option<(Vec<u8>, PrivateKey)>) -> Result<Arc<ClientConfig>, TlsError>{
     let mut root_cert_store = RootCertStore::empty();
     
     let ca_certs = rustls_pemfile::certs(&mut BufReader::new(Cursor::new(ca)))?;
@@ -35,7 +34,7 @@ pub fn smol_simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth
         return Err(TlsError::NoValidRootCertInChain);
     }
 
-    let mut config = ClientConfig::builder()
+    let config = ClientConfig::builder()
     .with_safe_defaults()
     .with_root_certificates(root_cert_store);
 
@@ -60,9 +59,10 @@ pub fn smol_simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth
         None => config.with_no_client_auth(),
     };
 
-    if let Some(alpn) = alpn.as_ref() {
-        config.alpn_protocols.extend_from_slice(alpn);
+    if let Some(alpn) = alpn {
+        config.alpn_protocols.extend(alpn)
     }
+    // config.enable_sni = false;
 
-    Ok(Arc::new(config))    
+    Ok(Arc::new(config))
 }

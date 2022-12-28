@@ -7,7 +7,8 @@ license = "Apache-2.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["smol", "rust-tls"]
+default = ["smol", "rust-tls", "tokio", "tcp"]
+#default = ["tokio", "tcp"]
 tokio = ["dep:tokio"]
 smol = ["dep:smol"]
 tcp = []
