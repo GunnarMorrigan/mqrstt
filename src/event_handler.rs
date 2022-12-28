@@ -8,7 +8,7 @@ use crate::packets::publish::Publish;
 use crate::packets::pubrec::PubRec;
 use crate::packets::pubrel::PubRel;
 use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
-use crate::packets::suback::{SubAck, self};
+use crate::packets::suback::SubAck;
 use crate::packets::subscribe::Subscribe;
 use crate::packets::unsuback::UnsubAck;
 use crate::packets::unsubscribe::Unsubscribe;
@@ -626,7 +626,7 @@ mod handler_tests {
         let mut nop = TestPubQoS2::new(client_to_handler_s.clone());
 
         let handler_task = tokio::task::spawn(async move {
-            dbg!(handler.handle(&mut nop).await);
+            dbg!(handler.handle(&mut nop).await).unwrap();
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));

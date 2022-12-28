@@ -8,7 +8,7 @@ use rustls::{Certificate, ClientConfig, OwnedTrustAnchor, RootCertStore};
 use super::transport::PrivateKey;
 use crate::error::TlsError;
 
-pub fn native() {}
+// pub fn native() {}
 
 pub fn simple_rust_tls(
     ca: Vec<u8>,

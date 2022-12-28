@@ -27,10 +27,9 @@ pub struct ConnectOptions {
     /// request (publish, subscribe) channel capacity
     channel_capacity: usize,
 
-    // /// Max internal request batching
-    // max_request_batch: usize,
     /// Minimum delay time between consecutive outgoing packets
     /// while retransmitting pending packets
+    // TODO! IMPLEMENT THIS!
     pending_throttle_s: u64,
 
     send_reason_messages: bool,

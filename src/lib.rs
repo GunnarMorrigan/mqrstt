@@ -6,10 +6,12 @@ use std::{sync::Arc, time::Instant};
 use async_mutex::Mutex;
 use client::AsyncClient;
 use connect_options::ConnectOptions;
+
 #[cfg(all(feature = "smol", feature = "rust-tls"))]
 use connections::async_rustls::{TlsReader, TlsWriter};
-#[cfg(feature = "tokio")]
+#[cfg(all(feature = "tokio", feature = "tcp"))]
 use connections::tcp::{TcpReader, TcpWriter};
+
 use connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 
 use connections::transport::RustlsConfig;
