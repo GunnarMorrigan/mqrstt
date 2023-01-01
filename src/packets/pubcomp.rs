@@ -213,7 +213,7 @@ mod tests {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);
-        buf.put_u8(0x99);
+        buf.put_u8(0x92);
 
         let mut properties = BytesMut::new();
         PropertyType::ReasonString.write(&mut properties).unwrap();
@@ -229,8 +229,6 @@ mod tests {
 
         buf.extend(properties);
 
-        // flags can be 0 because not used.
-        // remaining_length must be at least 4
         let p_ack = PubComp::read(0, buf.len(), buf.clone().into()).unwrap();
 
         let mut result = BytesMut::new();

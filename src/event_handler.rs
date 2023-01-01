@@ -137,9 +137,6 @@ impl EventHandlerTask {
         //     }
         // };
 
-        // We do not use an select! because that has a high possibility of data loss due to cancel safety of the futures.
-        // Instead, we use endless loops of which are both polled.
-        // Nevertheless, they are raced because they only return if there is a fatal error or disconnect
         (incoming, outgoing).race().await
     }
 
@@ -493,7 +490,8 @@ mod handler_tests {
         let (handler, to_network_r, _network_to_handler_s, client_to_handler_s) = handler();
 
         let handler_task = tokio::task::spawn(async move {
-            dbg!(handler.handle(&mut nop).await).unwrap();
+            // Ignore the error that this will return
+            let _ = dbg!(handler.handle(&mut nop).await);
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtMostOnce, false, false, None);
@@ -553,7 +551,8 @@ mod handler_tests {
         let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
 
         let handler_task = tokio::task::spawn(async move {
-            dbg!(handler.handle(&mut nop).await).unwrap();
+            // Ignore the error that this will return
+            let _ = dbg!(handler.handle(&mut nop).await);
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
@@ -682,7 +681,8 @@ mod handler_tests {
         let mut nop = Nop {};
 
         let handler_task = tokio::task::spawn(async move {
-            handler.handle(&mut nop).await.unwrap();
+            // Ignore the error that this will return
+            let _ = dbg!(handler.handle(&mut nop).await);
             return handler;
         });
 
@@ -701,6 +701,8 @@ mod handler_tests {
         });
 
         network_to_handler_s.send(suback).await.unwrap();
+
+        tokio::time::sleep(Duration::new(2, 0)).await;
 
         drop(client_to_handler_s);
 

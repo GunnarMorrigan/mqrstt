@@ -7,7 +7,7 @@ use async_mutex::Mutex;
 use client::AsyncClient;
 use connect_options::ConnectOptions;
 
-#[cfg(all(feature = "smol", feature = "rust-tls"))]
+#[cfg(all(feature = "smol", feature = "smol-rustls"))]
 use connections::async_rustls::{TlsReader, TlsWriter};
 #[cfg(all(feature = "tokio", feature = "tcp"))]
 use connections::tcp::{TcpReader, TcpWriter};

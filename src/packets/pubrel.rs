@@ -211,7 +211,7 @@ mod tests {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);
-        buf.put_u8(0x99);
+        buf.put_u8(0x92);
 
         let mut properties = BytesMut::new();
         PropertyType::ReasonString.write(&mut properties).unwrap();

@@ -23,8 +23,6 @@ pub struct ConnAck {
 
 impl VariableHeaderRead for ConnAck {
     fn read(_: u8, header_len: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
-        // let (header_len, _) = read_variable_integer(&mut buf).map_err(DeserializeError::from)?;
-
         if header_len > buf.len() {
             return Err(DeserializeError::InsufficientData(
                 "ConnAck".to_string(),
@@ -301,14 +299,13 @@ mod tests {
     fn read_connack() {
         let mut buf = bytes::BytesMut::new();
         let packet = &[
-            0x03, // Variable header length
             0x01, // Connack flags
             0x00, // Reason code,
             0x00, // empty properties
         ];
 
         buf.extend_from_slice(packet);
-        let c = ConnAck::read(0, 0, buf.into()).unwrap();
+        let c = ConnAck::read(0, packet.len(), buf.into()).unwrap();
 
         dbg!(c);
     }
