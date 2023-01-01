@@ -12,20 +12,22 @@ env:
 jobs:
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: "clippy, rustfmt"
       - uses: Swatinem/rust-cache@v2
-      - name: cargo clippy
-        run: cargo clippy --all-targets -- -D warnings
 
-    # - name: Build
-      # run: cargo build --verbose
-    # - name: Run tests
-      # run: cargo test --verbose
+      # make sure all code has been formatted with rustfmt and linted with clippy
+      - name: rustfmt
+        run: cargo fmt -- --check --color always
+
+      # run clippy to verify we have no warnings
+      - run: cargo fetch
+      - name: cargo clippy
+        run: cargo clippy --all-targets --all-features -- -D warnings
 
   test:
     name: Test
