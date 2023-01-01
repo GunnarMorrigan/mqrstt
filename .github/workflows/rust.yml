@@ -46,3 +46,20 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: EmbarkStudios/cargo-deny-action@v1
+
+  codecov:
+    name: Generate code coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: hecrj/setup-rust-action@v1
+      # TODO: we don't use caching here because it's unclear if it will cause
+      # the coverage to get less accurate (this is the case for some coverage
+      # tools, although possibly not tarpaulin?)
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          args: '--features "bundled-full session buildtime_bindgen"'
+
+      - name: Upload to codecov.io
+        uses: codecov/codecov-action@v1
