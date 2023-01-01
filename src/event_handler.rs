@@ -157,7 +157,7 @@ impl EventHandlerTask {
             Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback).await?,
             Packet::PingResp => self.handle_incoming_pingresp().await,
             Packet::ConnAck(_) => (),
-            _ => unreachable!(),
+            a => unreachable!("Should not receive {}", a),
         };
         Ok(())
     }
