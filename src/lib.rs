@@ -1,3 +1,48 @@
+//! A pure rust MQTT client which strives to be as efficient as possible.
+//! This crate strives to provide an ergonomic API and design that fits Rust.
+//! 
+//! There are three parts to the design of the MQTT client. The network, the event handler and the client.
+//! 
+//! The network - which simply reads and forms packets from the network.
+//! The event handler - which makes sure that the MQTT protocol is followed.
+//! By providing a custom handler during the internal handling, messages are handled before they are acked.
+//! The client - which is used to send messages from different places.
+//! 
+//! A few questions still remain:
+//! - This crate uses async channels to perform communication across its parts. Is there a better approach?
+//! - This crate provides network implementation which hinder sync and async agnosticity.
+//! 
+//! For the future it could be nice to be sync, async and runtime agnostic.
+//! This can be achieved by decoupling the MQTT internals from the network communication.
+//! The user could provide the received packets while this crate returns the response packets.
+//! Another aproach could be providing the read bytes, however, QUIC supports multiple streams.
+//!
+//! Currently, we do provide network implementations for the smol and tokio runtimes that you can enable with feature flags.
+//!
+//! Tokio example:
+//! ----------------------------
+//! ```no_run
+//! let config = RustlsConfig::Simple {
+//!     ca: EMQX_CERT.to_vec(),
+//!     alpn: None,
+//!     client_auth: None,
+//! };
+//! let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string());
+//! let (mqtt_network, handler, client) = create_tokio_rustls(opt, config);
+//! 
+//! task::spawn(async move {
+//!     join!(mqtt_network.run(), hadnler.handle(/* Custom handler */));
+//! });
+//! 
+//! for i in 0..10 {
+//!     client.publish("test", QoS::AtLeastOnce, false, b"test payload").await.unwrap();
+//!     time::sleep(Duration::from_millis(100)).await;
+//! }
+//! 
+//! ```
+//! 
+
+
 #![feature(async_fn_in_trait)]
 #![feature(return_position_impl_trait_in_trait)]
 
@@ -22,7 +67,7 @@ use network::MqttNetwork;
 mod available_packet_ids;
 pub mod client;
 pub mod connect_options;
-mod connections;
+pub mod connections;
 pub mod error;
 pub mod event_handler;
 mod network;
