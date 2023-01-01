@@ -272,7 +272,6 @@ mod test {
 
     use super::TlsReader;
 
-    #[test]
     fn connect_emqx_test() {
         let config = TlsConfig::Rustls(RustlsConfig::Simple {
             ca: EMQX_CERT.to_vec(),

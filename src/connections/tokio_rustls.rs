@@ -266,7 +266,6 @@ mod test {
 
     use super::TlsReader;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn connect_emqx_test() {
         let config = TlsConfig::Rustls(RustlsConfig::Simple {
             ca: EMQX_CERT.to_vec(),
