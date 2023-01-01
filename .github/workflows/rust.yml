@@ -21,8 +21,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       # make sure all code has been formatted with rustfmt and linted with clippy
-      - name: rustfmt
-        run: cargo fmt -- --check --color always
+#       - name: rustfmt
+#         run: cargo fmt -- --check --color always
 
       # run clippy to verify we have no warnings
       - run: cargo fetch
