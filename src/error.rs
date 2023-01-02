@@ -5,7 +5,7 @@ use async_channel::{RecvError, SendError};
 use crate::{
     packets::{
         error::{DeserializeError, SerializeError},
-        packets::{Packet, PacketType},
+        {Packet, PacketType},
         reason_codes::ConnAckReasonCode,
     },
     util::timeout::Timeout,

@@ -1,7 +1,7 @@
 use bytes::Bytes;
 
 use crate::connections::transport::TlsConfig;
-use crate::packets::connect::LastWill;
+use crate::packets::LastWill;
 use crate::util::constants::RECEIVE_MAXIMUM_DEFAULT;
 
 #[derive(Debug, Clone)]

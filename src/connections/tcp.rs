@@ -17,7 +17,7 @@ use tracing::trace;
 
 use crate::packets::{
     error::ReadBytes,
-    packets::{FixedHeader, Packet, PacketType},
+    {FixedHeader, Packet, PacketType},
     reason_codes::ConnAckReasonCode,
 };
 use crate::{

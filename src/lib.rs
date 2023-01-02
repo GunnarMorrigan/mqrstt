@@ -76,7 +76,7 @@ mod state;
 mod util;
 
 #[cfg(test)]
-mod tests;
+pub mod tests;
 
 #[cfg(all(feature = "smol", feature = "smol-rustls"))]
 pub fn create_smol_rustls(
@@ -151,4 +151,57 @@ where
     let client = AsyncClient::new(packet_ids, client_to_handler_s, to_network_s);
 
     (network, handler, client)
+}
+
+#[cfg(test)]
+mod lib_test{
+    use bytes::Bytes;
+    use tokio::join;
+
+    use crate::{connect_options::ConnectOptions, connections::transport::RustlsConfig, create_smol_rustls, event_handler::EventHandler, client::AsyncClient, packets::{self, Packet}};
+
+    pub struct PingPong {
+        pub client: AsyncClient,
+    }
+    
+    impl EventHandler for PingPong{
+        fn handle<'a>(&'a mut self, event: &'a packets::Packet) -> impl std::future::Future<Output = ()> + Send + 'a {
+            async move{
+                match event{
+                    Packet::Publish(p) => {
+                        if let Ok(payload) = String::from_utf8(p.payload.to_vec()){
+                            if payload.to_lowercase().contains("ping"){
+                                self.client.publish(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).await;
+                                println!("Recieved Ping, Send pong!");
+                            }
+                        }
+                        
+                    },
+                    _ => (),
+                }
+            }
+        }
+    }
+    
+    #[test]
+    fn test_smol(){
+        smol::block_on(async{
+            let options = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "mqrstt".to_string());
+            
+            let tls_config = RustlsConfig::Simple {
+                ca: crate::tests::resources::EMQX_CERT.to_vec(),
+                alpn: None,
+                client_auth: None,
+            };
+    
+            let (mut network, handler, client) = create_smol_rustls(options, tls_config);
+    
+            client.subscribe("mqrstt").await.unwrap();
+            
+    
+            let mut pingpong = PingPong{ client };
+    
+            join!(network.run(), handler.handle(&mut pingpong));
+        });
+    }
 }

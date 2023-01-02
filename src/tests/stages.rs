@@ -1,6 +1,6 @@
 use tracing::{trace, warn};
 
-use crate::{event_handler::EventHandler, packets::packets::Packet};
+use crate::{event_handler::EventHandler, packets::Packet};
 
 pub struct Nop { }
 impl EventHandler for Nop {
@@ -18,8 +18,8 @@ impl EventHandler for Nop {
 pub mod qos_2 {
     use crate::{
         client::AsyncClient,
-        event_handler::EventHandler,
-        packets::packets::{Packet, PacketType},
+        event_handler::EventHandler, packets::{Packet, PacketType},
+        // packets::{Packet, PacketType},
     };
 
     pub struct TestPubQoS2 {

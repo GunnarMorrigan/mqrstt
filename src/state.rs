@@ -5,7 +5,7 @@ use async_mutex::Mutex;
 
 use crate::{
     available_packet_ids::AvailablePacketIds,
-    packets::{publish::Publish, subscribe::Subscribe, unsubscribe::Unsubscribe},
+    packets::{Publish, Subscribe, Unsubscribe},
 };
 
 #[derive(Debug)]

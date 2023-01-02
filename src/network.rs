@@ -11,7 +11,7 @@ use tracing::trace;
 use crate::connect_options::ConnectOptions;
 use crate::connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 use crate::error::ConnectionError;
-use crate::packets::packets::Packet;
+use crate::packets::Packet;
 
 pub type Incoming = Packet;
 pub type Outgoing = Packet;

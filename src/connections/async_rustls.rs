@@ -23,7 +23,7 @@ use crate::{
     connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite},
     packets::{
         error::ReadBytes,
-        packets::{FixedHeader, Packet, PacketType},
+        {FixedHeader, Packet, PacketType},
         reason_codes::ConnAckReasonCode,
     },
 };
@@ -264,7 +264,7 @@ mod test {
             AsyncMqttNetworkRead,
         },
         packets::{
-            packets::{Packet, PacketType},
+            {Packet, PacketType},
             reason_codes::ConnAckReasonCode,
         },
         tests::resources::EMQX_CERT,

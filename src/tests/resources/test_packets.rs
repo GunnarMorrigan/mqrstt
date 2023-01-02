@@ -2,13 +2,13 @@
 use bytes::Bytes;
 
 use crate::packets::{
-    disconnect::{Disconnect, DisconnectProperties},
-    packets::Packet,
-    puback::{PubAck, PubAckProperties},
-    publish::{Publish, PublishProperties},
-    reason_codes::{DisconnectReasonCode, PubAckReasonCode},
-    subscribe::{Subscribe, Subscription},
+    Disconnect, DisconnectProperties,
+    Packet,
+    PubAck, PubAckProperties,
+    Publish, PublishProperties,
+    Subscribe, Subscription,
     QoS,
+    reason_codes::{PubAckReasonCode, DisconnectReasonCode},
 };
 
 pub fn publish_packets() -> Vec<Packet> {

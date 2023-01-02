@@ -27,8 +27,8 @@ use bytes::BytesMut;
 
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
-use crate::packets::connect::Connect;
-use crate::packets::packets::Packet;
+use crate::packets::Connect;
+use crate::packets::Packet;
 
 pub fn create_connect_from_options(options: &ConnectOptions) -> Packet {
     let mut connect = Connect::default();

@@ -5,12 +5,12 @@ use tracing::info;
 use crate::{
     error::ClientError,
     packets::{
-        disconnect::{Disconnect, DisconnectProperties},
-        packets::Packet,
-        publish::{Publish, PublishProperties},
+        {Disconnect, DisconnectProperties},
+        Packet,
+        {Publish, PublishProperties},
         reason_codes::DisconnectReasonCode,
-        subscribe::{Subscribe, SubscribeProperties, Subscription},
-        unsubscribe::{Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
+        {Subscribe, SubscribeProperties, Subscription},
+        {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
         QoS,
     },
 };

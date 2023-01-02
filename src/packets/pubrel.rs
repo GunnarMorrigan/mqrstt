@@ -213,6 +213,35 @@ mod tests {
     }
 
     #[test]
+    fn test_read_short() {
+        let mut expected_pubrel = PubRel {
+            packet_identifier: 12,
+            reason_code: PubRelReasonCode::Success,
+            properties: PubRelProperties::default(),
+        };
+
+        let mut buf = BytesMut::new();
+
+        expected_pubrel.write(&mut buf).unwrap();
+
+        assert_eq!(2, buf.len());
+
+        let pubrel = PubRel::read(0, 2, buf.into()).unwrap();
+        
+        assert_eq!(expected_pubrel, pubrel);
+        
+        let mut buf = BytesMut::new();
+        expected_pubrel.reason_code = PubRelReasonCode::PacketIdentifierNotFound;
+        expected_pubrel.write(&mut buf).unwrap();
+        
+        assert_eq!(3, buf.len());
+        
+        let pubrel = PubRel::read(0, 3, buf.into()).unwrap();
+        assert_eq!(expected_pubrel, pubrel);
+
+    }
+
+    #[test]
     fn test_read_simple_pub_rel() {
         let stream = &[
             0x00, 0x0C, // Packet identifier = 12

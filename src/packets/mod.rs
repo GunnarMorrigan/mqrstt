@@ -1,30 +1,44 @@
 pub mod error;
 pub mod mqtt_traits;
-pub mod publish;
-
-pub mod auth;
-pub mod connack;
-pub mod connect;
-pub mod disconnect;
-pub mod packets;
-pub mod puback;
-pub mod pubcomp;
-pub mod pubrec;
-pub mod pubrel;
 pub mod reason_codes;
-pub mod suback;
-pub mod subscribe;
-pub mod unsuback;
-pub mod unsubscribe;
+
+mod publish;
+mod auth;
+mod connack;
+mod connect;
+mod disconnect;
+mod packets;
+mod puback;
+mod pubcomp;
+mod pubrec;
+mod pubrel;
+mod suback;
+mod subscribe;
+mod unsuback;
+mod unsubscribe;
+
+
+pub use auth::*;
+pub use connack::*;
+pub use connect::*;
+pub use disconnect::*;
+pub use puback::*;
+pub use pubcomp::*;
+pub use pubrec::*;
+pub use pubrel::*;
+pub use suback::*;
+pub use subscribe::*;
+pub use unsuback::*;
+pub use unsubscribe::*;
+pub use publish::*;
+
+pub use packets::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::slice::Iter;
 
 use self::error::{DeserializeError, ReadBytes, SerializeError};
 use self::mqtt_traits::{MqttRead, MqttWrite, WireLength};
-
-use self::connect::ConnectFlags;
-use self::packets::PacketType;
 
 /// Protocol version
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
@@ -265,7 +279,7 @@ pub fn read_fixed_header_rem_len(
     for i in 0..4 {
         if let Some(byte) = buf.next() {
             length += 1;
-            integer += (*byte as usize & 0x7f) << 7 * i;
+            integer += (*byte as usize & 0x7f) << (7 * i);
 
             if (*byte & 0b1000_0000) == 0 {
                 return Ok((integer, length));
@@ -288,7 +302,7 @@ pub fn read_variable_integer(buf: &mut Bytes) -> Result<(usize, usize), Deserial
         length += 1;
         let byte = buf.get_u8();
 
-        integer += (byte as usize & 0x7f) << 7 * i;
+        integer += (byte as usize & 0x7f) << (7 * i);
 
         if (byte & 0b1000_0000) == 0 {
             return Ok((integer, length));

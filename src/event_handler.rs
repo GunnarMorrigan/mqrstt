@@ -1,17 +1,17 @@
 use crate::connect_options::ConnectOptions;
 use crate::error::MqttError;
-use crate::packets::disconnect::Disconnect;
-use crate::packets::packets::{Packet, PacketType};
-use crate::packets::puback::{PubAck, PubAckProperties};
-use crate::packets::pubcomp::PubComp;
-use crate::packets::publish::Publish;
-use crate::packets::pubrec::PubRec;
-use crate::packets::pubrel::PubRel;
+use crate::packets::Disconnect;
+use crate::packets::{Packet, PacketType};
+use crate::packets::{PubAck, PubAckProperties};
+use crate::packets::PubComp;
+use crate::packets::Publish;
+use crate::packets::PubRec;
+use crate::packets::PubRel;
 use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
-use crate::packets::suback::SubAck;
-use crate::packets::subscribe::Subscribe;
-use crate::packets::unsuback::UnsubAck;
-use crate::packets::unsubscribe::Unsubscribe;
+use crate::packets::SubAck;
+use crate::packets::Subscribe;
+use crate::packets::UnsubAck;
+use crate::packets::Unsubscribe;
 use crate::packets::QoS;
 use crate::state::State;
 
@@ -19,7 +19,7 @@ use futures_concurrency::future::Race;
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
-use tracing::{debug, error};
+use tracing::{error};
 
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -429,14 +429,14 @@ mod handler_tests {
         connect_options::ConnectOptions,
         event_handler::{EventHandler, EventHandlerTask},
         packets::{
-            packets::{Packet, PacketType},
-            pubcomp::{PubComp, PubCompProperties},
-            pubrec::{PubRec, PubRecProperties},
-            pubrel::{PubRel, PubRelProperties},
+            {Packet, PacketType},
+            {PubComp, PubCompProperties},
+            {PubRec, PubRecProperties},
+            {PubRel, PubRelProperties},
             reason_codes::{
                 PubCompReasonCode, PubRecReasonCode, PubRelReasonCode, SubAckReasonCode,
             },
-            suback::{SubAck, SubAckProperties},
+            {SubAck, SubAckProperties},
             QoS,
         },
         tests::resources::test_packets::{
