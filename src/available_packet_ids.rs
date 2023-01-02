@@ -21,7 +21,7 @@ impl AvailablePacketIds {
     pub async fn mark_available(&self, pkid: u16) {
         match self.sender.send(pkid).await {
             Ok(_) => {
-                debug!("Marked packet id as available: {}", pkid);
+                // debug!("Marked packet id as available: {}", pkid);
             }
             Err(err) => {
                 error!(

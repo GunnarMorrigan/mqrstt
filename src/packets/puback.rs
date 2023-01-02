@@ -56,21 +56,35 @@ impl VariableHeaderWrite for PubAck {
 
         if self.reason_code == PubAckReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
-            return Ok(());
+            && self.properties.user_properties.is_empty() {
+            ()
         }
-
-        self.reason_code.write(buf)?;
-        self.properties.write(buf)?;
-
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            self.reason_code.write(buf)?;
+        } 
+        else {
+            self.reason_code.write(buf)?;
+            self.properties.write(buf)?;
+        }
         Ok(())
     }
 }
 
 impl WireLength for PubAck {
     fn wire_len(&self) -> usize {
-        2 + 1 + self.properties.wire_len()
+        if self.reason_code == PubAckReasonCode::Success
+            && self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            2
+        } 
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            3
+        }
+        else {
+            2 + 1 + self.properties.wire_len()
+        }
     }
 }
 
@@ -163,12 +177,37 @@ impl WireLength for PubAckProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
         puback::{PubAck, PubAckProperties},
         reason_codes::PubAckReasonCode,
         write_variable_integer, PropertyType,
     };
     use bytes::{BufMut, Bytes, BytesMut};
+
+
+    #[test]
+    fn test_wire_len() {
+        let mut puback = PubAck {
+            packet_identifier: 12,
+            reason_code: PubAckReasonCode::Success,
+            properties: PubAckProperties::default(),
+        };
+
+        let mut buf = BytesMut::new();
+
+        puback.write(&mut buf).unwrap();
+        
+        assert_eq!(2, puback.wire_len());
+        assert_eq!(2, buf.len());
+        
+        puback.reason_code = PubAckReasonCode::NotAuthorized;
+        buf.clear();
+        puback.write(&mut buf).unwrap();
+
+        assert_eq!(3, puback.wire_len());
+        assert_eq!(3, buf.len());
+    }
+
 
     #[test]
     fn test_read_simple_puback() {

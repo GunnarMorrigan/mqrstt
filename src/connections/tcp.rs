@@ -214,16 +214,7 @@ impl AsyncMqttNetworkWrite for TcpWriter {
         if packet.packet_type() == PacketType::Disconnect {
             disconnect = true;
         }
-
-        while !outgoing.is_empty() && !disconnect {
-            let packet = outgoing.recv().await?;
-            packet.write(&mut self.buffer)?;
-            if packet.packet_type() == PacketType::Disconnect {
-                disconnect = true;
-                break;
-            }
-            trace!("Going to write packet to network: {:?}", packet);
-        }
+        trace!("Sending packet {}", packet);
 
         self.writehalf.write_all(&self.buffer[..]).await?;
         self.writehalf.flush().await?;

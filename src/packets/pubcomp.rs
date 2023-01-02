@@ -66,21 +66,35 @@ impl VariableHeaderWrite for PubComp {
 
         if self.reason_code == PubCompReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
-            return Ok(());
+            && self.properties.user_properties.is_empty() {
+            ()
         }
-
-        self.reason_code.write(buf)?;
-        self.properties.write(buf)?;
-
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            self.reason_code.write(buf)?;
+        } 
+        else {
+            self.reason_code.write(buf)?;
+            self.properties.write(buf)?;
+        }
         Ok(())
     }
 }
 
 impl WireLength for PubComp {
     fn wire_len(&self) -> usize {
-        2 + 1 + self.properties.wire_len()
+        if self.reason_code == PubCompReasonCode::Success
+            && self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            2
+        } 
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            3
+        }
+        else {
+            2 + 1 + self.properties.wire_len()
+        }
     }
 }
 
@@ -182,12 +196,36 @@ impl WireLength for PubCompProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
         pubcomp::{PubComp, PubCompProperties},
         reason_codes::PubCompReasonCode,
         write_variable_integer, PropertyType,
     };
     use bytes::{BufMut, Bytes, BytesMut};
+
+
+    #[test]
+    fn test_wire_len() {
+        let mut pubcomp = PubComp {
+            packet_identifier: 12,
+            reason_code: PubCompReasonCode::Success,
+            properties: PubCompProperties::default(),
+        };
+
+        let mut buf = BytesMut::new();
+
+        pubcomp.write(&mut buf).unwrap();
+
+        assert_eq!(2, pubcomp.wire_len());
+        assert_eq!(2, buf.len());
+
+        pubcomp.reason_code = PubCompReasonCode::PacketIdentifierNotFound;
+        buf.clear();
+        pubcomp.write(&mut buf).unwrap();
+
+        assert_eq!(3, pubcomp.wire_len());
+        assert_eq!(3, buf.len());
+    }
 
     #[test]
     fn test_read_simple_pub_comp() {

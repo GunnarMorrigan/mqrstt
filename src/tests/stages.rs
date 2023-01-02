@@ -1,3 +1,20 @@
+use tracing::{trace, warn};
+
+use crate::{event_handler::EventHandler, packets::packets::Packet};
+
+pub struct Nop { }
+impl EventHandler for Nop {
+    fn handle<'a>(
+        &'a mut self,
+        event: &'a Packet,
+    ) -> impl core::future::Future<Output = ()> + Send + 'a {
+        async move {
+            // warn!("{:?}", event)
+        }
+    }
+}
+
+
 pub mod qos_2 {
     use crate::{
         client::AsyncClient,

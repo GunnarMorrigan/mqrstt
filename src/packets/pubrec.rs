@@ -65,21 +65,35 @@ impl VariableHeaderWrite for PubRec {
 
         if self.reason_code == PubRecReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
-            return Ok(());
+            && self.properties.user_properties.is_empty() {
+            ()
         }
-
-        self.reason_code.write(buf)?;
-        self.properties.write(buf)?;
-
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            self.reason_code.write(buf)?;
+        } 
+        else {
+            self.reason_code.write(buf)?;
+            self.properties.write(buf)?;
+        }
         Ok(())
     }
 }
 
 impl WireLength for PubRec {
     fn wire_len(&self) -> usize {
-        2 + 1 + self.properties.wire_len()
+        if self.reason_code == PubRecReasonCode::Success
+            && self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            2
+        } 
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
+            3
+        }
+        else {
+            2 + 1 + self.properties.wire_len()
+        }
     }
 }
 
@@ -172,12 +186,35 @@ impl WireLength for PubRecProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
         pubrec::{PubRec, PubRecProperties},
         reason_codes::PubRecReasonCode,
         write_variable_integer, PropertyType,
     };
     use bytes::{BufMut, Bytes, BytesMut};
+
+    #[test]
+    fn test_wire_len() {
+        let mut pubrec = PubRec {
+            packet_identifier: 12,
+            reason_code: PubRecReasonCode::Success,
+            properties: PubRecProperties::default(),
+        };
+
+        let mut buf = BytesMut::new();
+
+        pubrec.write(&mut buf).unwrap();
+
+        assert_eq!(2, pubrec.wire_len());
+        assert_eq!(2, buf.len());
+
+        pubrec.reason_code = PubRecReasonCode::ImplementationSpecificError;
+        buf.clear();
+        pubrec.write(&mut buf).unwrap();
+
+        assert_eq!(3, pubrec.wire_len());
+        assert_eq!(3, buf.len());
+    }
 
     #[test]
     fn test_read_simple_pub_rec() {

@@ -219,7 +219,7 @@ impl Display for Packet {
             Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_session, c.username, c.password, c.keep_alive, c.client_id),
             Packet::ConnAck(c) => write!(f, "ConnAck(session:{:?}, reason code{:?})", c.connack_flags, c.reason_code),
             Packet::Publish(p) => write!(f, "Publish(topic: {}, qos: {:?}, dup: {:?}, retain: {:?}, packet id: {:?})", &p.topic, p.qos, p.dup, p.retain, p.packet_identifier),
-            Packet::PubAck(p) => write!(f, "PubAck(id:{:?}, reason code{:?})", p.packet_identifier, p.reason_code),
+            Packet::PubAck(p) => write!(f, "PubAck(id:{:?}, reason code: {:?})", p.packet_identifier, p.reason_code),
             Packet::PubRec(p) => write!(f, "PubRec(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
             Packet::PubRel(p) => write!(f, "PubRel(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
             Packet::PubComp(p) => write!(f, "PubComp(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
@@ -229,7 +229,7 @@ impl Display for Packet {
             Packet::UnsubAck(_) => write!(f, "UnsubAck()"),
             Packet::PingReq => write!(f, "PingReq"),
             Packet::PingResp => write!(f, "PingResp"),
-            Packet::Disconnect(_) => write!(f, "Disconnect()"),
+            Packet::Disconnect(d) => write!(f, "Disconnect(reason code: {:?})", d.reason_code),
             Packet::Auth(_) => write!(f, "Auth()"),
         }
     }
@@ -526,7 +526,6 @@ mod tests {
 
         packet.write(&mut buffer).unwrap();
 
-        // The input is not in the smallest possible format but when writing we do expect it to be in the smallest possible format.
         assert_eq!(buffer.to_vec(), bytes.to_vec())
     }
 }

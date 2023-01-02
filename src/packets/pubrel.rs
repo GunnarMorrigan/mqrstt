@@ -60,13 +60,14 @@ impl VariableHeaderWrite for PubRel {
 
         if self.reason_code == PubRelReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
-        } else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+            && self.properties.user_properties.is_empty() {
+            ()
+        }
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
             self.reason_code.write(buf)?;
-        } else {
+        } 
+        else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
         }
@@ -78,14 +79,14 @@ impl WireLength for PubRel {
     fn wire_len(&self) -> usize {
         if self.reason_code == PubRelReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+            && self.properties.user_properties.is_empty(){
             2
-        } else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+        } 
+        else if self.properties.reason_string.is_none()
+            && self.properties.user_properties.is_empty(){
             3
-        } else {
+        }
+        else {
             2 + 1 + self.properties.wire_len()
         }
     }
@@ -180,12 +181,36 @@ impl WireLength for PubRelProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
         pubrel::{PubRel, PubRelProperties},
         reason_codes::PubRelReasonCode,
         write_variable_integer, PropertyType,
     };
     use bytes::{BufMut, Bytes, BytesMut};
+
+
+    #[test]
+    fn test_wire_len() {
+        let mut pubrel = PubRel {
+            packet_identifier: 12,
+            reason_code: PubRelReasonCode::Success,
+            properties: PubRelProperties::default(),
+        };
+
+        let mut buf = BytesMut::new();
+
+        pubrel.write(&mut buf).unwrap();
+
+        assert_eq!(2, pubrel.wire_len());
+        assert_eq!(2, buf.len());
+
+        pubrel.reason_code = PubRelReasonCode::PacketIdentifierNotFound;
+        buf.clear();
+        pubrel.write(&mut buf).unwrap();
+
+        assert_eq!(3, pubrel.wire_len());
+        assert_eq!(3, buf.len());
+    }
 
     #[test]
     fn test_read_simple_pub_rel() {
@@ -207,7 +232,7 @@ mod tests {
     }
 
     #[test]
-    fn test_read_write_pub_rel_with_properties() {
+    fn test_read_write_pubrel_with_properties() {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);

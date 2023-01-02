@@ -85,7 +85,7 @@ impl EventHandlerTask {
             loop {
                 match self.network_receiver.recv().await {
                     Ok(event) => {
-                        debug!("Event Handler, handling incoming packet: {}", event);
+                        // debug!("Event Handler, handling incoming packet: {}", event);
                         if event.packet_type() == PacketType::Disconnect {
                             self.disconnect.store(true, Ordering::Release);
                         }
@@ -102,7 +102,7 @@ impl EventHandlerTask {
             loop {
                 match self.client_to_handler_r.recv().await {
                     Ok(event) => {
-                        debug!("Event Handler, handling outgoing packet: {}", event);
+                        // debug!("Event Handler, handling outgoing packet: {}", event);
                         self.handle_outgoing_packet(event).await?
                     }
                     Err(err) => return Err(MqttError::ClientChannelClosed(err)),
@@ -157,6 +157,7 @@ impl EventHandlerTask {
             Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback).await?,
             Packet::PingResp => self.handle_incoming_pingresp().await,
             Packet::ConnAck(_) => (),
+            Packet::Disconnect(_) => (),
             a => unreachable!("Should not receive {}", a),
         };
         Ok(())
@@ -199,11 +200,11 @@ impl EventHandlerTask {
     async fn handle_incoming_puback(&self, puback: &PubAck) -> Result<(), MqttError> {
         let mut outgoing_pub = self.state.outgoing_pub.lock().await;
         if let Some(p) = outgoing_pub.remove(&puback.packet_identifier) {
-            debug!(
-                "Publish {:?} with QoS {} has been acknowledged",
-                p.packet_identifier,
-                p.qos.into_u8(),
-            );
+            // debug!(
+            //     "Publish {:?} with QoS {} has been acknowledged",
+            //     p.packet_identifier,
+            //     p.qos.into_u8(),
+            // );
             self.state
                 .apkid
                 .mark_available(puback.packet_identifier)
@@ -233,11 +234,11 @@ impl EventHandlerTask {
                     }
                     self.network_sender.send(Packet::PubRel(pubrel)).await?;
 
-                    debug!(
-                        "Publish {:?} with QoS {} has been PubReced",
-                        p.packet_identifier,
-                        p.qos.into_u8(),
-                    );
+                    // debug!(
+                    //     "Publish {:?} with QoS {} has been PubReced",
+                    //     p.packet_identifier,
+                    //     p.qos.into_u8(),
+                    // );
                     Ok(())
                 }
                 _ => Ok(()),
@@ -568,6 +569,41 @@ mod handler_tests {
         network_to_handler_s.send(puback).await.unwrap();
 
         tokio::time::sleep(Duration::new(5, 0)).await;
+
+        // If we drop the client_to_handler channel the handler will stop executing and we can inspect its internals.
+        drop(client_to_handler_s);
+
+        let handler = handler_task.await.unwrap();
+
+        assert!(handler.state.incoming_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_pub.lock().await.is_empty());
+        assert!(handler.state.outgoing_rel.lock().await.is_empty());
+        assert!(handler.state.outgoing_sub.lock().await.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn incoming_publish_qos_q(){
+
+        let mut nop = Nop{};
+
+        let (handler, to_network_r, network_to_handler_s, client_to_handler_s) = handler();
+
+        let handler_task = tokio::task::spawn(async move {
+            // Ignore the error that this will return
+            let _ = dbg!(handler.handle(&mut nop).await);
+            return handler;
+        });
+        let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
+
+        network_to_handler_s.send(pub_packet.clone()).await.unwrap();
+
+        let puback = to_network_r.recv().await.unwrap();
+
+        assert_eq!(PacketType::PubAck, puback.packet_type());
+
+        let expected_puback = create_puback_packet(1);
+
+        assert_eq!(expected_puback, puback);
 
         // If we drop the client_to_handler channel the handler will stop executing and we can inspect its internals.
         drop(client_to_handler_s);
