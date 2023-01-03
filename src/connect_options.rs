@@ -18,14 +18,15 @@ pub struct ConnectOptions {
     // /// What transport protocol to use
     // transport: Transport,
     /// keep alive time to send pingreq to broker when the connection is idle
-    pub(crate) keep_alive_interval_s: u64,
-    pub(crate) connection_timeout_s: u64,
+    pub keep_alive_interval_s: u64,
+    pub connection_timeout_s: u64,
     /// clean (or) persistent session
-    pub(crate) clean_session: bool,
+    pub clean_session: bool,
     /// client identifier
-    pub(crate) client_id: String,
+    pub client_id: String,
     /// username and password
-    pub(crate) credentials: Option<(String, String)>,
+    pub username: Option<String>,
+    pub password: Option<String>,
     /// request (publish, subscribe) channel capacity
     channel_capacity: usize,
 
@@ -63,7 +64,8 @@ impl ConnectOptions {
             connection_timeout_s: 30,
             clean_session: false,
             client_id,
-            credentials: None,
+            username: None,
+            password: None,
             channel_capacity: 100,
             pending_throttle_s: 30,
             send_reason_messages: false,
@@ -132,12 +134,6 @@ impl ConnectOptions {
     }
     pub fn set_client_id(&mut self, client_id: String) {
         self.client_id = client_id
-    }
-    pub fn set_credentials(&mut self, credentials: (String, String)) {
-        self.credentials = Some(credentials)
-    }
-    pub fn clear_credentials(&mut self) {
-        self.credentials = None
     }
     pub fn set_channel_capacity(&mut self, channel_capacity: usize) {
         self.channel_capacity = channel_capacity

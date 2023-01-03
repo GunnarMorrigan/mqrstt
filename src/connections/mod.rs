@@ -40,6 +40,8 @@ pub fn create_connect_from_options(options: &ConnectOptions) -> Packet {
     connect.keep_alive = options.keep_alive_interval_s as u16;
     connect.connect_properties.request_problem_information = Some(1u8);
     connect.connect_properties.request_response_information = Some(1u8);
+    connect.username = options.username.clone();
+    connect.password = options.password.clone();
 
     Packet::Connect(connect)
 }
