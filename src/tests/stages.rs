@@ -1,9 +1,9 @@
 use tracing::{trace, warn};
 
-use crate::{event_handler::EventHandler, packets::Packet};
+use crate::{event_handler::AsyncEventHandler, packets::Packet};
 
 pub struct Nop { }
-impl EventHandler for Nop {
+impl AsyncEventHandler for Nop {
     fn handle<'a>(
         &'a mut self,
         event: &'a Packet,
@@ -18,7 +18,7 @@ impl EventHandler for Nop {
 pub mod qos_2 {
     use crate::{
         client::AsyncClient,
-        event_handler::EventHandler, packets::{Packet, PacketType},
+        event_handler::AsyncEventHandler, packets::{Packet, PacketType},
         // packets::{Packet, PacketType},
     };
 
@@ -41,7 +41,7 @@ pub mod qos_2 {
             }
         }
     }
-    impl EventHandler for TestPubQoS2 {
+    impl AsyncEventHandler for TestPubQoS2 {
         fn handle<'a>(
             &'a mut self,
             event: &'a Packet,

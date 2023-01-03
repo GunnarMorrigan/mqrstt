@@ -212,7 +212,7 @@ mod lib_test{
     use futures::join;
 
     use crate::{client::AsyncClient, packets::{self, Packet}};
-    use crate::event_handler::EventHandler;
+    use crate::event_handler::AsyncEventHandler;
     use crate::create_smol_rustls;
     use crate::connections::transport::RustlsConfig;
     use crate::connect_options::ConnectOptions;
@@ -221,7 +221,7 @@ mod lib_test{
         pub client: AsyncClient,
     }
     
-    impl EventHandler for PingPong{
+    impl AsyncEventHandler for PingPong{
         fn handle<'a>(&'a mut self, event: &'a packets::Packet) -> impl std::future::Future<Output = ()> + Send + 'a {
             async move{
                 match event{
@@ -244,6 +244,19 @@ mod lib_test{
     
     #[test]
     fn test_smol(){
+
+
+        let filter = tracing_subscriber::filter::EnvFilter::new("none,mqrstt=trace");
+
+        let subscriber = tracing_subscriber::FmtSubscriber::builder()
+            .with_env_filter(filter)
+            .with_max_level(tracing::Level::TRACE)
+            .with_line_number(true)
+            .finish();
+
+        tracing::subscriber::set_global_default(subscriber)
+            .expect("setting default subscriber failed");
+
         smol::block_on(async{
             let options = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "mqrstt".to_string());
             
@@ -253,20 +266,22 @@ mod lib_test{
                 client_auth: None,
             };
     
-            let (mut network, handler, client) = create_smol_rustls(options, tls_config);
+            let (mut network, mut handler, client) = create_smol_rustls(options, tls_config);
     
             client.subscribe("mqrstt").await.unwrap();
             
     
             let mut pingpong = PingPong{ client };
-    
-            join!(network.run(), 
-                async {
-                    loop{
-                        handler.handle(&mut pingpong).await.unwrap();
-                    }
-                }
-            );
+
+            
+            network.run().await.unwrap();
+            // join!(, 
+            //     async {
+            //         loop{
+            //             handler.handle(&mut pingpong).await.unwrap();
+            //         }
+            //     }
+            // ).0.unwrap();
         });
     }
 }
