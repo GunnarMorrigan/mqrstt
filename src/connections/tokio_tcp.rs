@@ -1,77 +1,55 @@
 use std::io::{self, Error, ErrorKind};
 
 use async_channel::Receiver;
-
-use async_rustls::client::TlsStream;
-use async_rustls::TlsConnector;
 use bytes::{Buf, BytesMut};
-use rustls::ServerName;
-use smol::io::{ReadHalf, WriteHalf};
-use smol::{
-    io::{split, AsyncReadExt, AsyncWriteExt},
-    net::TcpStream,
+// #[cfg(feature = "smol")]
+// use smol::{
+//     io::{AsyncReadExt, AsyncWriteExt},
+//     net::TcpStream,
+// };
+use tokio::{io::AsyncReadExt, net::TcpStream};
+use tokio::{
+    io::AsyncWriteExt,
+    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
 };
-
 use tracing::trace;
 
-use crate::error::TlsError;
-use crate::{
-    connect_options::ConnectOptions, connections::create_connect_from_options,
-    error::ConnectionError, network::Incoming,
+use crate::packets::{
+    error::ReadBytes,
+    {FixedHeader, Packet, PacketType},
+    reason_codes::ConnAckReasonCode,
 };
 use crate::{
-    connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite},
-    packets::{
-        error::ReadBytes,
-        {FixedHeader, Packet, PacketType},
-        reason_codes::ConnAckReasonCode,
-    },
+    connect_options::ConnectOptions,
+    connections::{create_connect_from_options, AsyncMqttNetworkWrite},
+    error::ConnectionError,
+    network::Incoming,
 };
 
-use super::transport::{RustlsConfig, TlsConfig};
-use super::util::simple_rust_tls;
+use super::AsyncMqttNetworkRead;
 
 #[derive(Debug)]
-pub struct TlsReader {
-    readhalf: ReadHalf<TlsStream<TcpStream>>,
+pub struct TcpReader {
+    readhalf: OwnedReadHalf,
 
-    /// Input buffer
-    const_buffer: [u8; 1000],
     /// Buffered reads
     buffer: BytesMut,
 }
 
-impl TlsReader {
-    pub async fn new(options: &ConnectOptions) -> Result<(TlsReader, TlsWriter), TlsError> {
-        if let Some(tls_config) = &options.tls_config {
-            let arc_tls_config = match tls_config {
-                TlsConfig::Rustls(RustlsConfig::Simple {
-                    ca,
-                    alpn,
-                    client_auth,
-                }) => simple_rust_tls(ca.clone(), alpn.clone(), client_auth.clone())?,
-                TlsConfig::Rustls(RustlsConfig::Rustls(config)) => config.clone(),
-            };
-
-            let domain = ServerName::try_from(options.address.as_str())?;
-            let connector = TlsConnector::from(arc_tls_config);
-
-            let stream = TcpStream::connect((options.address.as_str(), options.port)).await?;
-            let connection = connector.connect(domain, stream).await?;
-
-            let (readhalf, writehalf) = split(connection);
-
-            let reader = Self {
-                readhalf,
-                const_buffer: [0; 1000],
-                buffer: BytesMut::with_capacity(20 * 1024),
-            };
-            let writer = TlsWriter::new(writehalf);
-
-            Ok((reader, writer))
-        } else {
-            Err(TlsError::NoTlsConfig)
-        }
+impl TcpReader {
+    pub async fn new_tcp(
+        options: &ConnectOptions,
+    ) -> Result<(TcpReader, TcpWriter), ConnectionError> {
+        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port))
+            .await?
+            .into_split();
+        let reader = TcpReader {
+            readhalf,
+            buffer: BytesMut::with_capacity(20 * 1024),
+            // max_incoming_size: u32::MAX as usize,
+        };
+        let writer = TcpWriter::new(writehalf);
+        Ok((reader, writer))
     }
 
     pub async fn read(&mut self) -> io::Result<Packet> {
@@ -104,9 +82,11 @@ impl TlsReader {
         let mut total_read = 0;
 
         loop {
-            let read = self.readhalf.read(&mut self.const_buffer).await?;
-
-            if read == 0 {
+            #[cfg(feature = "tokio")]
+            let read = self.readhalf.read_buf(&mut self.buffer).await?;
+            // #[cfg(feature = "smol")]
+            // let read = self.connection.read(&mut self.buffer).await?;
+            if 0 == read {
                 return if self.buffer.is_empty() {
                     Err(io::Error::new(
                         io::ErrorKind::ConnectionAborted,
@@ -118,9 +98,6 @@ impl TlsReader {
                         "Connection reset by peer",
                     ))
                 };
-            } 
-            else {
-                self.buffer.extend_from_slice(&self.const_buffer[0..read]);
             }
 
             total_read += read;
@@ -131,15 +108,15 @@ impl TlsReader {
     }
 }
 
-impl AsyncMqttNetworkRead for TlsReader {
-    type W = TlsWriter;
+impl AsyncMqttNetworkRead for TcpReader {
+    type W = TcpWriter;
 
     fn connect(
         options: &ConnectOptions,
     ) -> impl std::future::Future<Output = Result<(Self, Self::W, Packet), ConnectionError>> + Send + '_
     {
         async {
-            let (mut reader, mut writer) = TlsReader::new(options).await?;
+            let (mut reader, mut writer) = TcpReader::new_tcp(options).await?;
 
             let mut buf_out = BytesMut::new();
 
@@ -202,15 +179,14 @@ impl AsyncMqttNetworkRead for TlsReader {
     }
 }
 
-#[derive(Debug)]
-pub struct TlsWriter {
-    writehalf: WriteHalf<TlsStream<TcpStream>>,
+pub struct TcpWriter {
+    writehalf: OwnedWriteHalf,
 
     buffer: BytesMut,
 }
 
-impl TlsWriter {
-    pub fn new(writehalf: WriteHalf<TlsStream<TcpStream>>) -> Self {
+impl TcpWriter {
+    pub fn new(writehalf: OwnedWriteHalf) -> Self {
         Self {
             writehalf,
             buffer: BytesMut::with_capacity(20 * 1024),
@@ -218,14 +194,13 @@ impl TlsWriter {
     }
 }
 
-impl AsyncMqttNetworkWrite for TlsWriter {
+impl AsyncMqttNetworkWrite for TcpWriter {
     async fn write_buffer(&mut self, buffer: &mut BytesMut) -> Result<(), ConnectionError> {
         if buffer.is_empty() {
             return Ok(());
         }
 
         self.writehalf.write_all(&buffer[..]).await?;
-        self.writehalf.flush().await?;
         buffer.clear();
         Ok(())
     }
@@ -238,60 +213,11 @@ impl AsyncMqttNetworkWrite for TlsWriter {
         if packet.packet_type() == PacketType::Disconnect {
             disconnect = true;
         }
-
-        while !outgoing.is_empty() && !disconnect {
-            let packet = outgoing.recv().await?;
-            packet.write(&mut self.buffer)?;
-            if packet.packet_type() == PacketType::Disconnect {
-                disconnect = true;
-                break;
-            }
-            trace!("Going to write packet to network: {:?}", packet);
-        }
+        trace!("Sending packet {}", packet);
 
         self.writehalf.write_all(&self.buffer[..]).await?;
         self.writehalf.flush().await?;
         self.buffer.clear();
         Ok(disconnect)
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use crate::{
-        connect_options::ConnectOptions,
-        connections::{
-            transport::{RustlsConfig, TlsConfig},
-            AsyncMqttNetworkRead,
-        },
-        packets::{
-            {Packet, PacketType},
-            reason_codes::ConnAckReasonCode,
-        },
-        tests::resources::EMQX_CERT,
-    };
-
-    use super::TlsReader;
-
-    fn connect_emqx_test() {
-        let config = TlsConfig::Rustls(RustlsConfig::Simple {
-            ca: EMQX_CERT.to_vec(),
-            alpn: None,
-            client_auth: None,
-        });
-
-        let opt = ConnectOptions::new_with_tls_config(
-            "broker.emqx.io".to_string(),
-            8883,
-            "test123123".to_string(),
-            Some(config),
-        );
-
-        let (_, _, packet) = smol::block_on(TlsReader::connect(&opt)).unwrap();
-
-        assert_eq!(PacketType::ConnAck, packet.packet_type());
-        if let Packet::ConnAck(conn) = packet {
-            assert_eq!(ConnAckReasonCode::Success, conn.reason_code);
-        }
     }
 }

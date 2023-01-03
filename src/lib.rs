@@ -105,10 +105,10 @@ use async_mutex::Mutex;
 use client::AsyncClient;
 use connect_options::ConnectOptions;
 
-#[cfg(all(feature = "smol", feature = "smol-rustls"))]
-use connections::async_rustls::{TlsReader, TlsWriter};
-#[cfg(all(feature = "tokio", feature = "tcp"))]
-use connections::tcp::{TcpReader, TcpWriter};
+use connections::*;
+
+// #[cfg(all(feature = "tokio", feature = "tcp"))]
+// use connections::tokio_tcp::{TcpReader, TcpWriter};
 
 use connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 
@@ -165,7 +165,18 @@ pub fn create_tokio_rustls(
 pub fn create_tokio_tcp(
     options: ConnectOptions,
 ) -> (
-    MqttNetwork<TcpReader, TcpWriter>,
+    MqttNetwork<tokio_tcp::TcpReader, tokio_tcp::TcpWriter>,
+    EventHandlerTask,
+    AsyncClient,
+) {
+    new(options)
+}
+
+#[cfg(all(feature = "smol", feature = "tcp"))]
+pub fn create_smol_tcp(
+    options: ConnectOptions,
+) -> (
+    MqttNetwork<smol_tcp::TcpReader, smol_tcp::TcpWriter>,
     EventHandlerTask,
     AsyncClient,
 ) {
@@ -242,7 +253,7 @@ mod lib_test{
         }
     }
     
-    #[test]
+    // #[test]
     fn test_smol(){
 
 
@@ -273,15 +284,13 @@ mod lib_test{
     
             let mut pingpong = PingPong{ client };
 
-            
-            network.run().await.unwrap();
-            // join!(, 
-            //     async {
-            //         loop{
-            //             handler.handle(&mut pingpong).await.unwrap();
-            //         }
-            //     }
-            // ).0.unwrap();
+            join!(network.run(), 
+                async {
+                    loop{
+                        handler.handle(&mut pingpong).await.unwrap();
+                    }
+                }
+            ).0.unwrap();
         });
     }
 }

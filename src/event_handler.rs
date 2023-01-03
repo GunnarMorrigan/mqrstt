@@ -84,7 +84,7 @@ impl EventHandlerTask {
     }
 
 
-    pub fn sync_handle<H: EventHandler + Send + Sized + 'static>(
+    pub fn sync_handle<H: EventHandler>(
         &self,
         handler: &mut H,
     ) -> Result<(), MqttError> {
@@ -146,7 +146,7 @@ impl EventHandlerTask {
                 match incoming {
                     Ok(event) => {
                         // debug!("Event Handler, handling incoming packet: {}", event);
-                        handler.handle(&event);
+                        handler.handle(&event).await;
                         self.handle_incoming_packet(event).await?
                     }
                     Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
@@ -539,8 +539,12 @@ mod handler_tests {
         let (mut handler, to_network_r, _network_to_handler_s, client_to_handler_s) = handler();
 
         let handler_task = tokio::task::spawn(async move {
-            // Ignore the error that this will return
-            let _ = dbg!(handler.handle(&mut nop).await);
+            let _ = loop{
+                match handler.handle(&mut nop).await{
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+            };
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtMostOnce, false, false, None);
@@ -601,7 +605,12 @@ mod handler_tests {
 
         let handler_task = tokio::task::spawn(async move {
             // Ignore the error that this will return
-            let _ = dbg!(handler.handle(&mut nop).await);
+            let _ = loop{
+                match handler.handle(&mut nop).await{
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+            };
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
@@ -620,6 +629,7 @@ mod handler_tests {
 
         // If we drop the client_to_handler channel the handler will stop executing and we can inspect its internals.
         drop(client_to_handler_s);
+        drop(network_to_handler_s);
 
         let handler = handler_task.await.unwrap();
 
@@ -630,7 +640,7 @@ mod handler_tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn incoming_publish_qos_q(){
+    async fn incoming_publish_qos_1(){
 
         let mut nop = Nop{};
 
@@ -638,7 +648,12 @@ mod handler_tests {
 
         let handler_task = tokio::task::spawn(async move {
             // Ignore the error that this will return
-            let _ = dbg!(handler.handle(&mut nop).await);
+            let _ = loop{
+                match handler.handle(&mut nop).await{
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+            };
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
@@ -655,6 +670,7 @@ mod handler_tests {
 
         // If we drop the client_to_handler channel the handler will stop executing and we can inspect its internals.
         drop(client_to_handler_s);
+        drop(network_to_handler_s);
 
         let handler = handler_task.await.unwrap();
 
@@ -713,7 +729,12 @@ mod handler_tests {
         let mut nop = TestPubQoS2::new(client_to_handler_s.clone());
 
         let handler_task = tokio::task::spawn(async move {
-            dbg!(handler.handle(&mut nop).await).unwrap();
+            let _ = loop{
+                match handler.handle(&mut nop).await{
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+            };
             return handler;
         });
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
@@ -750,6 +771,9 @@ mod handler_tests {
 
         network_to_handler_s.send(pubcomp).await.unwrap();
 
+        drop(client_to_handler_s);
+        drop(network_to_handler_s);
+
         let handler = handler_task.await.unwrap();
 
         assert!(handler.state.incoming_pub.is_empty());
@@ -766,7 +790,12 @@ mod handler_tests {
 
         let handler_task = tokio::task::spawn(async move {
             // Ignore the error that this will return
-            let _ = dbg!(handler.handle(&mut nop).await);
+            let _ = loop{
+                match handler.handle(&mut nop).await{
+                    Ok(_) => (),
+                    Err(_) => break,
+                }
+            };
             return handler;
         });
 
@@ -789,6 +818,7 @@ mod handler_tests {
         tokio::time::sleep(Duration::new(2, 0)).await;
 
         drop(client_to_handler_s);
+        drop(network_to_handler_s);
 
         let handler = handler_task.await.unwrap();
         assert!(handler.state.incoming_pub.is_empty());
