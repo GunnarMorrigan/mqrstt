@@ -1,5 +1,6 @@
 use bytes::Bytes;
 
+#[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 use crate::connections::transport::TlsConfig;
 use crate::packets::LastWill;
 use crate::util::constants::RECEIVE_MAXIMUM_DEFAULT;
@@ -11,6 +12,7 @@ pub struct ConnectOptions {
     /// broker port
     pub(crate) port: u16,
 
+    #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
     pub(crate) tls_config: Option<TlsConfig>,
 
     // /// What transport protocol to use
@@ -54,6 +56,7 @@ impl ConnectOptions {
         Self {
             address,
             port,
+            #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
             tls_config: None,
 
             keep_alive_interval_s: 60,
@@ -78,6 +81,7 @@ impl ConnectOptions {
         }
     }
 
+    #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
     pub(crate) fn new_with_tls_config(
         address: String,
         port: u16,

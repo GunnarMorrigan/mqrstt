@@ -213,7 +213,8 @@ where
     (network, handler, client)
 }
 
-#[cfg(test)]
+
+#[cfg(all(test, any(feature = "smol-rustls", feature = "tokio-rustls")))]
 mod lib_test{
     use bytes::Bytes;
     use futures::join;
