@@ -121,9 +121,9 @@ pub mod connect_options;
 pub mod connections;
 pub mod error;
 pub mod event_handler;
-mod network;
+pub mod network;
 pub mod packets;
-mod state;
+pub mod state;
 mod util;
 
 #[cfg(test)]
