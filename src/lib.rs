@@ -112,8 +112,6 @@ use connections::*;
 
 use connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 
-use connections::transport::RustlsConfig;
-
 use event_handler::EventHandlerTask;
 use network::MqttNetwork;
 
@@ -134,30 +132,28 @@ pub mod tests;
 #[cfg(all(feature = "smol", feature = "smol-rustls"))]
 pub fn create_smol_rustls(
     mut options: ConnectOptions,
-    tls_config: RustlsConfig,
+    tls_config: transport::RustlsConfig,
 ) -> (
     MqttNetwork<connections::async_rustls::TlsReader, connections::async_rustls::TlsWriter>,
     EventHandlerTask,
     AsyncClient,
 ) {
-    use connections::transport::TlsConfig;
 
-    options.tls_config = Some(TlsConfig::Rustls(tls_config));
+    options.tls_config = Some(transport::TlsConfig::Rustls(tls_config));
     new(options)
 }
 
 #[cfg(all(feature = "tokio", feature = "tokio-rustls"))]
 pub fn create_tokio_rustls(
     mut options: ConnectOptions,
-    tls_config: RustlsConfig,
+    tls_config: transport::RustlsConfig,
 ) -> (
     MqttNetwork<connections::tokio_rustls::TlsReader, connections::tokio_rustls::TlsWriter>,
     EventHandlerTask,
     AsyncClient,
 ) {
-    use connections::transport::TlsConfig;
 
-    options.tls_config = Some(TlsConfig::Rustls(tls_config));
+    options.tls_config = Some(transport::TlsConfig::Rustls(tls_config));
     new(options)
 }
 

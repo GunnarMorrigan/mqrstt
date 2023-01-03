@@ -31,6 +31,7 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 
 async-channel = "1.8.0"
 async-mutex = "1.4.0"
+futures-concurrency = "7.0.0"
 futures = { version = "0.3.25", default-features = false, features = ["std", "async-await"] }
 
 # Needed for all TLS
