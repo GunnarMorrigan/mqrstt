@@ -135,7 +135,7 @@ impl EventHandlerTask {
         // };
     }
 
-    async fn handle_incoming_packet<H: EventHandler + Send + Sized + 'static>(
+    async fn handle_incoming_packet<H: EventHandler>(
         &self,
         handler: &mut H,
         packet: Packet,
