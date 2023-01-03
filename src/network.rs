@@ -12,6 +12,7 @@ use crate::connect_options::ConnectOptions;
 use crate::connections::{AsyncMqttNetworkRead, AsyncMqttNetworkWrite};
 use crate::error::ConnectionError;
 use crate::packets::Packet;
+use crate::util::timeout::{timeout, self};
 
 pub type Incoming = Packet;
 pub type Outgoing = Packet;
@@ -62,16 +63,10 @@ where
         if self.network.is_none() {
             trace!("Creating network");
 
-            let con = R::connect(&self.options).await;
-
-            if let Err(err) = con.as_ref() {
-                dbg!(err);
-            }
+            // let con = R::connect(&self.options).await;
+            let con = timeout::timeout(R::connect(&self.options), self.options.connection_timeout_s).await?;
 
             let (reader, writer, connack) = con?;
-
-            // timeout::timeout(R::connect(&self.options), self.options.connection_timeout_s)
-            //     .await??;
 
             trace!("Succesfully created network");
             self.network = Some((reader, writer));
