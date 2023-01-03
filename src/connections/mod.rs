@@ -16,7 +16,9 @@ pub mod quic;
 #[cfg(all(feature = "tokio", feature = "tokio-rustls"))]
 pub mod tokio_rustls;
 
+#[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 pub mod transport;
+
 #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 mod util;
 
