@@ -1,8 +1,8 @@
 #[cfg(all(feature = "tokio", feature = "tcp"))]
-pub mod tcp;
+pub mod tokio_tcp;
 
 #[cfg(all(feature = "smol", feature = "tcp"))]
-pub mod tcp_smol;
+pub mod smol_tcp;
 
 #[cfg(all(feature = "smol", feature = "native-tls"))]
 pub mod async_native_tls;
