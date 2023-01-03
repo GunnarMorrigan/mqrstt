@@ -15,11 +15,12 @@ use crate::packets::Unsubscribe;
 use crate::packets::QoS;
 use crate::state::State;
 
+use futures::FutureExt;
 use futures_concurrency::future::Race;
 
 use async_channel::{Receiver, Sender};
 use async_mutex::Mutex;
-use tracing::{error};
+use tracing::{error, debug};
 
 use std::future::Future;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -79,28 +80,22 @@ impl EventHandlerTask {
         &self,
         handler: &mut H,
     ) -> Result<(), MqttError> {
-        self.disconnect.store(false, Ordering::Release);
-
-        let incoming = async {
-            loop {
-                match self.network_receiver.recv().await {
+        futures::select! {
+            incoming = self.network_receiver.recv().fuse() => {
+                match incoming {
                     Ok(event) => {
                         // debug!("Event Handler, handling incoming packet: {}", event);
-                        if event.packet_type() == PacketType::Disconnect {
-                            self.disconnect.store(true, Ordering::Release);
-                        }
                         self.handle_incoming_packet(handler, event).await?
                     }
                     Err(err) => return Err(MqttError::IncomingNetworkChannelClosed(err)),
                 }
                 if self.disconnect.load(Ordering::Acquire) {
+                    self.disconnect.store(false, Ordering::Release);
                     return Ok::<(), MqttError>(());
                 }
-            }
-        };
-        let outgoing = async {
-            loop {
-                match self.client_to_handler_r.recv().await {
+            },
+            outgoing = self.client_to_handler_r.recv().fuse() => {
+                match outgoing {
                     Ok(event) => {
                         // debug!("Event Handler, handling outgoing packet: {}", event);
                         self.handle_outgoing_packet(event).await?
@@ -108,10 +103,12 @@ impl EventHandlerTask {
                     Err(err) => return Err(MqttError::ClientChannelClosed(err)),
                 }
                 if self.disconnect.load(Ordering::Acquire) {
+                    self.disconnect.store(false, Ordering::Release);
                     return Ok::<(), MqttError>(());
                 }
             }
-        };
+        }
+        Ok(())
         // let keepalive = async {
         //     let initial_keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
         //     let mut keep_alive_duration = std::time::Duration::new(self.keep_alive_s, 0);
@@ -136,8 +133,6 @@ impl EventHandlerTask {
         //         }
         //     }
         // };
-
-        (incoming, outgoing).race().await
     }
 
     async fn handle_incoming_packet<H: EventHandler + Send + Sized + 'static>(
@@ -157,7 +152,9 @@ impl EventHandlerTask {
             Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback).await?,
             Packet::PingResp => self.handle_incoming_pingresp().await,
             Packet::ConnAck(_) => (),
-            Packet::Disconnect(_) => (),
+            Packet::Disconnect(_) => {
+                self.disconnect.store(true, Ordering::Release);
+            },
             a => unreachable!("Should not receive {}", a),
         };
         Ok(())
@@ -199,12 +196,12 @@ impl EventHandlerTask {
 
     async fn handle_incoming_puback(&self, puback: &PubAck) -> Result<(), MqttError> {
         let mut outgoing_pub = self.state.outgoing_pub.lock().await;
-        if let Some(p) = outgoing_pub.remove(&puback.packet_identifier) {
-            // debug!(
-            //     "Publish {:?} with QoS {} has been acknowledged",
-            //     p.packet_identifier,
-            //     p.qos.into_u8(),
-            // );
+        if let Some(_) = outgoing_pub.remove(&puback.packet_identifier) {
+            #[cfg(test)]
+            debug!(
+                "Publish {:?} has been acknowledged",
+                puback.packet_identifier
+            );
             self.state
                 .apkid
                 .mark_available(puback.packet_identifier)
@@ -225,7 +222,7 @@ impl EventHandlerTask {
     async fn handle_incoming_pubrec(&self, pubrec: &PubRec) -> Result<(), MqttError> {
         let mut outgoing_pub = self.state.outgoing_pub.lock().await;
         match outgoing_pub.remove(&pubrec.packet_identifier) {
-            Some(p) => match pubrec.reason_code {
+            Some(_) => match pubrec.reason_code {
                 PubRecReasonCode::Success | PubRecReasonCode::NoMatchingSubscribers => {
                     let pubrel = PubRel::new(pubrec.packet_identifier);
                     {
@@ -234,11 +231,11 @@ impl EventHandlerTask {
                     }
                     self.network_sender.send(Packet::PubRel(pubrel)).await?;
 
-                    // debug!(
-                    //     "Publish {:?} with QoS {} has been PubReced",
-                    //     p.packet_identifier,
-                    //     p.qos.into_u8(),
-                    // );
+                    #[cfg(test)]
+                    debug!(
+                        "Publish {:?} has been PubReced",
+                        pubrec.packet_identifier
+                    );
                     Ok(())
                 }
                 _ => Ok(()),

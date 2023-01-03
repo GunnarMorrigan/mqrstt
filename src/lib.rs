@@ -8,14 +8,20 @@
 //! By providing a custom handler during the internal handling, messages are handled before they are acked.
 //! The client - which is used to send messages from different places.
 //! 
+//! To Do:
+//! - Rebroadcast unacked packets.
+//! - Keep alive sending of PingReq and PingResp.
+//! - Enforce size of outbound messages (e.g. Publish)
+//! 
 //! A few questions still remain:
 //! - This crate uses async channels to perform communication across its parts. Is there a better approach?
-//! - This crate provides network implementation which hinder sync and async agnosticity.
+//!   These channels do allow the user to decouple this crate and the network in the future but comes at a cost of more copies
+//! - This crate provides network implementation which hinder sync and async agnosticism.
 //! 
 //! For the future it could be nice to be sync, async and runtime agnostic.
 //! This can be achieved by decoupling the MQTT internals from the network communication.
 //! The user could provide the received packets while this crate returns the response packets.
-//! Another aproach could be providing the read bytes, however, QUIC supports multiple streams.
+//! Another approach could be providing the read bytes, however, QUIC supports multiple streams.
 //!
 //! Currently, we do provide network implementations for the smol and tokio runtimes that you can enable with feature flags.
 //!
@@ -31,14 +37,61 @@
 //! let (mqtt_network, handler, client) = create_tokio_rustls(opt, config);
 //! 
 //! task::spawn(async move {
-//!     join!(mqtt_network.run(), hadnler.handle(/* Custom handler */));
+//!     join!(mqtt_network.run(), handler.handle(/* Custom handler */));
 //! });
 //! 
 //! for i in 0..10 {
 //!     client.publish("test", QoS::AtLeastOnce, false, b"test payload").await.unwrap();
 //!     time::sleep(Duration::from_millis(100)).await;
 //! }
+//! ```
 //! 
+//! Smol example:
+//! 
+//! ```
+//! pub struct PingPong {
+//! pub client: AsyncClient,
+//! }
+//! 
+//! impl EventHandler for PingPong{
+//!     fn handle<'a>(&'a mut self, event: &'a packets::Packet) -> impl std::future::Future<Output = ()> + Send + 'a {
+//!         async move{
+//!             match event{
+//!                 Packet::Publish(p) => {
+//!                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()){
+//!                         if payload.to_lowercase().contains("ping"){
+//!                             self.client.publish(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).await;
+//!                             println!("Received Ping, Send pong!");
+//!                         }
+//!                     }
+//!                 },
+//!                 Packet::ConnAck(_) => {
+//!                     println!("Connected!");
+//!                 }
+//!                 _ => (),
+//!             }
+//!         }
+//!     }
+//! }
+//! 
+//! fn main(){
+//!     let options = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "mqrstt".to_string());
+//!         
+//!     let tls_config = RustlsConfig::Simple {
+//!         ca: crate::tests::resources::EMQX_CERT.to_vec(),
+//!         alpn: None,
+//!         client_auth: None,
+//!     };
+//! 
+//!     let (mut network, handler, client) = create_smol_rustls(options, tls_config);
+//!     smol::block_on(async{
+//!         client.subscribe("mqrstt").await.unwrap();
+//!         
+//!         let mut pingpong = PingPong{ client };
+//! 
+//!         join!(network.run(), handler.handle(&mut pingpong));
+//!     });
+//! }
 //! ```
 //! 
 
@@ -156,9 +209,13 @@ where
 #[cfg(test)]
 mod lib_test{
     use bytes::Bytes;
-    use tokio::join;
+    use futures::join;
 
-    use crate::{connect_options::ConnectOptions, connections::transport::RustlsConfig, create_smol_rustls, event_handler::EventHandler, client::AsyncClient, packets::{self, Packet}};
+    use crate::{client::AsyncClient, packets::{self, Packet}};
+    use crate::event_handler::EventHandler;
+    use crate::create_smol_rustls;
+    use crate::connections::transport::RustlsConfig;
+    use crate::connect_options::ConnectOptions;
 
     pub struct PingPong {
         pub client: AsyncClient,
@@ -172,11 +229,13 @@ mod lib_test{
                         if let Ok(payload) = String::from_utf8(p.payload.to_vec()){
                             if payload.to_lowercase().contains("ping"){
                                 self.client.publish(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).await;
-                                println!("Recieved Ping, Send pong!");
+                                println!("Received Ping, Send pong!");
                             }
                         }
-                        
                     },
+                    Packet::ConnAck(_) => {
+                        println!("Connected!");
+                    }
                     _ => (),
                 }
             }
@@ -201,7 +260,13 @@ mod lib_test{
     
             let mut pingpong = PingPong{ client };
     
-            join!(network.run(), handler.handle(&mut pingpong));
+            join!(network.run(), 
+                async {
+                    loop{
+                        handler.handle(&mut pingpong).await.unwrap();
+                    }
+                }
+            );
         });
     }
 }
