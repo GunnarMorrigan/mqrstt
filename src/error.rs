@@ -16,14 +16,17 @@ pub enum MqttError {
     #[error("Missing Packet ID")]
     MissingPacketId,
 
-    #[error("The incoming channel between network and handler is closed: {0}")]
-    IncomingNetworkChannelClosed(RecvError),
+    #[error("The incoming channel between network and handler is closed")]
+    IncomingNetworkChannelClosed,
 
     #[error("The outgoing channel between handler and network is closed: {0}")]
     OutgoingNetworkChannelClosed(#[from] SendError<Packet>),
 
-    #[error("Channel between client and handler closed: {0}")]
-    ClientChannelClosed(RecvError),
+    #[error("Channel between client and handler closed")]
+    ClientChannelClosed,
+
+    #[error("Packet Id error, pkid: {0}")]
+    PacketIdError(u16),
 
     #[error("Received unsolicited ack pkid: {0}")]
     Unsolicited(u16, PacketType),

@@ -1,17 +1,12 @@
+
 use std::io::{self, Error, ErrorKind};
 
 use async_channel::Receiver;
 use bytes::{Buf, BytesMut};
 // #[cfg(feature = "smol")]
-// use smol::{
-//     io::{AsyncReadExt, AsyncWriteExt},
-//     net::TcpStream,
-// };
-#[cfg(feature = "tokio")]
-use tokio::{io::AsyncReadExt, net::TcpStream};
-use tokio::{
-    io::AsyncWriteExt,
-    net::tcp::{OwnedReadHalf, OwnedWriteHalf},
+use smol::{
+    io::{AsyncReadExt, AsyncWriteExt, split, ReadHalf, WriteHalf},
+    net::TcpStream,
 };
 use tracing::trace;
 
@@ -31,8 +26,10 @@ use super::AsyncMqttNetworkRead;
 
 #[derive(Debug)]
 pub struct TcpReader {
-    readhalf: OwnedReadHalf,
+    readhalf: ReadHalf<TcpStream>,
 
+    /// Input buffer
+    const_buffer: [u8; 1000],
     /// Buffered reads
     buffer: BytesMut,
 }
@@ -41,11 +38,10 @@ impl TcpReader {
     pub async fn new_tcp(
         options: &ConnectOptions,
     ) -> Result<(TcpReader, TcpWriter), ConnectionError> {
-        let (readhalf, writehalf) = TcpStream::connect((options.address.clone(), options.port))
-            .await?
-            .into_split();
+        let (readhalf, writehalf) = split(TcpStream::connect((options.address.clone(), options.port)).await?);
         let reader = TcpReader {
             readhalf,
+            const_buffer: [0; 1000],
             buffer: BytesMut::with_capacity(20 * 1024),
             // max_incoming_size: u32::MAX as usize,
         };
@@ -83,10 +79,7 @@ impl TcpReader {
         let mut total_read = 0;
 
         loop {
-            #[cfg(feature = "tokio")]
-            let read = self.readhalf.read_buf(&mut self.buffer).await?;
-            // #[cfg(feature = "smol")]
-            // let read = self.connection.read(&mut self.buffer).await?;
+            let read = self.readhalf.read(&mut self.const_buffer).await?;
             if 0 == read {
                 return if self.buffer.is_empty() {
                     Err(io::Error::new(
@@ -99,6 +92,9 @@ impl TcpReader {
                         "Connection reset by peer",
                     ))
                 };
+            }
+            else {
+                self.buffer.extend_from_slice(&self.const_buffer[0..read]);
             }
 
             total_read += read;
@@ -181,13 +177,13 @@ impl AsyncMqttNetworkRead for TcpReader {
 }
 
 pub struct TcpWriter {
-    writehalf: OwnedWriteHalf,
+    writehalf: WriteHalf<TcpStream>,
 
     buffer: BytesMut,
 }
 
 impl TcpWriter {
-    pub fn new(writehalf: OwnedWriteHalf) -> Self {
+    pub fn new(writehalf: WriteHalf<TcpStream>) -> Self {
         Self {
             writehalf,
             buffer: BytesMut::with_capacity(20 * 1024),

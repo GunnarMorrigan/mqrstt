@@ -13,16 +13,16 @@ pub struct State {
     pub(crate) apkid: AvailablePacketIds,
 
     /// Outgoing Subcribe requests which aren't acked yet
-    pub(crate) outgoing_sub: Mutex<BTreeMap<u16, Subscribe>>,
+    pub(crate) outgoing_sub: BTreeMap<u16, Subscribe>,
     /// Outgoing Unsubcribe requests which aren't acked yet
-    pub(crate) outgoing_unsub: Mutex<BTreeMap<u16, Unsubscribe>>,
+    pub(crate) outgoing_unsub: BTreeMap<u16, Unsubscribe>,
     /// Outgoing QoS 1, 2 publishes which aren't acked yet
-    pub(crate) outgoing_pub: Mutex<BTreeMap<u16, Publish>>,
+    pub(crate) outgoing_pub: BTreeMap<u16, Publish>,
     /// Packet ids of released QoS 2 publishes
-    pub(crate) outgoing_rel: Mutex<BTreeSet<u16>>,
+    pub(crate) outgoing_rel: BTreeSet<u16>,
 
     /// Packets on incoming QoS 2 publishes
-    pub(crate) incoming_pub: Mutex<BTreeSet<u16>>,
+    pub(crate) incoming_pub: BTreeSet<u16>,
 }
 
 impl State {
@@ -31,11 +31,11 @@ impl State {
 
         let state = Self {
             apkid,
-            outgoing_sub: Mutex::new(BTreeMap::new()),
-            outgoing_unsub: Mutex::new(BTreeMap::new()),
-            outgoing_pub: Mutex::new(BTreeMap::new()),
-            outgoing_rel: Mutex::new(BTreeSet::new()),
-            incoming_pub: Mutex::new(BTreeSet::new()),
+            outgoing_sub: BTreeMap::new(),
+            outgoing_unsub: BTreeMap::new(),
+            outgoing_pub: BTreeMap::new(),
+            outgoing_rel: BTreeSet::new(),
+            incoming_pub: BTreeSet::new(),
         };
 
         (state, r)
