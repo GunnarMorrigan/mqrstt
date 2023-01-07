@@ -1,0 +1,3 @@
+brace_style = "PreferSameLine"
+control_brace_style = "ClosingNextLine"
+hard_tabs = true
