@@ -6,7 +6,6 @@ mod auth;
 mod connack;
 mod connect;
 mod disconnect;
-mod packets;
 mod puback;
 mod pubcomp;
 mod publish;
@@ -30,8 +29,6 @@ pub use suback::*;
 pub use subscribe::*;
 pub use unsuback::*;
 pub use unsubscribe::*;
-
-pub use packets::*;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::slice::Iter;

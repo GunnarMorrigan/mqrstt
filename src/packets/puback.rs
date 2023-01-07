@@ -183,8 +183,7 @@ mod tests {
 	use crate::packets::{
 		mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
 		puback::{PubAck, PubAckProperties},
-		reason_codes::PubAckReasonCode,
-		write_variable_integer, PropertyType,
+		reason_codes::PubAckReasonCode, write_variable_integer, PropertyType
 	};
 	use bytes::{BufMut, Bytes, BytesMut};
 
