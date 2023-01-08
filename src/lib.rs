@@ -87,8 +87,8 @@
 //! ```
 //!
 
-#![feature(async_fn_in_trait)]
-#![feature(return_position_impl_trait_in_trait)]
+// #![feature(async_fn_in_trait)]
+// #![feature(return_position_impl_trait_in_trait)]
 
 use std::{sync::Arc, time::Instant};
 
@@ -197,8 +197,6 @@ mod lib_test {
 	use bytes::Bytes;
 	use futures::join;
 	use rustls::ServerName;
-
-	use crate::event_handler::AsyncEventHandler;
 	use crate::{
 		client::AsyncClient,
 		connect_options::ConnectOptions,
@@ -245,38 +243,38 @@ mod lib_test {
 		}
 	}
 
-	impl AsyncEventHandler for PingPong {
-		async fn handle<'a>(&'a mut self, event: &'a packets::Packet) -> () {
-			match event {
-				Packet::Publish(p) => {
-					if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
-						if payload.to_lowercase().contains("ping") {
-							self.client
-								.publish(
-									p.qos,
-									p.retain,
-									p.topic.clone(),
-									Bytes::from_static(b"pong"),
-								)
-								.await.unwrap();
-							self.counter += 1;
-							println!("Received Ping, Send pong!");
-						}
-					}
-				}
-				Packet::PingResp => {
-					self.client.disconnect().await.unwrap();
-				}
-				Packet::ConnAck(_) => {
-					println!("Connected!");
-				}
-				_ => (),
-			}
-			if self.counter > 10 {
-				self.client.disconnect().await.unwrap();
-			}
-		}
-	}
+	// impl AsyncEventHandler for PingPong {
+	// 	async fn handle<'a>(&'a mut self, event: &'a packets::Packet) -> () {
+	// 		match event {
+	// 			Packet::Publish(p) => {
+	// 				if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+	// 					if payload.to_lowercase().contains("ping") {
+	// 						self.client
+	// 							.publish(
+	// 								p.qos,
+	// 								p.retain,
+	// 								p.topic.clone(),
+	// 								Bytes::from_static(b"pong"),
+	// 							)
+	// 							.await.unwrap();
+	// 						self.counter += 1;
+	// 						println!("Received Ping, Send pong!");
+	// 					}
+	// 				}
+	// 			}
+	// 			Packet::PingResp => {
+	// 				self.client.disconnect().await.unwrap();
+	// 			}
+	// 			Packet::ConnAck(_) => {
+	// 				println!("Connected!");
+	// 			}
+	// 			_ => (),
+	// 		}
+	// 		if self.counter > 10 {
+	// 			self.client.disconnect().await.unwrap();
+	// 		}
+	// 	}
+	// }
 
 	async fn hello(_: &Packet) {}
 
@@ -327,7 +325,7 @@ mod lib_test {
 				async {
 					loop {
 						// handler.handle2(hello);
-						handler.handle(&mut pingpong).await.unwrap();
+						// handler.handle(&mut pingpong).await.unwrap();
 					}
 				}
 			);
@@ -387,3 +385,4 @@ mod lib_test {
 		);
 	}
 }
+
