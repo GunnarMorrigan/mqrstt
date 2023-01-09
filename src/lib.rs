@@ -223,7 +223,8 @@ where
 
 #[cfg(test)]
 mod lib_test {
-	use bytes::Bytes;
+	use async_trait::async_trait;
+use bytes::Bytes;
 	use futures::join;
 	use rustls::ServerName;
 	use crate::{
@@ -231,7 +232,7 @@ mod lib_test {
 		connect_options::ConnectOptions,
 		new_smol, new_tokio,
 		packets::{self, Packet},
-		util::tls::tests::simple_rust_tls,
+		util::tls::tests::simple_rust_tls, AsyncEventHandler, AsyncEventHandlerMut, NetworkStatus, HandlerStatus,
 	};
 
 	pub struct PingPong {
@@ -272,40 +273,39 @@ mod lib_test {
 		}
 	}
 
-	// impl AsyncEventHandler for PingPong {
-	// 	async fn handle<'a>(&'a mut self, event: &'a packets::Packet) -> () {
-	// 		match event {
-	// 			Packet::Publish(p) => {
-	// 				if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
-	// 					if payload.to_lowercase().contains("ping") {
-	// 						self.client
-	// 							.publish(
-	// 								p.qos,
-	// 								p.retain,
-	// 								p.topic.clone(),
-	// 								Bytes::from_static(b"pong"),
-	// 							)
-	// 							.await.unwrap();
-	// 						self.counter += 1;
-	// 						println!("Received Ping, Send pong!");
-	// 					}
-	// 				}
-	// 			}
-	// 			Packet::PingResp => {
-	// 				self.client.disconnect().await.unwrap();
-	// 			}
-	// 			Packet::ConnAck(_) => {
-	// 				println!("Connected!");
-	// 			}
-	// 			_ => (),
-	// 		}
-	// 		if self.counter > 10 {
-	// 			self.client.disconnect().await.unwrap();
-	// 		}
-	// 	}
-	// }
-
-	async fn hello(_: &Packet) {}
+	#[async_trait]
+	impl AsyncEventHandlerMut for PingPong {
+		async fn handle(&mut self, event: &packets::Packet) -> () {
+			match event {
+				Packet::Publish(p) => {
+					if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+						if payload.to_lowercase().contains("ping") {
+							self.client
+								.publish(
+									p.qos,
+									p.retain,
+									p.topic.clone(),
+									Bytes::from_static(b"pong"),
+								)
+								.await.unwrap();
+							self.counter += 1;
+							println!("Received Ping, Send pong!");
+						}
+					}
+				}
+				Packet::PingResp => {
+					self.client.disconnect().await.unwrap();
+				}
+				Packet::ConnAck(_) => {
+					println!("Connected!");
+				}
+				_ => (),
+			}
+			if self.counter > 10 {
+				self.client.disconnect().await.unwrap();
+			}
+		}
+	}
 
 	#[test]
 	fn test_smol() {
@@ -401,12 +401,23 @@ mod lib_test {
 		join!(
 			async {
 				loop {
-					network.run().await.unwrap();
+					return match network.run().await {
+						Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
+						Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+						Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
+						Ok(NetworkStatus::Active) => continue,
+						Err(a) => Err(a),
+					};
 				}
 			},
 			async {
 				loop {
-					
+					return match handler.handle_mut(&mut pingpong).await {
+						Ok(HandlerStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
+						Ok(HandlerStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+						Ok(HandlerStatus::Active) => continue,
+						Err(a) => Err(a),
+					};
 				}
 			}
 		);
