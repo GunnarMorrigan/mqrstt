@@ -225,14 +225,13 @@ where
 mod lib_test {
 	use async_trait::async_trait;
 use bytes::Bytes;
-	use futures::join;
 	use rustls::ServerName;
 	use crate::{
 		client::AsyncClient,
 		connect_options::ConnectOptions,
 		new_smol, new_tokio,
 		packets::{self, Packet},
-		util::tls::tests::simple_rust_tls, AsyncEventHandler, AsyncEventHandlerMut, NetworkStatus, HandlerStatus,
+		util::tls::tests::simple_rust_tls, AsyncEventHandlerMut, NetworkStatus, HandlerStatus,
 	};
 
 	pub struct PingPong {
@@ -345,16 +344,26 @@ use bytes::Bytes;
 
 			let mut pingpong = PingPong { client, counter: 0 };
 
-			join!(
+			futures::join!(
 				async {
 					loop {
-						network.run().await.unwrap();
+						return match network.run().await {
+							Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
+							Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+							Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
+							Ok(NetworkStatus::Active) => continue,
+							Err(a) => Err(a),
+						};
 					}
 				},
 				async {
 					loop {
-						// handler.handle2(hello);
-						// handler.handle(&mut pingpong).await.unwrap();
+						return match handler.handle_mut(&mut pingpong).await {
+							Ok(HandlerStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
+							Ok(HandlerStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+							Ok(HandlerStatus::Active) => continue,
+							Err(a) => Err(a),
+						};
 					}
 				}
 			);
@@ -398,7 +407,7 @@ use bytes::Bytes;
 
 		let mut pingpong = PingPong { client, counter: 0 };
 
-		join!(
+		tokio::join!(
 			async {
 				loop {
 					return match network.run().await {
