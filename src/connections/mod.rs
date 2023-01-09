@@ -10,15 +10,17 @@ use crate::packets::Connect;
 use crate::packets::Packet;
 
 pub fn create_connect_from_options(options: &ConnectOptions) -> Packet {
-	let mut connect = Connect::default();
+	let mut connect = Connect {
+		client_id: options.client_id.clone(),
+		clean_session: options.clean_session,
+		keep_alive: options.keep_alive_interval_s as u16,
+		username: options.username.clone(),
+		password: options.password.clone(),
+		..Default::default()
+	};
 
-	connect.client_id = options.client_id.clone();
-	connect.clean_session = options.clean_session;
-	connect.keep_alive = options.keep_alive_interval_s as u16;
-	connect.connect_properties.request_problem_information = Some(1u8);
-	connect.connect_properties.request_response_information = Some(1u8);
-	connect.username = options.username.clone();
-	connect.password = options.password.clone();
+	connect.connect_properties.request_problem_information = options.request_problem_information;
+	connect.connect_properties.request_response_information = options.request_response_information;
 
 	Packet::Connect(connect)
 }

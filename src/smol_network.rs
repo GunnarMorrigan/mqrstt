@@ -1,17 +1,16 @@
 use async_channel::{Receiver, Sender};
 
-use futures::{AsyncRead, AsyncWrite, FutureExt, select};
+use futures::{select, AsyncRead, AsyncWrite, FutureExt};
 use smol::io::{AsyncReadExt, AsyncWriteExt};
-use tracing::warn;
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
-use crate::{NetworkStatus};
 use crate::connect_options::ConnectOptions;
 use crate::connections::smol_stream::SmolStream;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::{Packet, PacketType};
+use crate::NetworkStatus;
 
 pub struct SmolNetwork<S> {
 	network: Option<SmolStream<S>>,
@@ -93,22 +92,24 @@ where
 			await_pingresp,
 			perform_keep_alive,
 			network_to_handler_s,
-    		to_network_r,
+			to_network_r,
 		} = self;
 
 		let sleep;
-		if !(*perform_keep_alive){
+		if !(*perform_keep_alive) {
 			sleep = Duration::new(3600, 0);
 		}
-		else if let Some(instant) = await_pingresp{
-			sleep = *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+		else if let Some(instant) = await_pingresp {
+			sleep =
+				*instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
 		}
-		else{
-			sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+		else {
+			sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s)
+				- Instant::now();
 		}
 
 		if let Some(stream) = network {
-			loop{
+			loop {
 				select! {
 					_ = stream.read_bytes().fuse() => {
 						match stream.parse_messages(network_to_handler_s).await {
@@ -157,8 +158,7 @@ where
 }
 
 #[test]
-fn test(){
-
+fn test() {
 	let a = Instant::now() - Duration::from_secs(100);
 
 	let sleep = a + Duration::from_secs(60) - Instant::now();

@@ -68,7 +68,7 @@ impl VariableHeaderWrite for PubComp {
 			&& self.properties.reason_string.is_none()
 			&& self.properties.user_properties.is_empty()
 		{
-			()
+			// nothing here
 		}
 		else if self.properties.reason_string.is_none()
 			&& self.properties.user_properties.is_empty()

@@ -268,7 +268,8 @@ mod tests {
 	use bytes::{BufMut, Bytes, BytesMut};
 
 	use crate::packets::{
-		mqtt_traits::{MqttRead, VariableHeaderRead, VariableHeaderWrite}, Packet,
+		mqtt_traits::{MqttRead, VariableHeaderRead, VariableHeaderWrite},
+		Packet,
 	};
 
 	use super::WireLength;

@@ -1,5 +1,5 @@
 use async_channel::{Receiver, Sender};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::error::MqttError;
 

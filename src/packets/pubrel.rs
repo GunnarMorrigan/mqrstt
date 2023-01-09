@@ -64,7 +64,7 @@ impl VariableHeaderWrite for PubRel {
 			&& self.properties.reason_string.is_none()
 			&& self.properties.user_properties.is_empty()
 		{
-			()
+			// Nothing here
 		}
 		else if self.properties.reason_string.is_none()
 			&& self.properties.user_properties.is_empty()

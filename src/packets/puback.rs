@@ -58,7 +58,7 @@ impl VariableHeaderWrite for PubAck {
 			&& self.properties.reason_string.is_none()
 			&& self.properties.user_properties.is_empty()
 		{
-			()
+			// nothing here
 		}
 		else if self.properties.reason_string.is_none()
 			&& self.properties.user_properties.is_empty()
@@ -183,7 +183,8 @@ mod tests {
 	use crate::packets::{
 		mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
 		puback::{PubAck, PubAckProperties},
-		reason_codes::PubAckReasonCode, write_variable_integer, PropertyType
+		reason_codes::PubAckReasonCode,
+		write_variable_integer, PropertyType,
 	};
 	use bytes::{BufMut, Bytes, BytesMut};
 

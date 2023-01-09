@@ -1,4 +1,3 @@
-use crate::{AsyncEventHandlerMut, AsyncEventHandler, HandlerStatus};
 use crate::connect_options::ConnectOptions;
 use crate::error::MqttError;
 use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
@@ -15,6 +14,7 @@ use crate::packets::Unsubscribe;
 use crate::packets::{Packet, PacketType};
 use crate::packets::{PubAck, PubAckProperties};
 use crate::state::State;
+use crate::{AsyncEventHandler, AsyncEventHandlerMut, HandlerStatus};
 
 use futures::FutureExt;
 
@@ -23,9 +23,6 @@ use tracing::error;
 
 #[cfg(test)]
 use tracing::debug;
-
-use std::future::Future;
-use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Eventloop with all the state of a connection
 pub struct EventHandlerTask {
@@ -90,7 +87,7 @@ impl EventHandlerTask {
 
 	pub async fn handle<H>(&mut self, handler: &H) -> Result<HandlerStatus, MqttError>
 	where
-		H: AsyncEventHandler {
+		H: AsyncEventHandler, {
 		futures::select! {
 			incoming = self.network_receiver.recv().fuse() => {
 				match incoming {
@@ -125,7 +122,7 @@ impl EventHandlerTask {
 
 	pub async fn handle_mut<H>(&mut self, handler: &mut H) -> Result<HandlerStatus, MqttError>
 	where
-		H: AsyncEventHandlerMut {
+		H: AsyncEventHandlerMut, {
 		futures::select! {
 			incoming = self.network_receiver.recv().fuse() => {
 				match incoming {
@@ -211,7 +208,12 @@ impl EventHandlerTask {
 	}
 
 	async fn handle_incoming_puback(&mut self, puback: &PubAck) -> Result<(), MqttError> {
-		if let Some(_) = self.state.outgoing_pub.remove(&puback.packet_identifier) {
+		if self
+			.state
+			.outgoing_pub
+			.remove(&puback.packet_identifier)
+			.is_some()
+		{
 			#[cfg(test)]
 			debug!(
 				"Publish {:?} has been acknowledged",

@@ -1,6 +1,5 @@
 use std::io::{self, Error, ErrorKind};
 
-use async_channel::Receiver;
 use bytes::{Buf, BytesMut};
 use smol::io::{AsyncReadExt, AsyncWriteExt};
 
@@ -68,8 +67,8 @@ where
 	) -> Result<Option<PacketType>, ReadBytes<ConnectionError>> {
 		let mut ret_packet_type = None;
 		loop {
-			if self.buffer.is_empty(){
-				return Ok(ret_packet_type)
+			if self.buffer.is_empty() {
+				return Ok(ret_packet_type);
 			}
 			let (header, header_length) = FixedHeader::read_fixed_header(self.buffer.iter())?;
 
@@ -87,7 +86,7 @@ where
 			let packet_type = read_packet.packet_type();
 			incoming_packet_sender.send(read_packet).await?;
 
-			match packet_type{
+			match packet_type {
 				PacketType::Disconnect => return Ok(Some(PacketType::Disconnect)),
 				PacketType::PingResp => return Ok(Some(PacketType::PingResp)),
 				packet_type => ret_packet_type = Some(packet_type),
@@ -123,7 +122,7 @@ where
 	pub async fn read_bytes(&mut self) -> io::Result<usize> {
 		let read = self.stream.read(&mut self.const_buffer).await?;
 		if 0 == read {
-			return if self.buffer.is_empty() {
+			if self.buffer.is_empty() {
 				Err(io::Error::new(
 					io::ErrorKind::ConnectionAborted,
 					"Connection closed by peer",
@@ -134,7 +133,7 @@ where
 					io::ErrorKind::ConnectionReset,
 					"Connection reset by peer",
 				))
-			};
+			}
 		}
 		else {
 			self.buffer.extend_from_slice(&self.const_buffer[0..read]);

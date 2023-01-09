@@ -35,7 +35,7 @@ use core::slice::Iter;
 use std::fmt::Display;
 
 use self::error::{DeserializeError, ReadBytes, SerializeError};
-use self::mqtt_traits::{MqttRead, MqttWrite, WireLength, VariableHeaderRead, VariableHeaderWrite};
+use self::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
 
 /// Protocol version
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
@@ -836,10 +836,10 @@ mod tests {
 	use crate::packets::disconnect::{Disconnect, DisconnectProperties};
 	use crate::packets::QoS;
 
-	use crate::packets::Packet;
 	use crate::packets::publish::{Publish, PublishProperties};
 	use crate::packets::pubrel::{PubRel, PubRelProperties};
 	use crate::packets::reason_codes::{ConnAckReasonCode, DisconnectReasonCode, PubRelReasonCode};
+	use crate::packets::Packet;
 
 	#[test]
 	fn test_connack_read() {

@@ -1,19 +1,15 @@
-use std::sync::Arc;
-
 use async_channel::{Receiver, Sender};
-use async_mutex::Mutex;
 
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
-use tracing::warn;
 
-use std::time::{Instant, Duration};
+use std::time::{Duration, Instant};
 
-use crate::{NetworkStatus};
 use crate::connect_options::ConnectOptions;
 use crate::connections::tokio_stream::TokioStream;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::{Packet, PacketType};
+use crate::NetworkStatus;
 
 pub struct TokioNetwork<S> {
 	network: Option<TokioStream<S>>,
@@ -91,19 +87,21 @@ where
 			await_pingresp,
 			perform_keep_alive,
 			network_to_handler_s,
-    		to_network_r,
+			to_network_r,
 		} = self;
 
-		let sleep; 
-		if let Some(instant) = await_pingresp{
-			sleep = *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+		let sleep;
+		if let Some(instant) = await_pingresp {
+			sleep =
+				*instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
 		}
-		else{
-			sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+		else {
+			sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s)
+				- Instant::now();
 		}
 
 		if let Some(stream) = network {
-			loop{
+			loop {
 				tokio::select! {
 					_ = stream.read_bytes() => {
 						match stream.parse_messages(network_to_handler_s).await {
@@ -150,8 +148,7 @@ where
 }
 
 #[test]
-fn test(){
-
+fn test() {
 	let a = Instant::now() - Duration::from_secs(100);
 
 	let sleep = a + Duration::from_secs(60) - Instant::now();

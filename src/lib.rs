@@ -87,12 +87,6 @@
 //! ```
 //!
 
-// #![feature(async_fn_in_trait)]
-// #![feature(return_position_impl_trait_in_trait)]
-
-use std::{sync::Arc, time::Instant};
-
-use async_mutex::Mutex;
 use client::AsyncClient;
 use connect_options::ConnectOptions;
 
@@ -118,17 +112,17 @@ pub mod tokio_network;
 
 /// Represents status of the Network object.
 /// It is returned when the run handle returns from performing an operation.
-pub enum NetworkStatus{
-    Active,
-    IncomingDisconnect,
-    OutgoingDisconnect,
-    NoPingResp,
+pub enum NetworkStatus {
+	Active,
+	IncomingDisconnect,
+	OutgoingDisconnect,
+	NoPingResp,
 }
 
-pub enum HandlerStatus{
-    Active,
-    IncomingDisconnect,
-    OutgoingDisconnect,
+pub enum HandlerStatus {
+	Active,
+	IncomingDisconnect,
+	OutgoingDisconnect,
 }
 
 #[async_trait::async_trait]
@@ -167,8 +161,6 @@ where
 	let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);
 	let (client_to_handler_s, client_to_handler_r) =
 		async_channel::bounded(receive_maximum as usize);
-
-	let last_network_action = Arc::new(Mutex::new(Instant::now()));
 
 	let (handler, packet_ids) = EventHandlerTask::new(
 		&options,
@@ -223,23 +215,24 @@ where
 
 #[cfg(test)]
 mod lib_test {
-	use async_trait::async_trait;
-use bytes::Bytes;
-	use rustls::ServerName;
 	use crate::{
 		client::AsyncClient,
 		connect_options::ConnectOptions,
 		new_smol, new_tokio,
 		packets::{self, Packet},
-		util::tls::tests::simple_rust_tls, AsyncEventHandlerMut, NetworkStatus, HandlerStatus,
+		util::tls::tests::simple_rust_tls,
+		AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
 	};
+	use async_trait::async_trait;
+	use bytes::Bytes;
+	use rustls::ServerName;
 
 	pub struct PingPong {
 		pub client: AsyncClient,
 		pub counter: u16,
 	}
 
-	impl PingPong{
+	impl PingPong {
 		async fn handle(&mut self, event: &packets::Packet) -> () {
 			match event {
 				Packet::Publish(p) => {
@@ -252,7 +245,8 @@ use bytes::Bytes;
 									p.topic.clone(),
 									Bytes::from_static(b"pong"),
 								)
-								.await.unwrap();
+								.await
+								.unwrap();
 							self.counter += 1;
 							println!("Received Ping, Send pong!");
 						}
@@ -286,7 +280,8 @@ use bytes::Bytes;
 									p.topic.clone(),
 									Bytes::from_static(b"pong"),
 								)
-								.await.unwrap();
+								.await
+								.unwrap();
 							self.counter += 1;
 							println!("Received Ping, Send pong!");
 						}
@@ -348,8 +343,12 @@ use bytes::Bytes;
 				async {
 					loop {
 						return match network.run().await {
-							Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
-							Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+							Ok(NetworkStatus::IncomingDisconnect) => {
+								Ok(NetworkStatus::IncomingDisconnect)
+							}
+							Ok(NetworkStatus::OutgoingDisconnect) => {
+								Ok(NetworkStatus::OutgoingDisconnect)
+							}
 							Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
 							Ok(NetworkStatus::Active) => continue,
 							Err(a) => Err(a),
@@ -359,8 +358,12 @@ use bytes::Bytes;
 				async {
 					loop {
 						return match handler.handle_mut(&mut pingpong).await {
-							Ok(HandlerStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
-							Ok(HandlerStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+							Ok(HandlerStatus::IncomingDisconnect) => {
+								Ok(NetworkStatus::IncomingDisconnect)
+							}
+							Ok(HandlerStatus::OutgoingDisconnect) => {
+								Ok(NetworkStatus::OutgoingDisconnect)
+							}
 							Ok(HandlerStatus::Active) => continue,
 							Err(a) => Err(a),
 						};
@@ -411,8 +414,12 @@ use bytes::Bytes;
 			async {
 				loop {
 					return match network.run().await {
-						Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
-						Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+						Ok(NetworkStatus::IncomingDisconnect) => {
+							Ok(NetworkStatus::IncomingDisconnect)
+						}
+						Ok(NetworkStatus::OutgoingDisconnect) => {
+							Ok(NetworkStatus::OutgoingDisconnect)
+						}
 						Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
 						Ok(NetworkStatus::Active) => continue,
 						Err(a) => Err(a),
@@ -422,8 +429,12 @@ use bytes::Bytes;
 			async {
 				loop {
 					return match handler.handle_mut(&mut pingpong).await {
-						Ok(HandlerStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
-						Ok(HandlerStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+						Ok(HandlerStatus::IncomingDisconnect) => {
+							Ok(NetworkStatus::IncomingDisconnect)
+						}
+						Ok(HandlerStatus::OutgoingDisconnect) => {
+							Ok(NetworkStatus::OutgoingDisconnect)
+						}
 						Ok(HandlerStatus::Active) => continue,
 						Err(a) => Err(a),
 					};
@@ -432,4 +443,3 @@ use bytes::Bytes;
 		);
 	}
 }
-
