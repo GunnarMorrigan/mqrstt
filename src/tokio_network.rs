@@ -76,7 +76,7 @@ where
 
 		let TokioNetwork {
 			network,
-			options,
+			options: _,
 			last_network_action,
 			await_pingresp,
 			perform_keep_alive,
@@ -128,17 +128,6 @@ where
 						*await_pingresp = Some(Instant::now());
 						warn!("PING REQ!");
 						return Ok(NetworkStatus::Active);
-						// let new_sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
-						// if new_sleep > Duration::from_secs(0) {
-						// 	continue
-						// } 
-						// else{
-						// 	let packet = Packet::PingReq;
-						// 	stream.write(&packet).await?;
-						// 	*last_network_action = Instant::now();
-						// 	*await_pingresp = Some(Instant::now());
-							
-						// }
 					},
 					_ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
 						self.reset();
