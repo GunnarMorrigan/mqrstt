@@ -1,3 +1,4 @@
+use crate::{AsyncEventHandlerMut, AsyncEventHandler, HandlerStatus};
 use crate::connect_options::ConnectOptions;
 use crate::error::MqttError;
 use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
@@ -13,7 +14,6 @@ use crate::packets::UnsubAck;
 use crate::packets::Unsubscribe;
 use crate::packets::{Packet, PacketType};
 use crate::packets::{PubAck, PubAckProperties};
-
 use crate::state::State;
 
 use futures::FutureExt;
@@ -37,7 +37,6 @@ pub struct EventHandlerTask {
 
 	client_to_handler_r: Receiver<Packet>,
 
-	atomic_disconnect: AtomicBool,
 	disconnect: bool,
 }
 
@@ -62,52 +61,49 @@ impl EventHandlerTask {
 
 			client_to_handler_r,
 
-			atomic_disconnect: AtomicBool::new(false),
 			disconnect: false,
 		};
 		(task, packet_id_channel)
 	}
 
-	pub fn sync_handle<H: EventHandler>(&self, handler: &mut H) -> Result<(), MqttError> {
-		match self.network_receiver.try_recv() {
-			Ok(event) => {
-				handler.handle(&event);
-			}
-			Err(err) => {
-				if err.is_closed() {
-					return Err(MqttError::IncomingNetworkChannelClosed);
-				}
-			}
-		}
-		match self.client_to_handler_r.try_recv() {
-			Ok(_) => {}
-			Err(err) => {
-				if err.is_closed() {
-					return Err(MqttError::IncomingNetworkChannelClosed);
-				}
-			}
-		}
-		Ok(())
-	}
+	// pub fn sync_handle<H: EventHandler>(&self, handler: &mut H) -> Result<(), MqttError> {
+	// 	match self.network_receiver.try_recv() {
+	// 		Ok(event) => {
+	// 			handler.handle(&event);
+	// 		}
+	// 		Err(err) => {
+	// 			if err.is_closed() {
+	// 				return Err(MqttError::IncomingNetworkChannelClosed);
+	// 			}
+	// 		}
+	// 	}
+	// 	match self.client_to_handler_r.try_recv() {
+	// 		Ok(_) => {}
+	// 		Err(err) => {
+	// 			if err.is_closed() {
+	// 				return Err(MqttError::IncomingNetworkChannelClosed);
+	// 			}
+	// 		}
+	// 	}
+	// 	Ok(())
+	// }
 
-	pub async fn handle2<'a, 'b, H, F, Fut>(&mut self, handler: &'a mut H, handler_fn: F) -> Result<(), MqttError>
+	pub async fn handle<H>(&mut self, handler: &H) -> Result<HandlerStatus, MqttError>
 	where
-		F: Fn(&'a mut H, &'b Packet) -> Fut,
-		Fut: Future<Output = ()> + Send + 'b, {
+		H: AsyncEventHandler {
 		futures::select! {
 			incoming = self.network_receiver.recv().fuse() => {
 				match incoming {
 					Ok(event) => {
 						// debug!("Event Handler, handling incoming packet: {}", event);
-						// let f = handler_fn(handler, &event).await;
-
-						// self.handle_incoming_packet(event).await?
+						handler.handle(&event).await;
+						self.handle_incoming_packet(event).await?;
 					}
 					Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
 				}
-				if self.atomic_disconnect.load(Ordering::Acquire) {
-					self.atomic_disconnect.store(false, Ordering::Release);
-					return Ok::<(), MqttError>(());
+				if self.disconnect {
+					self.disconnect = true;
+					return Ok(HandlerStatus::IncomingDisconnect);
 				}
 			},
 			outgoing = self.client_to_handler_r.recv().fuse() => {
@@ -118,47 +114,49 @@ impl EventHandlerTask {
 					}
 					Err(_) => return Err(MqttError::ClientChannelClosed),
 				}
-				if self.atomic_disconnect.load(Ordering::Acquire) {
-					self.atomic_disconnect.store(false, Ordering::Release);
-					return Ok::<(), MqttError>(());
+				if self.disconnect {
+					self.disconnect = true;
+					return Ok(HandlerStatus::OutgoingDisconnect);
 				}
 			}
 		}
-		Ok(())
+		Ok(HandlerStatus::Active)
 	}
 
-	// pub async fn handle<H: AsyncEventHandler>(&mut self, handler: &mut H) -> Result<(), MqttError> {
-	// 	futures::select! {
-	// 		incoming = self.network_receiver.recv().fuse() => {
-	// 			match incoming {
-	// 				Ok(event) => {
-	// 					// debug!("Event Handler, handling incoming packet: {}", event);
-	// 					handler.handle(&event).await;
-	// 					self.handle_incoming_packet(event).await?
-	// 				}
-	// 				Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
-	// 			}
-	// 			if self.atomic_disconnect.load(Ordering::Acquire) {
-	// 				self.atomic_disconnect.store(false, Ordering::Release);
-	// 				return Ok::<(), MqttError>(());
-	// 			}
-	// 		},
-	// 		outgoing = self.client_to_handler_r.recv().fuse() => {
-	// 			match outgoing {
-	// 				Ok(event) => {
-	// 					// debug!("Event Handler, handling outgoing packet: {}", event);
-	// 					self.handle_outgoing_packet(event).await?
-	// 				}
-	// 				Err(_) => return Err(MqttError::ClientChannelClosed),
-	// 			}
-	// 			if self.atomic_disconnect.load(Ordering::Acquire) {
-	// 				self.atomic_disconnect.store(false, Ordering::Release);
-	// 				return Ok::<(), MqttError>(());
-	// 			}
-	// 		}
-	// 	}
-	// 	Ok(())
-	// }
+	pub async fn handle_mut<H>(&mut self, handler: &mut H) -> Result<HandlerStatus, MqttError>
+	where
+		H: AsyncEventHandlerMut {
+		futures::select! {
+			incoming = self.network_receiver.recv().fuse() => {
+				match incoming {
+					Ok(event) => {
+						// debug!("Event Handler, handling incoming packet: {}", event);
+						handler.handle(&event).await;
+						self.handle_incoming_packet(event).await?;
+					}
+					Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
+				}
+				if self.disconnect {
+					self.disconnect = true;
+					return Ok(HandlerStatus::IncomingDisconnect);
+				}
+			},
+			outgoing = self.client_to_handler_r.recv().fuse() => {
+				match outgoing {
+					Ok(event) => {
+						// debug!("Event Handler, handling outgoing packet: {}", event);
+						self.handle_outgoing_packet(event).await?
+					}
+					Err(_) => return Err(MqttError::ClientChannelClosed),
+				}
+				if self.disconnect {
+					self.disconnect = true;
+					return Ok(HandlerStatus::OutgoingDisconnect);
+				}
+			}
+		}
+		Ok(HandlerStatus::Active)
+	}
 
 	async fn handle_incoming_packet(&mut self, packet: Packet) -> Result<(), MqttError> {
 		match packet {
@@ -172,7 +170,7 @@ impl EventHandlerTask {
 			Packet::PingResp => (),
 			Packet::ConnAck(_) => (),
 			Packet::Disconnect(_) => {
-				self.atomic_disconnect.store(true, Ordering::Release);
+				self.disconnect = true;
 			}
 			a => unreachable!("Should not receive {}", a),
 		};
@@ -436,14 +434,6 @@ impl EventHandlerTask {
 			.await?;
 		Ok(())
 	}
-}
-
-// pub trait AsyncEventHandler: Sized + Sync + 'static {
-// 	fn handle<'a>(&'a mut self, event: &'a Packet) -> impl Future<Output = ()> + Send + 'a;
-// }
-
-pub trait EventHandler: Sized {
-	fn handle<'a>(&'a mut self, event: &'a Packet);
 }
 
 #[cfg(test)]
