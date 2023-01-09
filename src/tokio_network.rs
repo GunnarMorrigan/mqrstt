@@ -126,7 +126,6 @@ where
 						stream.write(&packet).await?;
 						*last_network_action = Instant::now();
 						*await_pingresp = Some(Instant::now());
-						warn!("PING REQ!");
 						return Ok(NetworkStatus::Active);
 					},
 					_ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
