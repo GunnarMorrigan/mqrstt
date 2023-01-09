@@ -65,8 +65,12 @@ where
 	pub async fn parse_messages(
 		&mut self,
 		incoming_packet_sender: &async_channel::Sender<Packet>,
-	) -> Result<(), ReadBytes<ConnectionError>> {
+	) -> Result<Option<PacketType>, ReadBytes<ConnectionError>> {
+		let mut ret_packet_type = None;
 		loop {
+			if self.buffer.is_empty(){
+				return Ok(ret_packet_type)
+			}
 			let (header, header_length) = FixedHeader::read_fixed_header(self.buffer.iter())?;
 
 			if header.remaining_length > self.buffer.len() {
@@ -80,10 +84,13 @@ where
 			let buf = self.buffer.split_to(header.remaining_length);
 			let read_packet = Packet::read(header, buf.into())?;
 			tracing::trace!("Read packet from network {}", read_packet);
-			let disconnect = read_packet.packet_type() == PacketType::Disconnect;
+			let packet_type = read_packet.packet_type();
 			incoming_packet_sender.send(read_packet).await?;
-			if disconnect {
-				return Ok(());
+
+			match packet_type{
+				PacketType::Disconnect => return Ok(Some(PacketType::Disconnect)),
+				PacketType::PingResp => return Ok(Some(PacketType::PingResp)),
+				packet_type => ret_packet_type = Some(packet_type),
 			}
 		}
 	}
