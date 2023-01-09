@@ -98,6 +98,7 @@ use connect_options::ConnectOptions;
 
 use event_handler::EventHandlerTask;
 
+use packets::Packet;
 use smol_network::SmolNetwork;
 
 mod available_packet_ids;
@@ -115,13 +116,41 @@ mod util;
 pub mod tests;
 pub mod tokio_network;
 
-
+/// Represents status of the Network object.
+/// It is returned when the run handle returns from performing an operation.
 pub enum NetworkStatus{
     Active,
     IncomingDisconnect,
     OutgoingDisconnect,
     NoPingResp,
 }
+
+pub enum HandlerStatus{
+    Active,
+    IncomingDisconnect,
+    OutgoingDisconnect,
+}
+
+#[async_trait::async_trait]
+pub trait AsyncEventHandlerMut {
+	async fn handle(&mut self, event: &Packet);
+}
+
+#[async_trait::async_trait]
+pub trait AsyncEventHandler {
+	async fn handle(&self, event: &Packet);
+}
+
+pub trait EventHandlerMut {
+	fn handle(&mut self, event: &Packet);
+}
+
+pub trait EventHandler {
+	fn handle(&self, event: &Packet);
+}
+
+// #[cfg(all(feature = "smol", feature = "tokio"))]
+// std::compile_error!("The features smol and tokio can not be enabled simultaiously.");
 
 #[cfg(feature = "smol")]
 pub fn new_smol<S>(options: ConnectOptions) -> (SmolNetwork<S>, EventHandlerTask, AsyncClient)
@@ -377,9 +406,7 @@ mod lib_test {
 			},
 			async {
 				loop {
-					// handler.handle2(hello);
-					handler.handle2(&mut pingpong, PingPong::handle).await.unwrap();
-					// handler.handle(&mut pingpong).await.unwrap();
+					
 				}
 			}
 		);
