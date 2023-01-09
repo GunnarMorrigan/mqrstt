@@ -72,6 +72,20 @@ where
 			return Err(ConnectionError::NoNetwork);
 		}
 
+		match self.select().await {
+			Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
+			otherwise => {
+				self.reset();
+				otherwise
+			}
+		}
+	}
+
+	async fn select(&mut self) -> Result<NetworkStatus, ConnectionError> {
+		if self.network.is_none() {
+			return Err(ConnectionError::NoNetwork);
+		}
+
 		let SmolNetwork {
 			network,
 			options: _,
@@ -117,7 +131,6 @@ where
 						stream.write(&packet).await?;
 						*last_network_action = Instant::now();
 						if packet.packet_type() == PacketType::Disconnect{
-							self.reset();
 							return Ok(NetworkStatus::OutgoingDisconnect);
 						}
 						return Ok(NetworkStatus::Active);
@@ -131,7 +144,6 @@ where
 							return Ok(NetworkStatus::Active);
 						}
 						else{
-							self.reset();
 							return Ok(NetworkStatus::NoPingResp);
 						}
 					},

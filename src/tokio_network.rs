@@ -74,6 +74,16 @@ where
 			return Err(ConnectionError::NoNetwork);
 		}
 
+		match self.select().await {
+			Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
+			otherwise => {
+				self.reset();
+				otherwise
+			}
+		}
+	}
+
+	async fn select(&mut self) -> Result<NetworkStatus, ConnectionError> {
 		let TokioNetwork {
 			network,
 			options: _,
@@ -116,7 +126,6 @@ where
 						stream.write(&packet).await?;
 						*last_network_action = Instant::now();
 						if packet.packet_type() == PacketType::Disconnect{
-							self.reset();
 							return Ok(NetworkStatus::OutgoingDisconnect);
 						}
 						return Ok(NetworkStatus::Active);
@@ -129,7 +138,6 @@ where
 						return Ok(NetworkStatus::Active);
 					},
 					_ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
-						self.reset();
 						return Ok(NetworkStatus::NoPingResp);
 					}
 				}
