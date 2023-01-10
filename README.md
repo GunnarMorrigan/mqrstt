@@ -18,76 +18,76 @@ You want to reconnect (with a new stream) after the network encountered an error
 ### Smol example:
 ```rust
 use mqrstt::{
-    client::AsyncClient,
-    connect_options::ConnectOptions,
-    new_smol,
-    packets::{self, Packet},
-    AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
+  client::AsyncClient,
+  connect_options::ConnectOptions,
+  new_smol,
+  packets::{self, Packet},
+  AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
 pub struct PingPong {
-    pub client: AsyncClient,
+  pub client: AsyncClient,
 }
 #[async_trait]
 impl AsyncEventHandlerMut for PingPong {
-    // Handlers only get INCOMING packets. This can change later.
-    async fn handle(&mut self, event: &packets::Packet) -> () {
-        match event {
-            Packet::Publish(p) => {
-                if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
-                    if payload.to_lowercase().contains("ping") {
-                        self.client
-                            .publish(
-                                p.qos,
-                                p.retain,
-                                p.topic.clone(),
-                                Bytes::from_static(b"pong"),
-                            )
-                            .await
-                            .unwrap();
-                        println!("Received Ping, Send pong!");
-                    }
-                }
-            },
-            Packet::ConnAck(_) => { println!("Connected!") },
-            _ => (),
+  // Handlers only get INCOMING packets. This can change later.
+  async fn handle(&mut self, event: &packets::Packet) -> () {
+    match event {
+      Packet::Publish(p) => {
+        if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+          if payload.to_lowercase().contains("ping") {
+            self.client
+              .publish(
+                p.qos,
+                p.retain,
+                p.topic.clone(),
+                Bytes::from_static(b"pong"),
+              )
+              .await
+              .unwrap();
+            println!("Received Ping, Send pong!");
+          }
         }
+      },
+      Packet::ConnAck(_) => { println!("Connected!") },
+      _ => (),
     }
+  }
 }
 smol::block_on(async {
-    let options = ConnectOptions::new("mqrstt".to_string());
-    let (mut network, mut handler, client) = new_smol(options);
-    let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
-    network.connect(stream).await.unwrap();
-    client.subscribe("mqrstt").await.unwrap();
-    let mut pingpong = PingPong {
-        client: client.clone(),
-    };
-    let (n, h, t) = futures::join!(
-        async {
-            loop {
-                return match network.run().await {
-                    Ok(NetworkStatus::Active) => continue,
-                    otherwise => otherwise,
-                };
-            }
-        },
-        async {
-            loop {
-                return match handler.handle_mut(&mut pingpong).await {
-                    Ok(HandlerStatus::Active) => continue,
-                    otherwise => otherwise,
-                };
-            }
-        },
-        async {
-            smol::Timer::after(std::time::Duration::from_secs(60)).await;
-            client.disconnect().await.unwrap();
-        }
-    );
-    assert!(n.is_ok());
-    assert!(h.is_ok());
+  let options = ConnectOptions::new("mqrstt".to_string());
+  let (mut network, mut handler, client) = new_smol(options);
+  let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
+  network.connect(stream).await.unwrap();
+  client.subscribe("mqrstt").await.unwrap();
+  let mut pingpong = PingPong {
+    client: client.clone(),
+  };
+  let (n, h, t) = futures::join!(
+    async {
+      loop {
+        return match network.run().await {
+          Ok(NetworkStatus::Active) => continue,
+          otherwise => otherwise,
+        };
+      }
+    },
+    async {
+      loop {
+        return match handler.handle_mut(&mut pingpong).await {
+          Ok(HandlerStatus::Active) => continue,
+          otherwise => otherwise,
+        };
+      }
+    },
+    async {
+      smol::Timer::after(std::time::Duration::from_secs(60)).await;
+      client.disconnect().await.unwrap();
+    }
+  );
+  assert!(n.is_ok());
+  assert!(h.is_ok());
 });
 ```
 
@@ -99,38 +99,38 @@ let options = ConnectOptions::new("TokioTcpPingPong".to_string());
 let (mut network, mut handler, client) = new_tokio(options);
 
 let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
-    .await
-    .unwrap();
+  .await
+  .unwrap();
 
 network.connect(stream).await.unwrap();
 
 client.subscribe("mqrstt").await.unwrap();
 
 let mut pingpong = PingPong {
-    client: client.clone(),
+  client: client.clone(),
 };
 
 let (n, h, _) = tokio::join!(
-    async {
-        loop {
-            return match network.run().await {
-                Ok(NetworkStatus::Active) => continue,
-                otherwise => otherwise,
-            };
-        }
-    },
-    async {
-        loop {
-            return match handler.handle_mut(&mut pingpong).await {
-                Ok(HandlerStatus::Active) => continue,
-                otherwise => otherwise,
-            };
-        }
-    },
-    async {
-        tokio::time::sleep(Duration::from_secs(60)).await;
-        client.disconnect().await.unwrap();
+  async {
+    loop {
+      return match network.run().await {
+        Ok(NetworkStatus::Active) => continue,
+        otherwise => otherwise,
+      };
     }
+  },
+  async {
+    loop {
+      return match handler.handle_mut(&mut pingpong).await {
+        Ok(HandlerStatus::Active) => continue,
+        otherwise => otherwise,
+      };
+    }
+  },
+  async {
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    client.disconnect().await.unwrap();
+  }
 );
 ```
 
@@ -142,7 +142,7 @@ let (n, h, _) = tokio::join!(
 
 Licensed under
 
-* Mozilla Public License, Version 2.0, ([MPL-2.0](https://choosealicense.com/licenses/mpl-2.0/)
+* Mozilla Public License, Version 2.0, [(MPL-2.0)](https://choosealicense.com/licenses/mpl-2.0/)
 
 ## Contribution
 
