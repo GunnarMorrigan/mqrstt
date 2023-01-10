@@ -1,6 +1,6 @@
 use async_channel::{Receiver, Sender};
 
-use futures::{select, AsyncRead, AsyncWrite, FutureExt};
+use futures::{select, FutureExt};
 use smol::io::{AsyncReadExt, AsyncWriteExt};
 
 use std::time::{Duration, Instant};
@@ -29,7 +29,7 @@ pub struct SmolNetwork<S> {
 
 impl<S> SmolNetwork<S>
 where
-	S: AsyncRead + AsyncWrite + AsyncReadExt + AsyncWriteExt + Sized + Unpin,
+	S: AsyncReadExt + AsyncWriteExt + Sized + Unpin,
 {
 	pub fn new(
 		options: ConnectOptions,

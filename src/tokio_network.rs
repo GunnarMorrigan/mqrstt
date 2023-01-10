@@ -1,6 +1,6 @@
 use async_channel::{Receiver, Sender};
 
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use std::time::{Duration, Instant};
 
@@ -28,7 +28,7 @@ pub struct TokioNetwork<S> {
 
 impl<S> TokioNetwork<S>
 where
-	S: AsyncRead + AsyncWrite + AsyncReadExt + AsyncWriteExt + Sized + Unpin,
+	S: AsyncReadExt + AsyncWriteExt + Sized + Unpin,
 {
 	pub fn new(
 		options: ConnectOptions,
