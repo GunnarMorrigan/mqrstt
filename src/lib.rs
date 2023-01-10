@@ -64,7 +64,7 @@
 //!     }
 //! }
 //! smol::block_on(async {
-//!     let options = ConnectOptions::new("mqrstt".to_string());
+//!     let options = ConnectOptions::new("mqrsttExample".to_string());
 //!     let (mut network, mut handler, client) = new_smol(options);
 //!     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
@@ -105,7 +105,7 @@
 //!  Tokio example:
 //! ----------------------------
 //! ```ignore
-//! let options = ConnectOptions::new("TokioTcpPingPong".to_string());
+//! let options = ConnectOptions::new("TokioTcpPingPongExample".to_string());
 //! 
 //! let (mut network, mut handler, client) = new_tokio(options);
 //! 
@@ -324,6 +324,7 @@ mod lib_test {
                         }
                     }
                 }
+                Packet::ConnAck(_) => { println!("Connected!") },
                 _ => (),
             }
         }
