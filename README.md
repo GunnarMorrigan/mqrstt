@@ -12,7 +12,7 @@
 </div>
 
 # Size
-With the smol runtime you can create very small binaries. A simple PingPong smol TCP client can be had for 550~KB and with TLS you are looking at 1.5~ MB using the following flags. This makes `mqrstt` extremely usefull for embedded devices! :)
+With the smol runtime you can create very small binaries. A simple PingPong smol TCP client can be had for 550\~KB and with TLS you are looking at 1.5\~ MB using the following flags. This makes `mqrstt` extremely usefull for embedded devices! :)
 ```
 [profile.release]
 opt-level = "z"  # Optimize for size.
