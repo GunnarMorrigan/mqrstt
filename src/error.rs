@@ -2,13 +2,10 @@ use std::io;
 
 use async_channel::{RecvError, SendError};
 
-use crate::{
-    packets::{
-        error::{DeserializeError, SerializeError},
-        {Packet, PacketType},
-        reason_codes::ConnAckReasonCode,
-    },
-    util::timeout::Timeout,
+use crate::packets::{
+    error::{DeserializeError, ReadBytes, SerializeError},
+    reason_codes::ConnAckReasonCode,
+    {Packet, PacketType},
 };
 
 #[derive(Debug, Clone, thiserror::Error)]
@@ -44,14 +41,8 @@ pub enum ClientError {
 /// Critical errors during eventloop polling
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
-    // #[error("Mqtt state: {0}")]
-    // MqttState(#[from] StateError),
-    #[error("Connect timeout")]
-    Timeout(#[from] Timeout),
-
-    #[cfg(feature = "use-rustls")]
-    #[error("TLS: {0}")]
-    Tls(#[from] tls::Error),
+    #[error("No network connection")]
+    NoNetwork,
 
     #[error("No incoming packet handler available: {0}")]
     NoIncomingPacketHandler(#[from] SendError<Packet>),
@@ -76,9 +67,27 @@ pub enum ConnectionError {
 
     #[error("Requests done")]
     RequestsDone,
+}
 
-    #[error("TLS Error")]
-    TLS(#[from] TlsError),
+impl From<ReadBytes<DeserializeError>> for ReadBytes<ConnectionError> {
+    fn from(value: ReadBytes<DeserializeError>) -> Self {
+        match value {
+            ReadBytes::Err(err) => ReadBytes::Err(err.into()),
+            ReadBytes::InsufficientBytes(id) => ReadBytes::InsufficientBytes(id),
+        }
+    }
+}
+
+impl From<DeserializeError> for ReadBytes<ConnectionError> {
+    fn from(value: DeserializeError) -> Self {
+        ReadBytes::Err(value.into())
+    }
+}
+
+impl From<SendError<Packet>> for ReadBytes<ConnectionError> {
+    fn from(value: SendError<Packet>) -> Self {
+        ReadBytes::Err(value.into())
+    }
 }
 
 #[derive(Debug, thiserror::Error)]

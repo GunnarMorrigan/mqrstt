@@ -65,13 +65,15 @@ impl VariableHeaderWrite for PubRec {
 
         if self.reason_code == PubRecReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty() {
-            ()
+            && self.properties.user_properties.is_empty()
+        {
+            // nothing here
         }
         else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             self.reason_code.write(buf)?;
-        } 
+        }
         else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
@@ -84,11 +86,13 @@ impl WireLength for PubRec {
     fn wire_len(&self) -> usize {
         if self.reason_code == PubRecReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             2
-        } 
+        }
         else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             3
         }
         else {

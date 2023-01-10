@@ -76,7 +76,8 @@ impl MqttRead for UnsubscribeProperties {
 
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "UnsubscribeProperties".to_string(),
                 buf.len(),

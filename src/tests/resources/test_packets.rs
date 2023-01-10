@@ -1,14 +1,9 @@
-#[allow(dead_code)]
 use bytes::Bytes;
 
 use crate::packets::{
-    Disconnect, DisconnectProperties,
-    Packet,
-    PubAck, PubAckProperties,
-    Publish, PublishProperties,
-    Subscribe, Subscription,
-    QoS,
-    reason_codes::{PubAckReasonCode, DisconnectReasonCode},
+    reason_codes::{DisconnectReasonCode, PubAckReasonCode},
+    Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties,
+    QoS, Subscribe, Subscription,
 };
 
 pub fn publish_packets() -> Vec<Packet> {

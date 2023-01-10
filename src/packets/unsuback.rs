@@ -71,7 +71,8 @@ impl MqttRead for UnsubAckProperties {
 
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "UnsubAckProperties".to_string(),
                 buf.len(),
@@ -86,7 +87,8 @@ impl MqttRead for UnsubAckProperties {
                 PropertyType::ReasonString => {
                     if properties.reason_string.is_none() {
                         properties.reason_string = Some(String::read(&mut properties_data)?);
-                    } else {
+                    }
+                    else {
                         return Err(DeserializeError::DuplicateProperty(
                             PropertyType::SubscriptionIdentifier,
                         ));

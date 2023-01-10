@@ -66,13 +66,15 @@ impl VariableHeaderWrite for PubComp {
 
         if self.reason_code == PubCompReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty() {
-            ()
+            && self.properties.user_properties.is_empty()
+        {
+            // nothing here
         }
         else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             self.reason_code.write(buf)?;
-        } 
+        }
         else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
@@ -85,11 +87,13 @@ impl WireLength for PubComp {
     fn wire_len(&self) -> usize {
         if self.reason_code == PubCompReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             2
-        } 
+        }
         else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             3
         }
         else {
@@ -98,7 +102,7 @@ impl WireLength for PubComp {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, Default, PartialEq, Eq, Clone, Hash)]
 pub struct PubCompProperties {
     pub reason_string: Option<String>,
     pub user_properties: Vec<(String, String)>,
@@ -107,15 +111,6 @@ pub struct PubCompProperties {
 impl PubCompProperties {
     pub fn is_empty(&self) -> bool {
         self.reason_string.is_none() && self.user_properties.is_empty()
-    }
-}
-
-impl Default for PubCompProperties {
-    fn default() -> Self {
-        Self {
-            reason_string: Default::default(),
-            user_properties: Default::default(),
-        }
     }
 }
 
@@ -202,7 +197,6 @@ mod tests {
         write_variable_integer, PropertyType,
     };
     use bytes::{BufMut, Bytes, BytesMut};
-
 
     #[test]
     fn test_wire_len() {

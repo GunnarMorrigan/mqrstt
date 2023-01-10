@@ -1,7 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use async_channel::Receiver;
-use async_mutex::Mutex;
 
 use crate::{
     available_packet_ids::AvailablePacketIds,

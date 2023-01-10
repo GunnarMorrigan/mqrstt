@@ -1,5 +1,5 @@
 use async_channel::{Receiver, Sender};
-use tracing::{debug, error};
+use tracing::error;
 
 use crate::error::MqttError;
 
@@ -20,21 +20,21 @@ impl AvailablePacketIds {
         (apkid, r)
     }
 
-    pub fn try_mark_available(&self, pkid: u16) -> Result<(), MqttError> {
-        match self.sender.try_send(pkid) {
-            Ok(_) => {
-                Ok(())
-                // debug!("Marked packet id as available: {}", pkid);
-            }
-            Err(err) => {
-                error!(
-                    "Encountered an error while marking an packet id as available. Error: {}",
-                    err
-                );
-                Err(MqttError::PacketIdError(err.into_inner()))
-            }
-        }
-    }
+    // pub fn try_mark_available(&self, pkid: u16) -> Result<(), MqttError> {
+    // 	match self.sender.try_send(pkid) {
+    // 		Ok(_) => {
+    // 			Ok(())
+    // 			// debug!("Marked packet id as available: {}", pkid);
+    // 		}
+    // 		Err(err) => {
+    // 			error!(
+    // 				"Encountered an error while marking an packet id as available. Error: {}",
+    // 				err
+    // 			);
+    // 			Err(MqttError::PacketIdError(err.into_inner()))
+    // 		}
+    // 	}
+    // }
 
     pub async fn mark_available(&self, pkid: u16) -> Result<(), MqttError> {
         match self.sender.send(pkid).await {

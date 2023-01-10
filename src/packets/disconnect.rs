@@ -34,7 +34,8 @@ impl VariableHeaderRead for Disconnect {
         if remaining_length == 0 {
             reason_code = DisconnectReasonCode::NormalDisconnection;
             properties = DisconnectProperties::default();
-        } else {
+        }
+        else {
             reason_code = DisconnectReasonCode::read(&mut buf)?;
             properties = DisconnectProperties::read(&mut buf)?;
         }
@@ -62,7 +63,8 @@ impl WireLength for Disconnect {
             || self.properties.wire_len() != 0
         {
             self.properties.wire_len() + 1
-        } else {
+        }
+        else {
             0
         }
     }
@@ -83,7 +85,8 @@ impl MqttRead for DisconnectProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "DisconnectProperties".to_string(),
                 buf.len(),

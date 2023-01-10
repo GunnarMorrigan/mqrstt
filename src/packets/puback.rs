@@ -56,13 +56,15 @@ impl VariableHeaderWrite for PubAck {
 
         if self.reason_code == PubAckReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty() {
-            ()
+            && self.properties.user_properties.is_empty()
+        {
+            // nothing here
         }
         else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             self.reason_code.write(buf)?;
-        } 
+        }
         else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
@@ -75,11 +77,13 @@ impl WireLength for PubAck {
     fn wire_len(&self) -> usize {
         if self.reason_code == PubAckReasonCode::Success
             && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             2
-        } 
+        }
         else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty(){
+            && self.properties.user_properties.is_empty()
+        {
             3
         }
         else {
@@ -184,7 +188,6 @@ mod tests {
     };
     use bytes::{BufMut, Bytes, BytesMut};
 
-
     #[test]
     fn test_wire_len() {
         let mut puback = PubAck {
@@ -196,10 +199,10 @@ mod tests {
         let mut buf = BytesMut::new();
 
         puback.write(&mut buf).unwrap();
-        
+
         assert_eq!(2, puback.wire_len());
         assert_eq!(2, buf.len());
-        
+
         puback.reason_code = PubAckReasonCode::NotAuthorized;
         buf.clear();
         puback.write(&mut buf).unwrap();
@@ -207,7 +210,6 @@ mod tests {
         assert_eq!(3, puback.wire_len());
         assert_eq!(3, buf.len());
     }
-
 
     #[test]
     fn test_read_simple_puback() {

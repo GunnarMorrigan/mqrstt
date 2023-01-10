@@ -101,7 +101,8 @@ impl WireLength for Publish {
         let len = self.topic.wire_len()
             + if self.packet_identifier.is_some() {
                 2
-            } else {
+            }
+            else {
                 0
             }
             + self.publish_properties.wire_len()
@@ -152,7 +153,8 @@ impl MqttRead for PublishProperties {
 
         if len == 0 {
             return Ok(Self::default());
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "PublishProperties".to_string(),
                 buf.len(),

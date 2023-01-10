@@ -5,13 +5,10 @@ use tracing::info;
 use crate::{
     error::ClientError,
     packets::{
-        {Disconnect, DisconnectProperties},
-        Packet,
-        {Publish, PublishProperties},
         reason_codes::DisconnectReasonCode,
+        Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties},
         {Subscribe, SubscribeProperties, Subscription},
         {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
-        QoS,
     },
 };
 
@@ -115,7 +112,8 @@ impl AsyncClient {
                 "Published message into network_packet_sender. len {}",
                 self.to_network_s.len()
             );
-        } else {
+        }
+        else {
             self.client_to_handler_s
                 .send(Packet::Publish(publish))
                 .await
@@ -159,7 +157,8 @@ impl AsyncClient {
                 .send(Packet::Publish(publish))
                 .await
                 .map_err(|_| ClientError::NoHandler)?;
-        } else {
+        }
+        else {
             self.client_to_handler_s
                 .send(Packet::Publish(publish))
                 .await

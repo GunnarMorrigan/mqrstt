@@ -1,0 +1,3 @@
+unstable_features = true
+brace_style = "PreferSameLine"
+control_brace_style = "ClosingNextLine"

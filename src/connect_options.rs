@@ -7,16 +7,6 @@ use crate::util::constants::RECEIVE_MAXIMUM_DEFAULT;
 
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
-    /// broker address that you want to connect to
-    pub(crate) address: String,
-    /// broker port
-    pub(crate) port: u16,
-
-    #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
-    pub(crate) tls_config: Option<TlsConfig>,
-
-    // /// What transport protocol to use
-    // transport: Transport,
     /// keep alive time to send pingreq to broker when the connection is idle
     pub keep_alive_interval_s: u64,
     pub connection_timeout_s: u64,
@@ -28,38 +18,33 @@ pub struct ConnectOptions {
     pub username: Option<String>,
     pub password: Option<String>,
     /// request (publish, subscribe) channel capacity
-    channel_capacity: usize,
+    pub channel_capacity: usize,
 
     /// Minimum delay time between consecutive outgoing packets
     /// while retransmitting pending packets
     // TODO! IMPLEMENT THIS!
-    pending_throttle_s: u64,
+    pub pending_throttle_s: u64,
 
-    send_reason_messages: bool,
+    pub send_reason_messages: bool,
 
     // MQTT v5 Connect Properties:
-    session_expiry_interval: Option<u32>,
-    pub(crate) receive_maximum: Option<u16>,
-    maximum_packet_size: Option<u32>,
-    topic_alias_maximum: Option<u16>,
-    request_response_information: Option<u8>,
-    request_problem_information: Option<u8>,
-    user_properties: Vec<(String, String)>,
-    authentication_method: Option<String>,
-    authentication_data: Bytes,
+    pub session_expiry_interval: Option<u32>,
+    pub receive_maximum: Option<u16>,
+    pub maximum_packet_size: Option<u32>,
+    pub topic_alias_maximum: Option<u16>,
+    pub request_response_information: Option<u8>,
+    pub request_problem_information: Option<u8>,
+    pub user_properties: Vec<(String, String)>,
+    pub authentication_method: Option<String>,
+    pub authentication_data: Bytes,
 
     /// Last will that will be issued on unexpected disconnect
-    last_will: Option<LastWill>,
+    pub last_will: Option<LastWill>,
 }
 
 impl ConnectOptions {
-    pub fn new(address: String, port: u16, client_id: String) -> Self {
+    pub fn new(client_id: String) -> Self {
         Self {
-            address,
-            port,
-            #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
-            tls_config: None,
-
             keep_alive_interval_s: 60,
             connection_timeout_s: 30,
             clean_session: false,
@@ -83,46 +68,6 @@ impl ConnectOptions {
         }
     }
 
-    #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
-    pub(crate) fn new_with_tls_config(
-        address: String,
-        port: u16,
-        client_id: String,
-        tls_config: Option<TlsConfig>,
-    ) -> Self {
-        Self {
-            address,
-            port,
-            tls_config,
-
-            keep_alive_interval_s: 60,
-            connection_timeout_s: 30,
-            clean_session: false,
-            client_id,
-            credentials: None,
-            channel_capacity: 100,
-            pending_throttle_s: 30,
-            send_reason_messages: false,
-
-            session_expiry_interval: None,
-            receive_maximum: None,
-            maximum_packet_size: None,
-            topic_alias_maximum: None,
-            request_response_information: None,
-            request_problem_information: None,
-            user_properties: vec![],
-            authentication_method: None,
-            authentication_data: Bytes::new(),
-            last_will: None,
-        }
-    }
-
-    pub fn set_address(&mut self, address: String) {
-        self.address = address
-    }
-    pub fn set_port(&mut self, port: u16) {
-        self.port = port
-    }
     pub fn set_keep_alive_interval_s(&mut self, keep_alive_interval_s: u64) {
         self.keep_alive_interval_s = keep_alive_interval_s
     }
@@ -141,17 +86,12 @@ impl ConnectOptions {
     pub fn set_pending_throttle_s(&mut self, pending_throttle_s: u64) {
         self.pending_throttle_s = pending_throttle_s
     }
-    pub fn set_send_reason_messages(&mut self, send_reason_messages: bool) {
-        self.send_reason_messages = send_reason_messages
-    }
-
     pub fn set_session_expiry_interval(&mut self, session_expiry_interval: u32) {
         self.session_expiry_interval = Some(session_expiry_interval)
     }
     pub fn clear_session_expiry_interval(&mut self) {
         self.session_expiry_interval = None
     }
-
     pub fn set_receive_maximum(&mut self, receive_maximum: u16) {
         self.receive_maximum = Some(receive_maximum)
     }
@@ -161,7 +101,6 @@ impl ConnectOptions {
     pub fn receive_maximum(&self) -> u16 {
         self.receive_maximum.unwrap_or(RECEIVE_MAXIMUM_DEFAULT)
     }
-
     pub fn set_maximum_packet_size(&mut self, maximum_packet_size: u32) {
         self.maximum_packet_size = Some(maximum_packet_size)
     }
@@ -175,13 +114,13 @@ impl ConnectOptions {
         self.topic_alias_maximum = None
     }
     pub fn set_request_response_information(&mut self, request_response_information: bool) {
-        self.request_response_information = Some(if request_response_information { 1 } else { 0 })
+        self.request_response_information = Some(u8::from(request_response_information))
     }
     pub fn clear_request_response_information(&mut self) {
         self.request_response_information = None
     }
     pub fn set_request_problem_information(&mut self, request_problem_information: bool) {
-        self.request_problem_information = Some(if request_problem_information { 1 } else { 0 })
+        self.request_problem_information = Some(u8::from(request_problem_information))
     }
     pub fn clear_request_problem_information(&mut self) {
         self.request_problem_information = None

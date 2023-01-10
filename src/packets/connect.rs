@@ -128,12 +128,14 @@ impl VariableHeaderRead for Connect {
 
         let username = if connect_flags.contains(ConnectFlags::USERNAME) {
             Some(String::read(&mut buf)?)
-        } else {
+        }
+        else {
             None
         };
         let password = if connect_flags.contains(ConnectFlags::PASSWORD) {
             Some(String::read(&mut buf)?)
-        } else {
+        }
+        else {
             None
         };
 
@@ -351,7 +353,8 @@ impl MqttRead for ConnectProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "ConnectProperties".to_string(),
                 buf.len(),
@@ -573,7 +576,8 @@ impl MqttRead for LastWillProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "LastWillProperties".to_string(),
                 buf.len(),

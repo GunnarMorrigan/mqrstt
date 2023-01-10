@@ -67,7 +67,8 @@ impl MqttRead for AuthProperties {
 
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
+        }
+        else if buf.len() < len {
             return Err(DeserializeError::MalformedPacket);
         }
 
