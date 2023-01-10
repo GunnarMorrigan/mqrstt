@@ -11,8 +11,9 @@
 
 </div>
 
-
 ## Examples
+
+You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
 
 ### Smol example:
 ```rust
@@ -57,9 +58,7 @@ impl AsyncEventHandlerMut for PingPong {
 smol::block_on(async {
     let options = ConnectOptions::new("mqrstt".to_string());
     let (mut network, mut handler, client) = new_smol(options);
-    let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
-        .await
-        .unwrap();
+    let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
     network.connect(stream).await.unwrap();
     client.subscribe("mqrstt").await.unwrap();
     let mut pingpong = PingPong {
@@ -134,6 +133,9 @@ let (n, h, _) = tokio::join!(
     }
 );
 ```
+
+## Important notes:
+ - Handlers only get incoming packets.
 
 
 ## License

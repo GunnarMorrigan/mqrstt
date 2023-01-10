@@ -22,6 +22,9 @@
 //! - MPL-2.0 vs MIT OR APACHE 2.0 license? [poll](https://github.com/GunnarMorrigan/mqrstt/discussions/2)
 //! - The handler currently only gets INCOMING packets
 //!
+//! 
+//! 
+//! You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
 //!
 //! Smol example:
 //! ```
@@ -144,6 +147,9 @@
 //!     }
 //! );
 //! ```
+//! 
+//! 
+//! 
 
 
 use client::AsyncClient;
