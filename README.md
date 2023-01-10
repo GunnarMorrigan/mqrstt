@@ -11,6 +11,17 @@
 
 </div>
 
+# Size
+With the smol runtime you can create very small binaries. A simple PingPong smol TCP client can be had for 550~KB and with TLS you are looking at 1.5~ MB using the following flags. This makes `mqrstt` extremely usefull for embedded devices! :)
+```
+[profile.release]
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1
+strip = true
+```
+
+
 ## Examples
 
 You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
