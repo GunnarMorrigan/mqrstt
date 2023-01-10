@@ -369,7 +369,7 @@ mod lib_test {
                     }
                 },
                 async {
-                    smol::Timer::after(std::time::Duration::from_secs(60)).await;
+                    smol::Timer::after(std::time::Duration::from_secs(30)).await;
                     client.disconnect().await.unwrap();
                 }
             );
@@ -425,7 +425,7 @@ mod lib_test {
                     }
                 },
                 async {
-                    smol::Timer::after(std::time::Duration::from_secs(60)).await;
+                    smol::Timer::after(std::time::Duration::from_secs(30)).await;
                     client.disconnect().await.unwrap();
                 }
             );
@@ -470,7 +470,7 @@ mod lib_test {
                 }
             },
             async {
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                tokio::time::sleep(Duration::from_secs(30)).await;
                 client.disconnect().await.unwrap();
             }
         );
@@ -540,7 +540,7 @@ mod lib_test {
                 }
             },
             async {
-                tokio::time::sleep(Duration::from_secs(60)).await;
+                tokio::time::sleep(Duration::from_secs(30)).await;
                 client.disconnect().await.unwrap();
             }
         );
