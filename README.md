@@ -15,7 +15,7 @@
 ## Examples
 
 ### Smol example:
-```
+```rust
 use mqrstt::{
     client::AsyncClient,
     connect_options::ConnectOptions,
@@ -94,7 +94,7 @@ smol::block_on(async {
 
 
 ### Tokio example:
-```ignore
+```rust
 let options = ConnectOptions::new("TokioTcpPingPong".to_string());
 
 let (mut network, mut handler, client) = new_tokio(options);
