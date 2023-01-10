@@ -7,7 +7,7 @@
 [![dependency status](https://deps.rs/repo/github/GunnarMorrigan/mqrstt/status.svg)](https://deps.rs/repo/github/GunnarMorrigan/mqrstt)
 [![codecov](https://codecov.io/github/GunnarMorrigan/mqrstt/branch/main/graph/badge.svg?token=YSZFYQ063Y)](https://codecov.io/github/GunnarMorrigan/mqrstt)
 
-`mqrstt` is an MQTTv5 client implementation that follows the [sans-io](https://sans-io.readthedocs.io/) approach.
+`mqrstt` is an MQTTv5 client implementation that allows for the smol and tokio runtimes. In the future we will also support a sync implementation.
 
 </div>
 
