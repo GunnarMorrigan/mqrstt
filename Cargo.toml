@@ -3,6 +3,7 @@ name = "mqrstt"
 version = "0.1.1"
 homepage = "https://github.com/GunnarMorrigan/mqrstt"
 repository = "https://github.com/GunnarMorrigan/mqrstt"
+documentation = "https://docs.rs/mqrstt"
 categories = ["network-programming"]
 readme = "README.md"
 edition = "2021"
