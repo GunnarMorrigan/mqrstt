@@ -12,43 +12,15 @@
 //! - Rebroadcast unacked packets.
 //! - Enforce size of outbound messages (e.g. Publish)
 //! - Sync API
+//! - More testing
+//! - More documentation
 //!
 //! A few questions still remain:
 //! - This crate uses async channels to perform communication across its parts. Is there a better approach?
 //!   These channels do allow the user to decouple the network, handlers, and clients very easily.
-//! - This crate provides network implementation which hinder syn, counter: 0c and async agnosticism.
-//!   Would a true sansio implementation be better?
-//!   At first this crate used custom async traits which are not stable (async_fn_in_trait).
-//!   The current version allows the user to provide the appropriate stream.
-//!   This also nicely relives us from having to deal with TLS configuration.
+//! - MPL-2.0 vs MIT OR APACHE 2.0 license? [poll](https://github.com/GunnarMorrigan/mqrstt/discussions/2)
+//! - The handler currently only gets INCOMING packets
 //!
-//! For the future it could be nice to be sync, async and runtime agnostic.
-//! This can be achieved by decoupling the MQTT internals from the network communication.
-//! The user could provide the received packets while this crate returns the response packets.
-//! Another approach could be providing the read bytes, however, QUIC supports multiple streams.
-//!
-//! Currently, we do provide network implementations for the smol and tokio runtimes that you can enable with feature flags.
-//!
-//! Tokio example:
-//! ----------------------------
-//! ```ignore
-//! let config = RustlsConfig::Simple {
-//!     ca: EMQX_CERT.to_vec(),
-//!     alpn: None,
-//!     client_auth: None,
-//! };
-//! let opt = ConnectOptions::new("broker.emqx.io".to_string(), 8883, "test123123".to_string());
-//! let (mqtt_network, handler, client) = create_tokio_rustls(opt, config);
-//!
-//! task::spawn(async move {
-//!     join!(mqtt_network.run(), handler.handle(/* Custom handler */));
-//! });
-//!
-//! for i in 0..10 {
-//!     client.publish("test", QoS::AtLeastOnce, false, b"test payload").await.unwrap();
-//!     time::sleep(Duration::from_millis(100)).await;
-//! }
-//! ```
 //!
 //! Smol example:
 //! ```
@@ -66,6 +38,7 @@
 //! }
 //! #[async_trait]
 //! impl AsyncEventHandlerMut for PingPong {
+//!     // Handlers only get INCOMING packets. This can change later.
 //!     async fn handle(&mut self, event: &packets::Packet) -> () {
 //!         match event {
 //!             Packet::Publish(p) => {
@@ -126,6 +99,51 @@
 //!     assert!(h.is_ok());
 //! });
 //! ```
+//! 
+//! 
+//!  Tokio example:
+//! ----------------------------
+//! ```ignore
+//! let options = ConnectOptions::new("TokioTcpPingPong".to_string());
+//! 
+//! let (mut network, mut handler, client) = new_tokio(options);
+//! 
+//! let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
+//!     .await
+//!     .unwrap();
+//! 
+//! network.connect(stream).await.unwrap();
+//! 
+//! client.subscribe("mqrstt").await.unwrap();
+//! 
+//! let mut pingpong = PingPong {
+//!     client: client.clone(),
+//! };
+//! 
+//! let (n, h, _) = tokio::join!(
+//!     async {
+//!         loop {
+//!             return match network.run().await {
+//!                 Ok(NetworkStatus::Active) => continue,
+//!                 otherwise => otherwise,
+//!             };
+//!         }
+//!     },
+//!     async {
+//!         loop {
+//!             return match handler.handle_mut(&mut pingpong).await {
+//!                 Ok(HandlerStatus::Active) => continue,
+//!                 otherwise => otherwise,
+//!             };
+//!         }
+//!     },
+//!     async {
+//!         tokio::time::sleep(Duration::from_secs(60)).await;
+//!         client.disconnect().await.unwrap();
+//!     }
+//! );
+//! ```
+
 
 use client::AsyncClient;
 use connect_options::ConnectOptions;
