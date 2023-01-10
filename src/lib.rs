@@ -9,11 +9,12 @@
 //! The client - which is used to send messages from different places.
 //!
 //! To Do:
-//! - Rebroadcast unacked packets.
+//! - Rebroadcast unacked packets
 //! - Enforce size of outbound messages (e.g. Publish)
 //! - Sync API
 //! - More testing
 //! - More documentation
+//! - Remove logging calls or move all to test flag
 //!
 //! A few questions still remain:
 //! - This crate uses async channels to perform communication across its parts. Is there a better approach?
