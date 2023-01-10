@@ -167,13 +167,17 @@ pub mod connections;
 pub mod error;
 pub mod event_handler;
 pub mod packets;
+
+#[cfg(feature = "smol")]
 pub mod smol_network;
+#[cfg(feature = "tokio")]
+pub mod tokio_network;
+
 pub mod state;
 mod util;
 
 #[cfg(test)]
 pub mod tests;
-pub mod tokio_network;
 
 /// [`NetworkStatus`] Represents status of the Network object.
 /// It is returned when the run handle returns from performing an operation.

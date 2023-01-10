@@ -156,11 +156,3 @@ where
         }
     }
 }
-
-#[test]
-fn test() {
-    let a = Instant::now() - Duration::from_secs(100);
-
-    let sleep = a + Duration::from_secs(60) - Instant::now();
-    dbg!(sleep);
-}
