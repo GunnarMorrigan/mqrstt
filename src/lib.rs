@@ -277,7 +277,9 @@ where
 
 #[cfg(test)]
 mod lib_test {
-	use crate::{
+	use std::time::Duration;
+
+use crate::{
 		client::AsyncClient,
 		connect_options::ConnectOptions,
 		new_smol, new_tokio,
@@ -290,8 +292,7 @@ mod lib_test {
 	use rustls::ServerName;
 
 	pub struct PingPong {
-		pub client: AsyncClient,
-		pub counter: u16,
+		pub client: AsyncClient
 	}
 
 	#[async_trait]
@@ -310,21 +311,11 @@ mod lib_test {
 								)
 								.await
 								.unwrap();
-							self.counter += 1;
 							println!("Received Ping, Send pong!");
 						}
 					}
 				}
-				Packet::PingResp => {
-					self.client.disconnect().await.unwrap();
-				}
-				Packet::ConnAck(_) => {
-					println!("Connected!");
-				}
 				_ => (),
-			}
-			if self.counter > 10 {
-				self.client.disconnect().await.unwrap();
 			}
 		}
 	}
@@ -348,9 +339,9 @@ mod lib_test {
 
 			client.subscribe("mqrstt").await.unwrap();
 
-			let mut pingpong = PingPong { client, counter: 0 };
+			let mut pingpong = PingPong { client: client.clone() };
 
-			let (n, h) = futures::join!(
+			let (n, h, _) = futures::join!(
 				async {
 					loop {
 						return match network.run().await {
@@ -366,6 +357,10 @@ mod lib_test {
 							otherwise => otherwise,
 						};
 					}
+				},
+				async{
+					smol::Timer::after(std::time::Duration::from_secs(60)).await;
+					client.disconnect().await.unwrap();
 				}
 			);
 			assert!(n.is_ok());
@@ -399,9 +394,9 @@ mod lib_test {
 
 			client.subscribe("mqrstt").await.unwrap();
 
-			let mut pingpong = PingPong { client, counter: 0 };
+			let mut pingpong = PingPong { client: client.clone() };
 
-			let (n, h) = futures::join!(
+			let (n, h, _) = futures::join!(
 				async {
 					loop {
 						return match network.run().await {
@@ -417,6 +412,10 @@ mod lib_test {
 							otherwise => otherwise,
 						};
 					}
+				},
+				async{
+					smol::Timer::after(std::time::Duration::from_secs(60)).await;
+					client.disconnect().await.unwrap();
 				}
 			);
 			assert!(n.is_ok());
@@ -427,7 +426,7 @@ mod lib_test {
 	#[tokio::test]
 	async fn test_tokio_tcp() {
 		smol::block_on(async {
-			let options = ConnectOptions::new("SmolTcpPingPong".to_string());
+			let options = ConnectOptions::new("TokioTcpPingPong".to_string());
 
 			let (mut network, mut handler, client) = new_smol(options);
 
@@ -437,9 +436,9 @@ mod lib_test {
 
 			client.subscribe("mqrstt").await.unwrap();
 
-			let mut pingpong = PingPong { client, counter: 0 };
+			let mut pingpong = PingPong { client: client.clone() };
 
-			let (n, h) = futures::join!(
+			let (n, h, _) = tokio::join!(
 				async {
 					loop {
 						return match network.run().await {
@@ -455,6 +454,11 @@ mod lib_test {
 							otherwise => otherwise,
 						};
 					}
+				},
+				async{
+                    tokio::time::sleep(Duration::from_secs(60)).await;
+                    client.disconnect().await.unwrap();
+					
 				}
 			);
 			assert!(n.is_ok());
@@ -489,9 +493,9 @@ mod lib_test {
 
 		client.subscribe("mqrstt").await.unwrap();
 
-		let mut pingpong = PingPong { client, counter: 0 };
+		let mut pingpong = PingPong { client: client.clone() };
 
-		let (n, h) = tokio::join!(
+		let (n, h, _) = tokio::join!(
 			async {
 				loop {
 					return match network.run().await {
@@ -520,6 +524,10 @@ mod lib_test {
 						Err(a) => Err(a),
 					};
 				}
+			},
+			async{
+				tokio::time::sleep(Duration::from_secs(60)).await;
+				client.disconnect().await.unwrap();
 			}
 		);
 		assert!(n.is_ok());
