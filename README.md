@@ -5,6 +5,7 @@
 [![Crates.io](https://img.shields.io/crates/v/mqrstt.svg)](https://crates.io/crates/mqrstt)
 [![Docs](https://docs.rs/mqrstt/badge.svg)](https://docs.rs/mqrstt)
 [![dependency status](https://deps.rs/repo/github/GunnarMorrigan/mqrstt/status.svg)](https://deps.rs/repo/github/GunnarMorrigan/mqrstt)
+[![codecov](https://codecov.io/github/GunnarMorrigan/mqrstt/branch/main/graph/badge.svg?token=YSZFYQ063Y)](https://codecov.io/github/GunnarMorrigan/mqrstt)
 
 `mqrstt` is an MQTTv5 client implementation that follows the [sans-io](https://sans-io.readthedocs.io/) approach.
 
