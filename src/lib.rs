@@ -60,6 +60,7 @@
 //!     AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
 //! };
 //! use async_trait::async_trait;
+//! use bytes::Bytes;
 //! pub struct PingPong {
 //!     pub client: AsyncClient,
 //! }
@@ -82,7 +83,8 @@
 //!                         println!("Received Ping, Send pong!");
 //!                     }
 //!                 }
-//!             }
+//!             },
+//!             Packet::ConnAck(_) => { println!("Connected!") },
 //!             _ => (),
 //!         }
 //!     }
