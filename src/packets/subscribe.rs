@@ -1,9 +1,9 @@
 use super::{
     error::DeserializeError,
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
+    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
+    QoS,
 };
-use bitflags::bitflags;
 use bytes::{Buf, BufMut};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -96,8 +96,7 @@ impl MqttRead for SubscribeProperties {
 
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "SubscribeProperties".to_string(),
                 buf.len(),
@@ -114,8 +113,7 @@ impl MqttRead for SubscribeProperties {
                         let (subscription_id, _) = read_variable_integer(&mut properties_data)?;
 
                         properties.subscription_id = Some(subscription_id);
-                    }
-                    else {
+                    } else {
                         return Err(DeserializeError::DuplicateProperty(
                             PropertyType::SubscriptionIdentifier,
                         ));
@@ -173,12 +171,11 @@ impl WireLength for SubscribeProperties {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct SubscriptionOptions{
+pub struct SubscriptionOptions {
     retain_handling: RetainHandling,
     retain_as_publish: bool,
     no_local: bool,
     qos: QoS,
-
 }
 
 impl Default for SubscriptionOptions {
@@ -206,10 +203,10 @@ impl MqttRead for SubscriptionOptions {
 
         let retain_handling_part = (byte & 0b00110000) >> 4;
         let retain_as_publish_part = (byte & 0b00001000) >> 3;
-        let no_local_part= (byte & 0b00000100) >> 2;
+        let no_local_part = (byte & 0b00000100) >> 2;
         let qos_part = byte & 0b00000011;
 
-        let options = Self{
+        let options = Self {
             retain_handling: RetainHandling::from_u8(retain_handling_part)?,
             retain_as_publish: retain_as_publish_part != 0,
             no_local: no_local_part != 0,
@@ -223,9 +220,9 @@ impl MqttRead for SubscriptionOptions {
 impl MqttWrite for SubscriptionOptions {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let byte = (self.retain_handling.into_u8() << 4)
-        | ((self.retain_as_publish as u8) << 3)
-        | ((self.no_local as u8) << 2)
-        | self.qos.into_u8();
+            | ((self.retain_as_publish as u8) << 3)
+            | ((self.no_local as u8) << 2)
+            | self.qos.into_u8();
 
         buf.put_u8(byte);
         Ok(())
@@ -233,19 +230,19 @@ impl MqttWrite for SubscriptionOptions {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum RetainHandling{
+pub enum RetainHandling {
     ZERO,
     ONE,
     TWO,
 }
 
-impl RetainHandling{
+impl RetainHandling {
     pub fn from_u8(value: u8) -> Result<Self, DeserializeError> {
         match value {
             0 => Ok(RetainHandling::ZERO),
             1 => Ok(RetainHandling::ONE),
             2 => Ok(RetainHandling::TWO),
-            _ => Err(DeserializeError::MalformedPacket)
+            _ => Err(DeserializeError::MalformedPacket),
         }
     }
     pub fn into_u8(&self) -> u8 {
@@ -296,7 +293,7 @@ impl From<&[&str]> for Subscription {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{BufMut, Bytes, BytesMut};
+    use bytes::{Bytes, BytesMut};
 
     use crate::packets::{
         mqtt_traits::{MqttRead, VariableHeaderRead, VariableHeaderWrite},
@@ -371,7 +368,7 @@ mod tests {
     }
 
     #[test]
-    fn test_subscription_options(){
+    fn test_subscription_options() {
         let mut buf = Bytes::from_static(&[0b00101110u8]);
         let a = SubscriptionOptions::read(&mut buf).unwrap();
     }
