@@ -5,7 +5,7 @@ use super::{
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::DisconnectReasonCode,
-    write_variable_integer, PacketType, PropertyType,
+    write_variable_integer, PacketType, PropertyType, variable_integer_len,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -62,7 +62,9 @@ impl WireLength for Disconnect {
         if self.reason_code != DisconnectReasonCode::NormalDisconnection
             || self.properties.wire_len() != 0
         {
-            self.properties.wire_len() + 1
+            let property_len = self.properties.wire_len();
+            // reasoncode, length of property length, property length
+            1 + variable_integer_len(property_len) + property_len
         }
         else {
             0

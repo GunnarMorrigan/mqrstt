@@ -547,7 +547,12 @@ impl MqttWrite for LastWill {
 
 impl WireLength for LastWill {
     fn wire_len(&self) -> usize {
-        self.topic.wire_len() + self.payload.wire_len() + self.last_will_properties.wire_len()
+        let property_len = self.last_will_properties.wire_len();
+
+        self.topic.wire_len() 
+        + self.payload.wire_len() 
+        + variable_integer_len(property_len) 
+        + property_len
     }
 }
 
