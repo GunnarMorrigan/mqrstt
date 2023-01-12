@@ -51,12 +51,10 @@ where
         if let Packet::ConnAck(con) = packet {
             if con.reason_code == ConnAckReasonCode::Success {
                 Ok((s, Packet::ConnAck(con)))
-            }
-            else {
+            } else {
                 Err(ConnectionError::ConnectionRefused(con.reason_code))
             }
-        }
-        else {
+        } else {
             Err(ConnectionError::NotConnAck(packet))
         }
     }
@@ -127,15 +125,13 @@ where
                     io::ErrorKind::ConnectionAborted,
                     "Connection closed by peer",
                 ))
-            }
-            else {
+            } else {
                 Err(io::Error::new(
                     io::ErrorKind::ConnectionReset,
                     "Connection reset by peer",
                 ))
             }
-        }
-        else {
+        } else {
             self.buffer.extend_from_slice(&self.const_buffer[0..read]);
             Ok(read)
         }

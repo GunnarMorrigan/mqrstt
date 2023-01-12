@@ -10,7 +10,7 @@ use crate::connections::smol_stream::SmolStream;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
-use crate::packets::{Packet, PacketType, Disconnect};
+use crate::packets::{Disconnect, Packet, PacketType};
 use crate::NetworkStatus;
 
 pub struct SmolNetwork<S> {
@@ -99,12 +99,10 @@ where
         let sleep;
         if !(*perform_keep_alive) {
             sleep = Duration::new(3600, 0);
-        }
-        else if let Some(instant) = await_pingresp {
+        } else if let Some(instant) = await_pingresp {
             sleep =
                 *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
-        }
-        else {
+        } else {
             sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s)
                 - Instant::now();
         }
@@ -153,8 +151,7 @@ where
                     },
                 }
             }
-        }
-        else {
+        } else {
             Err(ConnectionError::NoNetwork)
         }
     }

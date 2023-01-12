@@ -12,7 +12,7 @@ use crate::packets::Packet;
 pub fn create_connect_from_options(options: &ConnectOptions) -> Packet {
     let mut connect = Connect {
         client_id: options.client_id.clone(),
-        clean_session: options.clean_session,
+        clean_start: options.clean_session,
         keep_alive: options.keep_alive_interval_s as u16,
         username: options.username.clone(),
         password: options.password.clone(),

@@ -64,9 +64,6 @@ pub enum ConnectionError {
 
     #[error("Expected ConnAck packet, received: {0:?}")]
     NotConnAck(Packet),
-
-    #[error("Requests done")]
-    RequestsDone,
 }
 
 impl From<ReadBytes<DeserializeError>> for ReadBytes<ConnectionError> {

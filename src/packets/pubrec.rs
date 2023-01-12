@@ -68,13 +68,11 @@ impl VariableHeaderWrite for PubRec {
             && self.properties.user_properties.is_empty()
         {
             // nothing here
-        }
-        else if self.properties.reason_string.is_none()
+        } else if self.properties.reason_string.is_none()
             && self.properties.user_properties.is_empty()
         {
             self.reason_code.write(buf)?;
-        }
-        else {
+        } else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
         }
@@ -89,13 +87,11 @@ impl WireLength for PubRec {
             && self.properties.user_properties.is_empty()
         {
             2
-        }
-        else if self.properties.reason_string.is_none()
+        } else if self.properties.reason_string.is_none()
             && self.properties.user_properties.is_empty()
         {
             3
-        }
-        else {
+        } else {
             2 + 1 + self.properties.wire_len()
         }
     }

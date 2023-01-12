@@ -112,8 +112,7 @@ impl AsyncClient {
                 "Published message into network_packet_sender. len {}",
                 self.to_network_s.len()
             );
-        }
-        else {
+        } else {
             self.client_to_handler_s
                 .send(Packet::Publish(publish))
                 .await
@@ -157,8 +156,7 @@ impl AsyncClient {
                 .send(Packet::Publish(publish))
                 .await
                 .map_err(|_| ClientError::NoHandler)?;
-        }
-        else {
+        } else {
             self.client_to_handler_s
                 .send(Packet::Publish(publish))
                 .await
@@ -239,19 +237,21 @@ impl AsyncClient {
     }
 }
 
-
 #[cfg(test)]
-mod tests{
+mod tests {
     use async_channel::Receiver;
 
-    use crate::packets::{Packet, reason_codes::DisconnectReasonCode, PacketType, DisconnectProperties, UnsubscribeProperties};
+    use crate::packets::{
+        reason_codes::DisconnectReasonCode, DisconnectProperties, Packet, PacketType,
+        UnsubscribeProperties,
+    };
 
     use super::AsyncClient;
 
     fn create_new_test_client() -> (AsyncClient, Receiver<Packet>, Receiver<Packet>) {
         let (s, r) = async_channel::bounded(100);
 
-        for i in 1..=100{
+        for i in 1..=100 {
             s.send_blocking(i).unwrap();
         }
 
@@ -270,72 +270,76 @@ mod tests{
         let mut prop = UnsubscribeProperties::default();
         prop.user_properties = vec![("A".to_string(), "B".to_string())];
 
-        client.unsubscribe_with_properties("Topic", prop.clone()).await.unwrap();
+        client
+            .unsubscribe_with_properties("Topic", prop.clone())
+            .await
+            .unwrap();
         let unsubscribe = client_to_handler_r.recv().await.unwrap();
 
         assert_eq!(PacketType::Unsubscribe, unsubscribe.packet_type());
 
-        if let Packet::Unsubscribe(unsub) = unsubscribe{
+        if let Packet::Unsubscribe(unsub) = unsubscribe {
             assert_eq!(1, unsub.packet_identifier);
             assert_eq!(vec!["Topic"], unsub.topics);
             assert_eq!(prop, unsub.properties);
-        }
-        else{
+        } else {
             // To make sure we did the if branch
             unreachable!();
         }
-
     }
 
     #[tokio::test]
-    async fn disconnect_test(){
+    async fn disconnect_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
         client.disconnect().await.unwrap();
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        if let Packet::Disconnect(res) = disconnect{
+        if let Packet::Disconnect(res) = disconnect {
             assert_eq!(DisconnectReasonCode::NormalDisconnection, res.reason_code);
             assert_eq!(DisconnectProperties::default(), res.properties);
-        }
-        else{
+        } else {
             // To make sure we did the if branch
             unreachable!();
         }
     }
 
     #[tokio::test]
-    async fn disconnect_with_properties_test(){
+    async fn disconnect_with_properties_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
-        client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, Default::default()).await.unwrap();
+        client
+            .disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, Default::default())
+            .await
+            .unwrap();
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        if let Packet::Disconnect(res) = disconnect{
+        if let Packet::Disconnect(res) = disconnect {
             assert_eq!(DisconnectReasonCode::KeepAliveTimeout, res.reason_code);
             assert_eq!(DisconnectProperties::default(), res.properties);
-        }
-        else{
+        } else {
             // To make sure we did the if branch
             unreachable!();
         }
     }
 
     #[tokio::test]
-    async fn disconnect_with_properties_test2(){
+    async fn disconnect_with_properties_test2() {
         let (client, client_to_handler_r, _) = create_new_test_client();
         let mut properties = DisconnectProperties::default();
         properties.reason_string = Some("TestString".to_string());
 
-        client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, properties.clone()).await.unwrap();
+        client
+            .disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, properties.clone())
+            .await
+            .unwrap();
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        if let Packet::Disconnect(res) = disconnect{
+        if let Packet::Disconnect(res) = disconnect {
             assert_eq!(DisconnectReasonCode::KeepAliveTimeout, res.reason_code);
             assert_eq!(properties, res.properties);
-        }
-        else{
+        } else {
             // To make sure we did the if branch
             unreachable!();
         }

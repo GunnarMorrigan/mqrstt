@@ -5,7 +5,7 @@ use super::{
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::PubAckReasonCode,
-    write_variable_integer, PacketType, PropertyType, variable_integer_len,
+    variable_integer_len, write_variable_integer, PacketType, PropertyType,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -59,13 +59,11 @@ impl VariableHeaderWrite for PubAck {
             && self.properties.user_properties.is_empty()
         {
             // nothing here
-        }
-        else if self.properties.reason_string.is_none()
+        } else if self.properties.reason_string.is_none()
             && self.properties.user_properties.is_empty()
         {
             self.reason_code.write(buf)?;
-        }
-        else {
+        } else {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
         }
@@ -81,14 +79,12 @@ impl WireLength for PubAck {
         {
             // Only pkid
             2
-        }
-        else if self.properties.reason_string.is_none()
+        } else if self.properties.reason_string.is_none()
             && self.properties.user_properties.is_empty()
         {
             // pkid and reason code
             3
-        }
-        else {
+        } else {
             let prop_len = self.properties.wire_len();
             // pkid, reason code, length of the length of properties and lenght of properties
             3 + variable_integer_len(prop_len) + prop_len

@@ -29,8 +29,7 @@ pub mod tests {
                     ta.spki,
                     ta.name_constraints,
                 ))
-            }
-            else {
+            } else {
                 None
             }
         });

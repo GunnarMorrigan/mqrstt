@@ -153,8 +153,7 @@ impl MqttRead for PublishProperties {
 
         if len == 0 {
             return Ok(Self::default());
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "PublishProperties".to_string(),
                 buf.len(),

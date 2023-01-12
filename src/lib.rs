@@ -7,7 +7,7 @@
 //! - The event handler - which makes sure that the MQTT protocol is followed.
 //!   By providing a custom handler messages are handled before they are acked, meaning that they are always handled.
 //! - The client - which is used to send messages from different places.
-//! 
+//!
 //! To Do:
 //! - Rebroadcast unacked packets
 //! - Enforce size of outbound messages (e.g. Publish)
@@ -22,8 +22,8 @@
 //! - MPL-2.0 vs MIT OR APACHE 2.0 license? [poll](https://github.com/GunnarMorrigan/mqrstt/discussions/2)
 //! - The handler currently only gets INCOMING packets
 //!
-//! 
-//! 
+//!
+//!
 //! You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
 //!
 //! Smol example:
@@ -103,27 +103,27 @@
 //!     assert!(h.is_ok());
 //! });
 //! ```
-//! 
-//! 
+//!
+//!
 //!  Tokio example:
 //! ----------------------------
 //! ```ignore
 //! let options = ConnectOptions::new("TokioTcpPingPongExample".to_string());
-//! 
+//!
 //! let (mut network, mut handler, client) = new_tokio(options);
-//! 
+//!
 //! let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!     .await
 //!     .unwrap();
-//! 
+//!
 //! network.connect(stream).await.unwrap();
-//! 
+//!
 //! client.subscribe("mqrstt").await.unwrap();
-//! 
+//!
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
-//! 
+//!
 //! let (n, h, _) = tokio::join!(
 //!     async {
 //!         loop {
@@ -147,10 +147,9 @@
 //!     }
 //! );
 //! ```
-//! 
-//! 
-//! 
-
+//!
+//!
+//!
 
 use client::AsyncClient;
 use connect_options::ConnectOptions;
@@ -239,7 +238,8 @@ pub trait EventHandler {
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
 pub fn new_smol<S>(options: ConnectOptions) -> (SmolNetwork<S>, EventHandlerTask, AsyncClient)
 where
-    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin, {
+    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+{
     let receive_maximum = options.receive_maximum();
 
     let (to_network_s, to_network_r) = async_channel::bounded(100);
@@ -271,7 +271,8 @@ pub fn new_tokio<S>(
     AsyncClient,
 )
 where
-    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin, {
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
+{
     let receive_maximum = options.receive_maximum();
 
     let (to_network_s, to_network_r) = async_channel::bounded(100);
@@ -334,7 +335,9 @@ mod lib_test {
                         }
                     }
                 }
-                Packet::ConnAck(_) => { println!("Connected!") },
+                Packet::ConnAck(_) => {
+                    println!("Connected!")
+                }
                 _ => (),
             }
         }

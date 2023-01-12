@@ -117,25 +117,6 @@ impl MqttWrite for QoS {
     }
 }
 
-impl TryFrom<ConnectFlags> for QoS {
-    type Error = DeserializeError;
-
-    fn try_from(c: ConnectFlags) -> Result<Self, Self::Error> {
-        if c.contains(ConnectFlags::WILL_QOS1 | ConnectFlags::WILL_QOS2) {
-            Err(DeserializeError::MalformedPacket)
-        }
-        else if c.contains(ConnectFlags::WILL_QOS2) {
-            Ok(QoS::ExactlyOnce)
-        }
-        else if c.contains(ConnectFlags::WILL_QOS1) {
-            Ok(QoS::AtLeastOnce)
-        }
-        else {
-            Ok(QoS::AtMostOnce)
-        }
-    }
-}
-
 impl MqttWrite for &str {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.len() as u16);
@@ -228,8 +209,7 @@ impl MqttWrite for bool {
         if *self {
             buf.put_u8(1);
             Ok(())
-        }
-        else {
+        } else {
             buf.put_u8(0);
             Ok(())
         }
@@ -285,8 +265,7 @@ pub fn read_fixed_header_rem_len(
             if (*byte & 0b1000_0000) == 0 {
                 return Ok((integer, length));
             }
-        }
-        else {
+        } else {
             return Err(ReadBytes::InsufficientBytes(1));
         }
     }
@@ -337,14 +316,11 @@ pub fn write_variable_integer(buf: &mut BytesMut, integer: usize) -> Result<(), 
 pub fn variable_integer_len(integer: usize) -> usize {
     if integer >= 2_097_152 {
         4
-    }
-    else if integer >= 16_384 {
+    } else if integer >= 16_384 {
         3
-    }
-    else if integer >= 128 {
+    } else if integer >= 128 {
         2
-    }
-    else {
+    } else {
         1
     }
 }
@@ -722,7 +698,7 @@ impl Packet {
 impl Display for Packet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self{
-            Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_session, c.username, c.password, c.keep_alive, c.client_id),
+            Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_start, c.username, c.password, c.keep_alive, c.client_id),
             Packet::ConnAck(c) => write!(f, "ConnAck(session:{:?}, reason code{:?})", c.connack_flags, c.reason_code),
             Packet::Publish(p) => write!(f, "Publish(topic: {}, qos: {:?}, dup: {:?}, retain: {:?}, packet id: {:?})", &p.topic, p.qos, p.dup, p.retain, p.packet_identifier),
             Packet::PubAck(p) => write!(f, "PubAck(id:{:?}, reason code: {:?})", p.packet_identifier, p.reason_code),
@@ -775,7 +751,6 @@ impl FixedHeader {
 
         let (remaining_length, length) = read_fixed_header_rem_len(header)?;
         header_length += length;
-
 
         Ok((
             Self {
@@ -857,7 +832,7 @@ mod tests {
         let res = res.unwrap();
 
         let expected = ConnAck {
-            connack_flags: ConnAckFlags::SESSION_PRESENT,
+            connack_flags: ConnAckFlags{ session_present: true },
             reason_code: ConnAckReasonCode::Success,
             connack_properties: ConnAckProperties {
                 session_expiry_interval: None,

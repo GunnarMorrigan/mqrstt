@@ -77,8 +77,7 @@ impl MqttRead for SubAckProperties {
 
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "SubAckProperties".to_string(),
                 buf.len(),
@@ -95,8 +94,7 @@ impl MqttRead for SubAckProperties {
                         let (subscription_id, _) = read_variable_integer(&mut properties_data)?;
 
                         properties.subscription_id = Some(subscription_id);
-                    }
-                    else {
+                    } else {
                         return Err(DeserializeError::DuplicateProperty(
                             PropertyType::SubscriptionIdentifier,
                         ));

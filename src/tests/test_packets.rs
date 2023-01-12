@@ -5,10 +5,10 @@ use rstest::*;
 use crate::packets::{
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
     Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties,
-    QoS, Subscribe, Subscription
+    QoS, Subscribe, Subscription,
 };
 
-fn publish_packet_1() -> Packet{
+fn publish_packet_1() -> Packet {
     Packet::Publish(Publish {
         dup: false,
         qos: QoS::ExactlyOnce,
@@ -28,7 +28,7 @@ fn publish_packet_1() -> Packet{
         payload: Bytes::from_static(b""),
     })
 }
-fn publish_packet_2() -> Packet{
+fn publish_packet_2() -> Packet {
     Packet::Publish(Publish {
         dup: true,
         qos: QoS::ExactlyOnce,
@@ -48,7 +48,7 @@ fn publish_packet_2() -> Packet{
         payload: Bytes::from_static(b""),
     })
 }
-fn publish_packet_3() -> Packet{
+fn publish_packet_3() -> Packet {
     Packet::Publish(Publish {
         dup: true,
         qos: QoS::AtLeastOnce,
@@ -68,7 +68,7 @@ fn publish_packet_3() -> Packet{
         payload: Bytes::from_static(b""),
     })
 }
-fn publish_packet_4() -> Packet{
+fn publish_packet_4() -> Packet {
     Packet::Publish(Publish {
         dup: true,
         qos: QoS::AtLeastOnce,
@@ -89,7 +89,6 @@ fn publish_packet_4() -> Packet{
         // payload: Bytes::from_iter(b"abcdefg".repeat(500)),
     })
 }
-
 
 pub fn create_subscribe_packet(packet_identifier: u16) -> Packet {
     let subscription: Subscription = "test/topic".into();
@@ -149,12 +148,12 @@ pub fn create_disconnect_packet() -> Packet {
 #[case(publish_packet_3())]
 #[case(publish_packet_4())]
 /// Test if the input == output after read packet form input and write packet to output
-fn test_equal_write_read(#[case] packet: Packet){
+fn test_equal_write_read(#[case] packet: Packet) {
     let mut buffer = bytes::BytesMut::new();
 
     packet.write(&mut buffer).unwrap();
 
     let read_packet = Packet::read_from_buffer(&mut buffer).unwrap();
- 
+
     assert_eq!(packet, read_packet);
 }

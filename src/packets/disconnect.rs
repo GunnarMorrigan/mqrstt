@@ -5,7 +5,7 @@ use super::{
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::DisconnectReasonCode,
-    write_variable_integer, PacketType, PropertyType, variable_integer_len,
+    variable_integer_len, write_variable_integer, PacketType, PropertyType,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,8 +34,7 @@ impl VariableHeaderRead for Disconnect {
         if remaining_length == 0 {
             reason_code = DisconnectReasonCode::NormalDisconnection;
             properties = DisconnectProperties::default();
-        }
-        else {
+        } else {
             reason_code = DisconnectReasonCode::read(&mut buf)?;
             properties = DisconnectProperties::read(&mut buf)?;
         }
@@ -65,8 +64,7 @@ impl WireLength for Disconnect {
             let property_len = self.properties.wire_len();
             // reasoncode, length of property length, property length
             1 + variable_integer_len(property_len) + property_len
-        }
-        else {
+        } else {
             0
         }
     }
@@ -87,8 +85,7 @@ impl MqttRead for DisconnectProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "DisconnectProperties".to_string(),
                 buf.len(),
