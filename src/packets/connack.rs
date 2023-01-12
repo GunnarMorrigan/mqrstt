@@ -1,14 +1,13 @@
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, VariableHeaderRead},
+    mqtt_traits::{MqttRead, VariableHeaderRead, MqttWrite},
     read_variable_integer,
     reason_codes::ConnAckReasonCode,
     PacketType, PropertyType, QoS,
 };
-use bitflags::bitflags;
-use bytes::{Buf, Bytes};
+use bytes::{Buf, Bytes, BufMut};
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConnAck {
     /// 3.2.2.1 Connect Acknowledge Flags
     pub connack_flags: ConnAckFlags,
@@ -31,9 +30,7 @@ impl VariableHeaderRead for ConnAck {
             ));
         }
 
-        let connack_flags = ConnAckFlags::from_bits(buf.get_u8()).ok_or(
-            DeserializeError::MalformedPacketWithInfo("Can't read ConnAckFlags".to_string()),
-        )?;
+        let connack_flags = ConnAckFlags::read(&mut buf)?;
         let reason_code = ConnAckReasonCode::read(&mut buf)?;
         let connack_properties = ConnAckProperties::read(&mut buf)?;
 
@@ -123,8 +120,7 @@ impl MqttRead for ConnAckProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "ConnAckProperties".to_string(),
                 buf.len(),
@@ -283,9 +279,43 @@ impl MqttRead for ConnAckProperties {
     }
 }
 
-bitflags! {
-    pub struct ConnAckFlags: u8 {
-        const  SESSION_PRESENT    = 0b00000001;
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct ConnAckFlags{
+    pub session_present: bool,
+}
+
+impl Default for ConnAckFlags {
+    fn default() -> Self {
+        Self {
+           session_present: false,
+        }
+    }
+}
+
+impl MqttRead for ConnAckFlags {
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "ConnAckFlags".to_string(),
+                0,
+                1,
+            ));
+        }
+
+        let byte = buf.get_u8();
+
+        Ok(Self { 
+            session_present:  (byte & 0b00000001) != 0,
+        })
+    }
+}
+
+impl MqttWrite for ConnAckFlags {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+        let byte = self.session_present as u8;
+
+        buf.put_u8(byte);
+        Ok(())
     }
 }
 
