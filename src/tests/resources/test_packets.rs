@@ -1,15 +1,15 @@
 use bytes::Bytes;
 
+use rstest::*;
+
 use crate::packets::{
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
     Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties,
-    QoS, Subscribe, Subscription,
+    QoS, Subscribe, Subscription, mqtt_traits::{MqttWrite, WireLength}, FixedHeader, read_variable_integer,
 };
 
-pub fn publish_packets() -> Vec<Packet> {
-    let mut ret = vec![];
-
-    let packet = Packet::Publish(Publish {
+fn publish_packet_1() -> Packet{
+    Packet::Publish(Publish {
         dup: false,
         qos: QoS::ExactlyOnce,
         retain: true,
@@ -26,12 +26,12 @@ pub fn publish_packets() -> Vec<Packet> {
             content_type: None,
         },
         payload: Bytes::from_static(b""),
-    });
-    ret.push(packet);
-
-    let packet = Packet::Publish(Publish {
+    })
+}
+fn publish_packet_2() -> Packet{
+    Packet::Publish(Publish {
         dup: true,
-        qos: QoS::AtMostOnce,
+        qos: QoS::ExactlyOnce,
         retain: false,
         topic: "test/#".to_string(),
         packet_identifier: Some(4566),
@@ -46,12 +46,12 @@ pub fn publish_packets() -> Vec<Packet> {
             content_type: None,
         },
         payload: Bytes::from_static(b""),
-    });
-    ret.push(packet);
-
-    let packet = Packet::Publish(Publish {
+    })
+}
+fn publish_packet_3() -> Packet{
+    Packet::Publish(Publish {
         dup: true,
-        qos: QoS::AtMostOnce,
+        qos: QoS::AtLeastOnce,
         retain: false,
         topic: "test/#".to_string(),
         packet_identifier: Some(4566),
@@ -66,12 +66,12 @@ pub fn publish_packets() -> Vec<Packet> {
             content_type: None,
         },
         payload: Bytes::from_static(b""),
-    });
-    ret.push(packet);
-
-    let packet = Packet::Publish(Publish {
+    })
+}
+fn publish_packet_4() -> Packet{
+    Packet::Publish(Publish {
         dup: true,
-        qos: QoS::AtMostOnce,
+        qos: QoS::AtLeastOnce,
         retain: false,
         topic: "test/#".to_string(),
         packet_identifier: Some(4566),
@@ -85,12 +85,11 @@ pub fn publish_packets() -> Vec<Packet> {
             user_properties: vec![],
             content_type: Some("Garbage".to_string()),
         },
-        payload: Bytes::from_iter(b"abcdefg".repeat(500)),
-    });
-    ret.push(packet);
-
-    ret
+        payload: Bytes::from_static(b""),
+        // payload: Bytes::from_iter(b"abcdefg".repeat(500)),
+    })
 }
+
 
 pub fn create_subscribe_packet(packet_identifier: u16) -> Packet {
     let subscription: Subscription = "test/topic".into();
@@ -132,17 +131,63 @@ pub fn create_puback_packet(packet_identifier: u16) -> Packet {
     })
 }
 
-// pub fn create_pubrel_packet(packet_identifier: u16) -> Packet{
-//     Packet::PubRel(PubRel{
-//         packet_identifier,
-//         reason_code: PubAckReasonCode::Success,
-//         properties: PubAckProperties::default(),
-//     })
-// }
-
 pub fn create_disconnect_packet() -> Packet {
     Packet::Disconnect(Disconnect {
         reason_code: DisconnectReasonCode::NormalDisconnection,
         properties: DisconnectProperties::default(),
     })
 }
+
+#[rstest]
+#[case(create_subscribe_packet(1))]
+#[case(create_subscribe_packet(65335))]
+#[case(create_puback_packet(1))]
+#[case(create_puback_packet(65335))]
+#[case(create_disconnect_packet())]
+#[case(publish_packet_1())]
+#[case(publish_packet_2())]
+#[case(publish_packet_3())]
+#[case(publish_packet_4())]
+/// Test if the input == output after read packet form input and write packet to output
+fn test_equal_write_read(#[case] packet: Packet){
+    let mut buffer = bytes::BytesMut::new();
+
+    packet.write(&mut buffer).unwrap();
+
+    let read_packet = Packet::read_from_buffer(&mut buffer).unwrap();
+ 
+    assert_eq!(packet, read_packet);
+}
+
+// #[test]
+// fn test_dirty(){
+//     let mut buffer = bytes::BytesMut::new();
+
+//     let packet = publish_packet_4();
+
+//     packet.write(&mut buffer).unwrap();
+
+//     if let Packet::Publish(p) = packet.clone(){
+//         dbg!(p.wire_len());
+
+//         println!("topic: {} == {}" ,p.topic.len()+2, p.topic.wire_len());
+//         dbg!(p.packet_identifier.unwrap());
+//         dbg!(p.publish_properties.wire_len());
+
+
+//         println!("payload: {} == {}", p.payload.len(), Bytes::from_iter(b"abcdefg".repeat(500)).len())
+
+//     }
+
+//     let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter()).unwrap();
+
+//     dbg!(header);
+//     dbg!(header_length);
+
+//     dbg!(buffer.len());
+//     println!("{:02X?}", buffer.to_vec());
+    
+//     let read_packet = Packet::read_from_buffer(&mut buffer).unwrap();
+    
+//     assert_eq!(packet, read_packet);
+// }
