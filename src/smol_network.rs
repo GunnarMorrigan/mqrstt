@@ -9,7 +9,8 @@ use crate::connect_options::ConnectOptions;
 use crate::connections::smol_stream::SmolStream;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
-use crate::packets::{Packet, PacketType};
+use crate::packets::reason_codes::DisconnectReasonCode;
+use crate::packets::{Packet, PacketType, Disconnect};
 use crate::NetworkStatus;
 
 pub struct SmolNetwork<S> {
@@ -145,6 +146,8 @@ where
                             return Ok(NetworkStatus::Active);
                         }
                         else{
+                            let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
+                            stream.write(&Packet::Disconnect(disconnect)).await?;
                             return Ok(NetworkStatus::NoPingResp);
                         }
                     },
