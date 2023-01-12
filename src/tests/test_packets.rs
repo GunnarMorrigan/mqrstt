@@ -158,36 +158,3 @@ fn test_equal_write_read(#[case] packet: Packet){
  
     assert_eq!(packet, read_packet);
 }
-
-// #[test]
-// fn test_dirty(){
-//     let mut buffer = bytes::BytesMut::new();
-
-//     let packet = publish_packet_4();
-
-//     packet.write(&mut buffer).unwrap();
-
-//     if let Packet::Publish(p) = packet.clone(){
-//         dbg!(p.wire_len());
-
-//         println!("topic: {} == {}" ,p.topic.len()+2, p.topic.wire_len());
-//         dbg!(p.packet_identifier.unwrap());
-//         dbg!(p.publish_properties.wire_len());
-
-
-//         println!("payload: {} == {}", p.payload.len(), Bytes::from_iter(b"abcdefg".repeat(500)).len())
-
-//     }
-
-//     let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter()).unwrap();
-
-//     dbg!(header);
-//     dbg!(header_length);
-
-//     dbg!(buffer.len());
-//     println!("{:02X?}", buffer.to_vec());
-    
-//     let read_packet = Packet::read_from_buffer(&mut buffer).unwrap();
-    
-//     assert_eq!(packet, read_packet);
-// }
