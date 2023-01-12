@@ -28,7 +28,7 @@ fn publish_packet_2() -> Vec<u8>{
 
 
 #[rstest]
-#[case(publish_packet())]
+#[case(publish_packet_2())]
 fn publish_packet_test(#[case] bytes: Vec<u8>){
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
     let mut write_buffer = BytesMut::new();
@@ -36,16 +36,15 @@ fn publish_packet_test(#[case] bytes: Vec<u8>){
     packet.write(&mut write_buffer).unwrap();
     
     assert_eq!(bytes.len(), write_buffer.len());
-
+    
     let packet_from_write_buffer = Packet::read_from_buffer(&mut write_buffer).unwrap();
-
+    
     assert_eq!(packet, packet_from_write_buffer);
-
 }
 
 // In some cases the properties are not written in the same order as they are originally read.
 #[rstest]
-#[case(publish_packet_2())]
+#[case(publish_packet())]
 /// Test if the input == output after read packet form input and write packet to output
 fn test_equal_read_write_packet_from_bytes(#[case] bytes: Vec<u8>){
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
