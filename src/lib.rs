@@ -3,11 +3,11 @@
 //!
 //! There are three parts to the design of the MQTT client. The network, the event handler and the client.
 //!
-//! The network - which simply reads and forms packets from the network.
-//! The event handler - which makes sure that the MQTT protocol is followed.
-//! By providing a custom handler during the internal handling, messages are handled before they are acked.
-//! The client - which is used to send messages from different places.
-//!
+//! - The network - which simply reads and forms packets from the network.
+//! - The event handler - which makes sure that the MQTT protocol is followed.
+//!   By providing a custom handler messages are handled before they are acked, meaning that they are always handled.
+//! - The client - which is used to send messages from different places.
+//! 
 //! To Do:
 //! - Rebroadcast unacked packets
 //! - Enforce size of outbound messages (e.g. Publish)
