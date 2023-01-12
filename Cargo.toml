@@ -22,7 +22,6 @@ smol = ["dep:smol"]
 [dependencies]
 # Packets
 bytes = "1.2.1"
-bitflags = "1.3.2"
 
 # Errors
 thiserror = "1.0.37"
