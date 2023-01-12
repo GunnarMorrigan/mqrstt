@@ -98,17 +98,17 @@ impl VariableHeaderWrite for Publish {
 
 impl WireLength for Publish {
     fn wire_len(&self) -> usize {
-        let len = self.topic.wire_len()
-            + if self.packet_identifier.is_some() {
-                2
-            }
-            else {
-                0
-            }
-            + self.publish_properties.wire_len()
-            + self.payload.len();
+        let mut len = self.topic.wire_len();
+        if self.packet_identifier.is_some() {
+            len += 2;
+        }
 
-        len + variable_integer_len(len)
+        let properties_len = self.publish_properties.wire_len();
+
+        len += variable_integer_len(properties_len);
+        len += properties_len;
+        len += self.payload.len();
+        len
     }
 }
 
