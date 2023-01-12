@@ -238,3 +238,106 @@ impl AsyncClient {
         Ok(())
     }
 }
+
+
+#[cfg(test)]
+mod tests{
+    use async_channel::Receiver;
+
+    use crate::packets::{Packet, reason_codes::DisconnectReasonCode, PacketType, DisconnectProperties, UnsubscribeProperties};
+
+    use super::AsyncClient;
+
+    fn create_new_test_client() -> (AsyncClient, Receiver<Packet>, Receiver<Packet>) {
+        let (s, r) = async_channel::bounded(100);
+
+        for i in 1..=100{
+            s.send_blocking(i).unwrap();
+        }
+
+        let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
+        let (to_network_s, to_network_r) = async_channel::bounded(100);
+
+        let client = AsyncClient::new(r, client_to_handler_s, to_network_s);
+
+        (client, client_to_handler_r, to_network_r)
+    }
+
+    #[tokio::test]
+    async fn unsubscribe_with_properties_test() {
+        let (client, client_to_handler_r, _) = create_new_test_client();
+
+        let mut prop = UnsubscribeProperties::default();
+        prop.user_properties = vec![("A".to_string(), "B".to_string())];
+
+        client.unsubscribe_with_properties("Topic", prop.clone()).await.unwrap();
+        let unsubscribe = client_to_handler_r.recv().await.unwrap();
+
+        assert_eq!(PacketType::Unsubscribe, unsubscribe.packet_type());
+
+        if let Packet::Unsubscribe(unsub) = unsubscribe{
+            assert_eq!(1, unsub.packet_identifier);
+            assert_eq!(vec!["Topic"], unsub.topics);
+            assert_eq!(prop, unsub.properties);
+        }
+        else{
+            // To make sure we did the if branch
+            assert!(false);
+        }
+
+    }
+
+    #[tokio::test]
+    async fn disconnect_test(){
+        let (client, client_to_handler_r, _) = create_new_test_client();
+        client.disconnect().await.unwrap();
+        let disconnect = client_to_handler_r.recv().await.unwrap();
+        assert_eq!(PacketType::Disconnect, disconnect.packet_type());
+
+        if let Packet::Disconnect(res) = disconnect{
+            assert_eq!(DisconnectReasonCode::NormalDisconnection, res.reason_code);
+            assert_eq!(DisconnectProperties::default(), res.properties);
+        }
+        else{
+            // To make sure we did the if branch
+            assert!(false);
+        }
+    }
+
+    #[tokio::test]
+    async fn disconnect_with_properties_test(){
+        let (client, client_to_handler_r, _) = create_new_test_client();
+        client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, Default::default()).await.unwrap();
+        let disconnect = client_to_handler_r.recv().await.unwrap();
+        assert_eq!(PacketType::Disconnect, disconnect.packet_type());
+
+        if let Packet::Disconnect(res) = disconnect{
+            assert_eq!(DisconnectReasonCode::KeepAliveTimeout, res.reason_code);
+            assert_eq!(DisconnectProperties::default(), res.properties);
+        }
+        else{
+            // To make sure we did the if branch
+            assert!(false);
+        }
+    }
+
+    #[tokio::test]
+    async fn disconnect_with_properties_test2(){
+        let (client, client_to_handler_r, _) = create_new_test_client();
+        let mut properties = DisconnectProperties::default();
+        properties.reason_string = Some("TestString".to_string());
+
+        client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, properties.clone()).await.unwrap();
+        let disconnect = client_to_handler_r.recv().await.unwrap();
+        assert_eq!(PacketType::Disconnect, disconnect.packet_type());
+
+        if let Packet::Disconnect(res) = disconnect{
+            assert_eq!(DisconnectReasonCode::KeepAliveTimeout, res.reason_code);
+            assert_eq!(properties, res.properties);
+        }
+        else{
+            // To make sure we did the if branch
+            assert!(false);
+        }
+    }
+}
