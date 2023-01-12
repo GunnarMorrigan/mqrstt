@@ -706,10 +706,9 @@ impl Packet {
 
     pub fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
         let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
-
         if header.remaining_length + header_length > buffer.len() {
             return Err(ReadBytes::InsufficientBytes(
-                header.remaining_length - buffer.len(),
+                header.remaining_length + header_length - buffer.len(),
             ));
         }
         buffer.advance(header_length);
