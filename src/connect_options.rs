@@ -67,7 +67,7 @@ impl ConnectOptions {
             last_will: None,
         }
     }
-    
+
     pub fn receive_maximum(&self) -> u16 {
         self.receive_maximum.unwrap_or(RECEIVE_MAXIMUM_DEFAULT)
     }
