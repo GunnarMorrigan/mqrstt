@@ -135,6 +135,18 @@ impl WireLength for UnsubscribeProperties {
 
 pub struct UnsubscribeTopics(pub Vec<String>);
 
+impl From<&str> for UnsubscribeTopics {
+    fn from(value: &str) -> Self {
+        Self(vec![value.to_string()])
+    }
+}
+
+impl From<&[&str]> for UnsubscribeTopics {
+    fn from(value: &[&str]) -> Self {
+        Self(value.iter().map(|s| s.to_string()).collect::<Vec<_>>())
+    }
+}
+
 impl From<String> for UnsubscribeTopics {
     fn from(value: String) -> Self {
         Self(vec![value])
@@ -144,6 +156,12 @@ impl From<String> for UnsubscribeTopics {
 impl From<Vec<String>> for UnsubscribeTopics {
     fn from(value: Vec<String>) -> Self {
         Self(value)
+    }
+}
+
+impl From<&[String]> for UnsubscribeTopics {
+    fn from(value: &[String]) -> Self {
+        Self(value.to_vec())
     }
 }
 
