@@ -1,4 +1,3 @@
-use bitflags::bitflags;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use super::{
@@ -61,7 +60,7 @@ pub struct Connect {
 
     /// 3.1.2.4 Clean Start Flag
     /// bit 1
-    pub clean_session: bool,
+    pub clean_start: bool,
 
     /// 3.1.2.5 Will Flag through option
     pub last_will: Option<LastWill>,
@@ -86,7 +85,7 @@ impl Default for Connect {
     fn default() -> Self {
         Self {
             protocol_version: ProtocolVersion::V5,
-            clean_session: true,
+            clean_start: true,
             last_will: None,
             username: None,
             password: None,
@@ -107,41 +106,35 @@ impl VariableHeaderRead for Connect {
 
         let protocol_version = ProtocolVersion::read(&mut buf)?;
 
-        let connect_flags_byte = buf.get_u8();
-        let connect_flags = ConnectFlags::from_bits(connect_flags_byte)
-            .ok_or("Can't read ConnectFlags".to_string())?;
+        let connect_flags = ConnectFlags::read(&mut buf)?;
 
-        let clean_session = connect_flags.contains(ConnectFlags::CLEAN_START);
+        let clean_start = connect_flags.clean_start;
         let keep_alive = buf.get_u16();
 
         let connect_properties = ConnectProperties::read(&mut buf)?;
 
         let client_id = String::read(&mut buf)?;
         let mut last_will = None;
-        if connect_flags.contains(ConnectFlags::WILL_FLAG) {
-            let retain = connect_flags.contains(ConnectFlags::WILL_RETAIN);
+        if connect_flags.will_flag {
+            let retain = connect_flags.will_retain;
 
-            let qos = QoS::try_from(connect_flags)?;
-
-            last_will = Some(LastWill::read(qos, retain, &mut buf)?);
+            last_will = Some(LastWill::read(connect_flags.will_qos, retain, &mut buf)?);
         }
 
-        let username = if connect_flags.contains(ConnectFlags::USERNAME) {
+        let username = if connect_flags.username {
             Some(String::read(&mut buf)?)
-        }
-        else {
+        } else {
             None
         };
-        let password = if connect_flags.contains(ConnectFlags::PASSWORD) {
+        let password = if connect_flags.password {
             Some(String::read(&mut buf)?)
-        }
-        else {
+        } else {
             None
         };
 
         let connect = Connect {
             protocol_version,
-            clean_session,
+            clean_start,
             last_will,
             username,
             password,
@@ -160,26 +153,18 @@ impl VariableHeaderWrite for Connect {
 
         self.protocol_version.write(buf)?;
 
-        let mut connect_flags = ConnectFlags::empty();
+        let mut connect_flags = ConnectFlags::default();
 
-        if self.clean_session {
-            connect_flags |= ConnectFlags::CLEAN_START;
-        }
+        connect_flags.clean_start = self.clean_start;
         if let Some(last_will) = &self.last_will {
-            connect_flags |= ConnectFlags::WILL_FLAG;
-            if last_will.retain {
-                connect_flags |= ConnectFlags::WILL_RETAIN;
-            }
-            connect_flags |= last_will.qos.into();
+            connect_flags.will_flag = true;
+            connect_flags.will_retain = last_will.retain;
+            connect_flags.will_qos = last_will.qos;
         }
-        if self.username.is_some() {
-            connect_flags |= ConnectFlags::USERNAME;
-        }
-        if self.password.is_some() {
-            connect_flags |= ConnectFlags::PASSWORD;
-        }
+        connect_flags.username = self.username.is_some();
+        connect_flags.password = self.password.is_some();
 
-        buf.put_u8(connect_flags.bits());
+        connect_flags.write(buf)?;
 
         buf.put_u16(self.keep_alive);
 
@@ -223,30 +208,79 @@ impl WireLength for Connect {
     }
 }
 
-bitflags! {
-    /// ╔═════╦═══════════╦══════════╦═════════════╦═════╦════╦═══════════╦═════════════╦══════════╗
-    /// ║ Bit ║ 7         ║ 6        ║ 5           ║ 4   ║ 3  ║ 2         ║ 1           ║ 0        ║
-    /// ╠═════╬═══════════╬══════════╬═════════════╬═════╩════╬═══════════╬═════════════╬══════════╣
-    /// ║     ║ User Name ║ Password ║ Will Retain ║ Will QoS ║ Will Flag ║ Clean Start ║ Reserved ║
-    /// ╚═════╩═══════════╩══════════╩═════════════╩══════════╩═══════════╩═════════════╩══════════╝
-    pub struct ConnectFlags: u8 {
-        const CLEAN_START   = 0b00000010;
-        const WILL_FLAG     = 0b00000100;
-        const WILL_QOS1     = 0b00001000;
-        const WILL_QOS2     = 0b00010000;
-        const WILL_RETAIN   = 0b00100000;
-        const PASSWORD      = 0b01000000;
-        const USERNAME      = 0b10000000;
+/// ╔═════╦═══════════╦══════════╦═════════════╦═════╦════╦═══════════╦═════════════╦══════════╗
+/// ║ Bit ║ 7         ║ 6        ║ 5           ║ 4   ║ 3  ║ 2         ║ 1           ║ 0        ║
+/// ╠═════╬═══════════╬══════════╬═════════════╬═════╩════╬═══════════╬═════════════╬══════════╣
+/// ║     ║ User Name ║ Password ║ Will Retain ║ Will QoS ║ Will Flag ║ Clean Start ║ Reserved ║
+/// ╚═════╩═══════════╩══════════╩═════════════╩══════════╩═══════════╩═════════════╩══════════╝
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct ConnectFlags{
+    pub clean_start: bool,
+    pub will_flag: bool,
+    pub will_qos: QoS,
+    pub will_retain: bool,
+    pub password: bool,
+    pub username: bool,
+}
+
+impl ConnectFlags{
+    pub fn from_u8(value: u8) -> Result<Self, DeserializeError>{
+        Ok(
+            Self{
+                clean_start: ((value & 0b00000010) >> 1) != 0,
+                will_flag: ((value & 0b00000100) >> 2) != 0,
+                will_qos: QoS::from_u8((value & 0b00011000) >> 3)?,
+                will_retain: ((value & 0b00100000) >> 5) != 0,
+                password: ((value & 0b01000000) >> 6) != 0,
+                username: ((value & 0b10000000) >> 7) != 0,
+            }
+        )
+    }
+
+    pub fn into_u8(&self) -> Result<u8, SerializeError>{
+        let byte = ((self.clean_start as u8) << 1)
+        | ((self.will_flag as u8) << 2)
+        | (self.will_qos.into_u8() << 3)
+        | ((self.will_retain as u8) << 5)
+        | ((self.password as u8) << 6)
+        | ((self.username as u8) << 7);
+        Ok(byte)
     }
 }
 
-impl From<QoS> for ConnectFlags {
-    fn from(q: QoS) -> Self {
-        match q {
-            QoS::AtMostOnce => ConnectFlags::empty(),
-            QoS::AtLeastOnce => ConnectFlags::WILL_QOS1,
-            QoS::ExactlyOnce => ConnectFlags::WILL_QOS2,
+impl Default for ConnectFlags {
+    fn default() -> Self {
+        Self {
+            clean_start: false,
+            will_flag: false,
+            will_qos: QoS::AtMostOnce,
+            will_retain: false,
+            password: false,
+            username: false,
         }
+    }
+}
+
+impl MqttRead for ConnectFlags {
+    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(
+                "ConnectFlags".to_string(),
+                0,
+                1,
+            ));
+        }
+
+        let byte = buf.get_u8();
+
+        ConnectFlags::from_u8(byte)
+    }
+}
+
+impl MqttWrite for ConnectFlags {
+    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+        buf.put_u8(self.into_u8()?);
+        Ok(())
     }
 }
 
@@ -353,8 +387,7 @@ impl MqttRead for ConnectProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "ConnectProperties".to_string(),
                 buf.len(),
@@ -549,10 +582,10 @@ impl WireLength for LastWill {
     fn wire_len(&self) -> usize {
         let property_len = self.last_will_properties.wire_len();
 
-        self.topic.wire_len() 
-        + self.payload.wire_len() 
-        + variable_integer_len(property_len) 
-        + property_len
+        self.topic.wire_len()
+            + self.payload.wire_len()
+            + variable_integer_len(property_len)
+            + property_len
     }
 }
 
@@ -581,8 +614,7 @@ impl MqttRead for LastWillProperties {
         let mut properties = Self::default();
         if len == 0 {
             return Ok(properties);
-        }
-        else if buf.len() < len {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(
                 "LastWillProperties".to_string(),
                 buf.len(),
@@ -701,16 +733,16 @@ impl WireLength for LastWillProperties {
     fn wire_len(&self) -> usize {
         let mut len: usize = 0;
 
-        if self.delay_interval.is_some(){
+        if self.delay_interval.is_some() {
             len += 5;
         }
-        if self.payload_format_indicator.is_some(){
+        if self.payload_format_indicator.is_some() {
             len += 2;
         }
-        if self.message_expiry_interval.is_some(){
+        if self.message_expiry_interval.is_some() {
             len += 5;
         }
-        // +1 for the property type 
+        // +1 for the property type
         len += self
             .content_type
             .as_ref()
@@ -738,7 +770,7 @@ mod tests {
         QoS,
     };
 
-    use super::{Connect, LastWill};
+    use super::{Connect, LastWill, ConnectFlags};
 
     #[test]
     fn read_connect() {
@@ -930,5 +962,12 @@ mod tests {
         lw.write(&mut write_buf).unwrap();
 
         assert_eq!(last_will.to_vec(), write_buf.to_vec());
+    }
+
+    #[test]
+    fn connect_flag(){
+        let byte = 0b1100_1110;
+        let flags = ConnectFlags::from_u8(byte).unwrap();
+        assert_eq!(byte, flags.into_u8().unwrap());
     }
 }
