@@ -767,12 +767,15 @@ impl FixedHeader {
             return Err(ReadBytes::InsufficientBytes(2 - header.len()));
         }
 
+        let mut header_length = 1;
         let first_byte = header.next().unwrap();
 
         let (packet_type, flags) =
             PacketType::from_first_byte(*first_byte).map_err(ReadBytes::Err)?;
 
         let (remaining_length, length) = read_fixed_header_rem_len(header)?;
+        header_length += length;
+
 
         Ok((
             Self {
@@ -780,7 +783,7 @@ impl FixedHeader {
                 flags,
                 remaining_length,
             },
-            1 + length,
+            header_length,
         ))
     }
 }
