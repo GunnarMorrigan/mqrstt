@@ -223,6 +223,7 @@ impl MqttRead for PublishProperties {
                             PropertyType::ContentType,
                         ));
                     }
+                    properties.content_type = Some(String::read(&mut property_data)?);
                 }
                 t => return Err(DeserializeError::UnexpectedProperty(t, PacketType::Publish)),
             }
