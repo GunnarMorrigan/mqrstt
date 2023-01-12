@@ -5,7 +5,7 @@ use rstest::*;
 use crate::packets::{
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
     Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties,
-    QoS, Subscribe, Subscription, mqtt_traits::{MqttWrite, WireLength}, FixedHeader, read_variable_integer,
+    QoS, Subscribe, Subscription
 };
 
 fn publish_packet_1() -> Packet{
