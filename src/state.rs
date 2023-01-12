@@ -8,6 +8,8 @@ use crate::{
 };
 
 #[derive(Debug)]
+/// [`State`] keeps track of the outgoing and incoming messages on which actions needs to be taken.
+/// In the future this will be adjusted to rebroadcast packets that have not been acked and thus need to be rebroadcast.
 pub struct State {
     pub(crate) apkid: AvailablePacketIds,
 

@@ -147,9 +147,6 @@
 //!     }
 //! );
 //! ```
-//!
-//!
-//!
 
 use client::AsyncClient;
 use connect_options::ConnectOptions;
@@ -173,6 +170,7 @@ pub mod smol_network;
 pub mod tokio_network;
 
 pub mod state;
+
 mod util;
 
 #[cfg(test)]
@@ -197,42 +195,27 @@ pub enum HandlerStatus {
     OutgoingDisconnect,
 }
 
-#[async_trait::async_trait]
 /// Handlers are used to deal with packets before they are further processed (acked)
 /// This guarantees that the end user has handlded the packet.
 /// Trait for async mutable access to handler.
 /// Usefull when you have a single handler
+#[async_trait::async_trait]
 pub trait AsyncEventHandlerMut {
     async fn handle(&mut self, event: &Packet);
 }
 
 #[async_trait::async_trait]
-/// Handlers are used to deal with packets before they are further processed (acked)
-/// This guarantees that the end user has handlded the packet.
-/// Trait for async immutable access to handler.
-/// Usefull when you want to run multiple handlers concurrently to increase throughput.
 pub trait AsyncEventHandler {
     async fn handle(&self, event: &Packet);
 }
 
-/// Handlers are used to deal with packets before they are further processed (acked)
-/// This guarantees that the end user has handlded the packet.
-/// Trait for sync mutable access to handler.
-/// Usefull when you want to run multiple handlers concurrently to increase throughput.
 pub trait EventHandlerMut {
     fn handle(&mut self, event: &Packet);
 }
 
-/// Handlers are used to deal with packets before they are further processed (acked)
-/// This guarantees that the end user has handlded the packet.
-/// Trait for sync immutable access to handler.
-/// Usefull when you want to run multiple handlers concurrently to increase throughput.
 pub trait EventHandler {
     fn handle(&self, event: &Packet);
 }
-
-// #[cfg(all(feature = "smol", feature = "tokio"))]
-// std::compile_error!("The features smol and tokio can not be enabled simultaiously.");
 
 #[cfg(feature = "smol")]
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
@@ -304,7 +287,7 @@ mod lib_test {
         connect_options::ConnectOptions,
         new_smol, new_tokio,
         packets::{self, Packet},
-        util::tls::tests::simple_rust_tls,
+        tests::tls::tests::simple_rust_tls,
         AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
     };
     use async_trait::async_trait;

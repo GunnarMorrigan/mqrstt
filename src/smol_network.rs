@@ -13,6 +13,10 @@ use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 use crate::NetworkStatus;
 
+/// [`SmolNetwork`] reads and writes to the network based on futures [`AsyncReadExt`] [`AsyncWriteExt`]. 
+/// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
+/// The most import thing to remember is that you have to provide a new stream after the previous failed.
+/// (i.e. you need to reconnect after any expected or unexpected disconnect).
 pub struct SmolNetwork<S> {
     network: Option<SmolStream<S>>,
 
