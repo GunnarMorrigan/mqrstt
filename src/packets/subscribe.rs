@@ -1,7 +1,7 @@
 use super::{
     error::DeserializeError,
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
+    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 use bitflags::bitflags;
 use bytes::{Buf, BufMut};
@@ -172,19 +172,23 @@ impl WireLength for SubscribeProperties {
     }
 }
 
-bitflags! {
-    pub struct SubscriptionOptions: u8 {
-        const MAX_QOS1     = 0b00000001;
-        const MAX_QOS2     = 0b00000010;
-        const RETAIN_AS_PUBLISH = 0b00000100;
-        const RETAIN_HANDLING1  = 0b00001000;
-        const RETAIN_HANDLING2  = 0b00010000;
-    }
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub struct SubscriptionOptions{
+    retain_handling: RetainHandling,
+    retain_as_publish: bool,
+    no_local: bool,
+    qos: QoS,
+
 }
 
 impl Default for SubscriptionOptions {
     fn default() -> Self {
-        Self { bits: 0b00000010 }
+        Self {
+            retain_handling: RetainHandling::ZERO,
+            retain_as_publish: false,
+            no_local: false,
+            qos: QoS::AtMostOnce,
+        }
     }
 }
 
@@ -198,22 +202,19 @@ impl MqttRead for SubscriptionOptions {
             ));
         }
 
-        let options = SubscriptionOptions::from_bits(buf.get_u8())
-            .ok_or(DeserializeError::MalformedPacket)?;
+        let byte = buf.get_u8();
 
-        if options.contains(SubscriptionOptions::MAX_QOS1 | SubscriptionOptions::MAX_QOS2) {
-            return Err(DeserializeError::MalformedPacketWithInfo(
-                "3.8.3.1 Subscription Options, Maximum QoS 1 and 2 enabled at once.".to_string(),
-            ));
-        }
-        if options
-            .contains(SubscriptionOptions::RETAIN_HANDLING1 | SubscriptionOptions::RETAIN_HANDLING2)
-        {
-            return Err(DeserializeError::MalformedPacketWithInfo(
-                "3.8.3.1 Subscription Options, RETAIN_HANDLING 1 and 2 enabled at once."
-                    .to_string(),
-            ));
-        }
+        let retain_handling_part = (byte & 0b00110000) >> 4;
+        let retain_as_publish_part = (byte & 0b00001000) >> 3;
+        let no_local_part= (byte & 0b00000100) >> 2;
+        let qos_part = byte & 0b00000011;
+
+        let options = Self{
+            retain_handling: RetainHandling::from_u8(retain_handling_part)?,
+            retain_as_publish: retain_as_publish_part != 0,
+            no_local: no_local_part != 0,
+            qos: QoS::from_u8(qos_part)?,
+        };
 
         Ok(options)
     }
@@ -221,8 +222,38 @@ impl MqttRead for SubscriptionOptions {
 
 impl MqttWrite for SubscriptionOptions {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        buf.put_u8(self.bits);
+        let byte = (self.retain_handling.into_u8() << 4)
+        | ((self.retain_as_publish as u8) << 3)
+        | ((self.no_local as u8) << 2)
+        | self.qos.into_u8();
+
+        buf.put_u8(byte);
         Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RetainHandling{
+    ZERO,
+    ONE,
+    TWO,
+}
+
+impl RetainHandling{
+    pub fn from_u8(value: u8) -> Result<Self, DeserializeError> {
+        match value {
+            0 => Ok(RetainHandling::ZERO),
+            1 => Ok(RetainHandling::ONE),
+            2 => Ok(RetainHandling::TWO),
+            _ => Err(DeserializeError::MalformedPacket)
+        }
+    }
+    pub fn into_u8(&self) -> u8 {
+        match self {
+            RetainHandling::ZERO => 0,
+            RetainHandling::ONE => 1,
+            RetainHandling::TWO => 2,
+        }
     }
 }
 
@@ -316,33 +347,6 @@ mod tests {
     }
 
     #[test]
-    fn test_read_subscription_option_err() {
-        let mut h = SubscriptionOptions::empty();
-        h |= SubscriptionOptions::MAX_QOS1;
-        h |= SubscriptionOptions::MAX_QOS2;
-        h |= SubscriptionOptions::RETAIN_AS_PUBLISH;
-        h |= SubscriptionOptions::RETAIN_HANDLING1;
-
-        let mut buf = bytes::BytesMut::new();
-        buf.put_u8(h.bits);
-
-        assert!(SubscriptionOptions::read(&mut buf.into()).is_err());
-    }
-
-    #[test]
-    fn test_read_subscription_option_ok() {
-        let mut h = SubscriptionOptions::empty();
-        h |= SubscriptionOptions::MAX_QOS1;
-        h |= SubscriptionOptions::RETAIN_AS_PUBLISH;
-        h |= SubscriptionOptions::RETAIN_HANDLING1;
-
-        let mut buf = bytes::BytesMut::new();
-        buf.put_u8(h.bits);
-
-        assert!(SubscriptionOptions::read(&mut buf.into()).is_ok());
-    }
-
-    #[test]
     fn test_write() {
         let expected_bytes = [
             0x82, 0x0e, 0x00, 0x01, 0x00, 0x00, 0x08, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32,
@@ -352,7 +356,7 @@ mod tests {
         let sub = Subscribe {
             packet_identifier: 1,
             properties: SubscribeProperties::default(),
-            topics: vec![("test/123".to_string(), SubscriptionOptions::empty())],
+            topics: vec![("test/123".to_string(), SubscriptionOptions::default())],
         };
 
         assert_eq!(14, sub.wire_len());
@@ -364,5 +368,11 @@ mod tests {
         packet.write(&mut write_buffer).unwrap();
 
         assert_eq!(expected_bytes.to_vec(), write_buffer.to_vec())
+    }
+
+    #[test]
+    fn test_subscription_options(){
+        let mut buf = Bytes::from_static(&[0b00101110u8]);
+        let a = SubscriptionOptions::read(&mut buf).unwrap();
     }
 }
