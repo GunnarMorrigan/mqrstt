@@ -51,9 +51,17 @@ fn connect_packet() -> Vec<u8>{
 }
 
 
+pub fn subscribe_packet() -> Vec<u8>{
+    vec![0x82, 0x22, 0x82, 0x02, 0x02, 0x0b, 0x7b, 0x00, 0x1a, 0x63, 0x75, 0x2f, 0x39, 0x2e, 0x30, 0x2e,
+    0x31, 0x2f, 0x72, 0x65, 0x70, 0x6c, 0x79, 0x2f, 0x72, 0x65, 0x73, 0x74, 0x61, 0x72, 0x74, 0x74,
+    0x65, 0x73, 0x74, 0x2e]
+}
+
+
 #[rstest]
 #[case(publish_packet_2())]
-// #[case(connect_packet())]
+#[case(connect_packet())]
+#[case(subscribe_packet())]
 fn publish_packet_test(#[case] bytes: Vec<u8>){
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
     let mut write_buffer = BytesMut::new();
@@ -68,7 +76,19 @@ fn publish_packet_test(#[case] bytes: Vec<u8>){
 }
 
 #[test]
-fn test_dirty(){
+fn test_subscribe(){
+    let bytes = subscribe_packet();
+
+    let mut read_buffer = BytesMut::from_iter(bytes.iter());
+    let mut write_buffer = BytesMut::new();
+    let packet = Packet::read_from_buffer(&mut read_buffer).unwrap();
+    // packet.write(&mut write_buffer).unwrap();
+
+    dbg!(packet);
+}
+
+#[test]
+fn test_connect(){
     let bytes = connect_packet();
 
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
