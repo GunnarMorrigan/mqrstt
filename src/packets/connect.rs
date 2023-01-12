@@ -701,23 +701,30 @@ impl WireLength for LastWillProperties {
     fn wire_len(&self) -> usize {
         let mut len: usize = 0;
 
-        len += self.delay_interval.map_or(0, |_| 5);
-        len += self.payload_format_indicator.map_or(0, |_| 2);
-        len += self.message_expiry_interval.map_or(0, |_| 5);
+        if self.delay_interval.is_some(){
+            len += 5;
+        }
+        if self.payload_format_indicator.is_some(){
+            len += 2;
+        }
+        if self.message_expiry_interval.is_some(){
+            len += 5;
+        }
+        // +1 for the property type 
         len += self
             .content_type
             .as_ref()
-            .map_or_else(|| 0, |s| s.wire_len());
+            .map_or_else(|| 0, |s| s.wire_len() + 1);
         len += self
             .response_topic
             .as_ref()
-            .map_or_else(|| 0, |s| s.wire_len());
+            .map_or_else(|| 0, |s| s.wire_len() + 1);
         len += self
             .correlation_data
             .as_ref()
-            .map_or_else(|| 0, |b| b.wire_len());
+            .map_or_else(|| 0, |b| b.wire_len() + 1);
         for (key, value) in &self.user_properties {
-            len += key.wire_len() + value.wire_len();
+            len += key.wire_len() + value.wire_len() + 1;
         }
 
         len
