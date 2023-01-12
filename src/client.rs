@@ -282,7 +282,7 @@ mod tests{
         }
         else{
             // To make sure we did the if branch
-            assert!(false);
+            unreachable!();
         }
 
     }
@@ -300,7 +300,7 @@ mod tests{
         }
         else{
             // To make sure we did the if branch
-            assert!(false);
+            unreachable!();
         }
     }
 
@@ -317,7 +317,7 @@ mod tests{
         }
         else{
             // To make sure we did the if branch
-            assert!(false);
+            unreachable!();
         }
     }
 
@@ -337,7 +337,7 @@ mod tests{
         }
         else{
             // To make sure we did the if branch
-            assert!(false);
+            unreachable!();
         }
     }
 }
