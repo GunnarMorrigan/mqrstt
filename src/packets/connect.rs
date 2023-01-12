@@ -785,7 +785,7 @@ mod tests {
             b'T',
             b'T',
             0x05,
-            0b1100_1110, // Connect Flags, username, password, will retain=false, will qos=1, last_will, clean_session
+            0b1100_1110, // Connect Flags, username, password, will retain=false, will qos=1, last_will, clean_start
             0x00,        // Keep alive = 10 sec
             0x0a,
             0x00, // Length of Connect properties
