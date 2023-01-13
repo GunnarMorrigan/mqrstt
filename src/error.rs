@@ -8,6 +8,7 @@ use crate::packets::{
     {Packet, PacketType},
 };
 
+/// Errors that the [`mqrstt::EventHandler`] can emit
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum MqttError {
     #[error("Missing Packet ID")]
@@ -29,6 +30,7 @@ pub enum MqttError {
     Unsolicited(u16, PacketType),
 }
 
+/// Errors producable by the [`mqrstt::AsyncClient`]
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ClientError {
     #[error("One of more of the internal handler channels are closed")]
@@ -38,7 +40,7 @@ pub enum ClientError {
     NoNetwork,
 }
 
-/// Critical errors during eventloop polling
+/// Critical errors that can happen during the operation of the entire client
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
     #[error("No network connection")]
@@ -85,27 +87,4 @@ impl From<SendError<Packet>> for ReadBytes<ConnectionError> {
     fn from(value: SendError<Packet>) -> Self {
         ReadBytes::Err(value.into())
     }
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum TlsError {
-    #[error("There is no or an incorrect TLS configuration for the requested TLS connection")]
-    NoTlsConfig,
-
-    #[error("Io error")]
-    TlsIoError(#[from] io::Error),
-
-    #[error("Could no construct a valid root certificate")]
-    NoValidRootCertInChain,
-
-    #[error("Could not construct a valid private key")]
-    NoValidPrivateKey,
-
-    #[cfg(any(feature = "tokio-rustls", feature = "smol-rustls"))]
-    #[error("{0}")]
-    RustlsError(#[from] rustls::Error),
-
-    #[cfg(any(feature = "tokio-rustls", feature = "smol-rustls"))]
-    #[error("{0}")]
-    RustlsInvalidDnsNameError(#[from] rustls::client::InvalidDnsNameError),
 }
