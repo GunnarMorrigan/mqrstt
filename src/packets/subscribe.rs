@@ -370,6 +370,6 @@ mod tests {
     #[test]
     fn test_subscription_options() {
         let mut buf = Bytes::from_static(&[0b00101110u8]);
-        let a = SubscriptionOptions::read(&mut buf).unwrap();
+        let _ = SubscriptionOptions::read(&mut buf).unwrap();
     }
 }

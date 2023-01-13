@@ -29,8 +29,8 @@
 //! Smol example:
 //! ```
 //! use mqrstt::{
-//!     client::AsyncClient,
-//!     connect_options::ConnectOptions,
+//!     AsyncClient,
+//!     ConnectOptions,
 //!     new_smol,
 //!     packets::{self, Packet},
 //!     AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
@@ -95,7 +95,7 @@
 //!             }
 //!         },
 //!         async {
-//!             smol::Timer::after(std::time::Duration::from_secs(60)).await;
+//!             smol::Timer::after(std::time::Duration::from_secs(30)).await;
 //!             client.disconnect().await.unwrap();
 //!         }
 //!     );
@@ -142,36 +142,42 @@
 //!         }
 //!     },
 //!     async {
-//!         tokio::time::sleep(Duration::from_secs(60)).await;
+//!         tokio::time::sleep(Duration::from_secs(30)).await;
 //!         client.disconnect().await.unwrap();
 //!     }
 //! );
 //! ```
 
-use client::AsyncClient;
-use connect_options::ConnectOptions;
-
-use event_handler::EventHandlerTask;
-
 use packets::Packet;
 use smol_network::SmolNetwork;
 
 mod available_packet_ids;
-pub mod client;
-pub mod connect_options;
+mod client;
+mod connect_options;
 pub mod connections;
 pub mod error;
-pub mod event_handler;
+mod mqtt_handler;
 pub mod packets;
 
 #[cfg(feature = "smol")]
-pub mod smol_network;
+mod smol_network;
+#[cfg(feature = "smol")]
+pub use smol_network::*;
+
 #[cfg(feature = "tokio")]
-pub mod tokio_network;
+mod tokio_network;
+#[cfg(feature = "tokio")]
+pub use tokio_network::*;
 
 pub mod state;
 
 mod util;
+
+pub use client::AsyncClient;
+pub use connect_options::ConnectOptions;
+pub use mqtt_handler::MqttHandler;
+
+
 
 #[cfg(test)]
 pub mod tests;
@@ -219,7 +225,7 @@ pub trait EventHandler {
 
 #[cfg(feature = "smol")]
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
-pub fn new_smol<S>(options: ConnectOptions) -> (SmolNetwork<S>, EventHandlerTask, AsyncClient)
+pub fn new_smol<S>(options: ConnectOptions) -> (SmolNetwork<S>, MqttHandler, AsyncClient)
 where
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
@@ -230,7 +236,7 @@ where
     let (client_to_handler_s, client_to_handler_r) =
         async_channel::bounded(receive_maximum as usize);
 
-    let (handler, packet_ids) = EventHandlerTask::new(
+    let (handler, packet_ids) = MqttHandler::new(
         &options,
         network_to_handler_r,
         to_network_s.clone(),
@@ -250,7 +256,7 @@ pub fn new_tokio<S>(
     options: ConnectOptions,
 ) -> (
     tokio_network::TokioNetwork<S>,
-    EventHandlerTask,
+    MqttHandler,
     AsyncClient,
 )
 where
@@ -263,7 +269,7 @@ where
     let (client_to_handler_s, client_to_handler_r) =
         async_channel::bounded(receive_maximum as usize);
 
-    let (handler, packet_ids) = EventHandlerTask::new(
+    let (handler, packet_ids) = MqttHandler::new(
         &options,
         network_to_handler_r,
         to_network_s.clone(),
@@ -283,10 +289,10 @@ mod lib_test {
     use std::time::Duration;
 
     use crate::{
-        client::AsyncClient,
-        connect_options::ConnectOptions,
+        AsyncClient,
+        ConnectOptions,
         new_smol, new_tokio,
-        packets::{self, Packet},
+        packets::{self, Packet, QoS},
         tests::tls::tests::simple_rust_tls,
         AsyncEventHandlerMut, HandlerStatus, NetworkStatus,
     };
@@ -467,6 +473,13 @@ mod lib_test {
                 }
             },
             async {
+                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
+                client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
+                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+
+                client.unsubscribe("mqrstt").await.unwrap();
+
                 tokio::time::sleep(Duration::from_secs(30)).await;
                 client.disconnect().await.unwrap();
             }
