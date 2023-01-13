@@ -25,7 +25,7 @@ use tracing::error;
 use tracing::debug;
 
 /// Eventloop with all the state of a connection
-pub struct EventHandlerTask {
+pub struct MqttHandler {
     state: State,
 
     network_receiver: Receiver<Packet>,
@@ -37,11 +37,9 @@ pub struct EventHandlerTask {
     disconnect: bool,
 }
 
-impl EventHandlerTask {
-    /// New MQTT `EventLoop`
-    ///
-    /// When connection encounters critical errors (like auth failure), user has a choice to
-    /// access and update `options`, `state` and `requests`.
+/// [`MqttHandler`] is used to properly handle incoming and outgoing packets according to the MQTT specifications.
+/// Only the incoming messages are shown to the user via the user provided handler.
+impl MqttHandler {
     pub(crate) fn new(
         options: &ConnectOptions,
         network_receiver: Receiver<Packet>,
@@ -50,7 +48,7 @@ impl EventHandlerTask {
     ) -> (Self, Receiver<u16>) {
         let (state, packet_id_channel) = State::new(options.receive_maximum());
 
-        let task = EventHandlerTask {
+        let task = MqttHandler {
             state,
 
             network_receiver,
@@ -441,8 +439,8 @@ mod handler_tests {
     use async_channel::{Receiver, Sender};
 
     use crate::{
-        connect_options::ConnectOptions,
-        event_handler::EventHandlerTask,
+        ConnectOptions,
+        MqttHandler,
         packets::{
             reason_codes::{
                 PubCompReasonCode, PubRecReasonCode, PubRelReasonCode, SubAckReasonCode,
@@ -464,7 +462,7 @@ mod handler_tests {
     }
 
     fn handler() -> (
-        EventHandlerTask,
+        MqttHandler,
         Receiver<Packet>,
         Sender<Packet>,
         Sender<Packet>,
@@ -475,7 +473,7 @@ mod handler_tests {
         let (network_to_handler_s, network_to_handler_r) = async_channel::bounded(100);
         let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
 
-        let (handler, _apkid) = EventHandlerTask::new(
+        let (handler, _apkid) = MqttHandler::new(
             &opt,
             network_to_handler_r,
             to_network_s,
