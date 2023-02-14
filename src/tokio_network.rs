@@ -2,6 +2,8 @@ use async_channel::{Receiver, Sender};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::{Duration, Instant};
 
 use crate::connect_options::ConnectOptions;
@@ -10,7 +12,7 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::NetworkStatus;
+use crate::{NetworkStatus, MqttHandler};
 
 /// [`TokioNetwork`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`]. 
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
@@ -22,11 +24,12 @@ pub struct TokioNetwork<S> {
     /// Options of the current mqtt connection
     options: ConnectOptions,
 
+    connected: Arc<AtomicBool>,
     last_network_action: Instant,
     await_pingresp: Option<Instant>,
     perform_keep_alive: bool,
 
-    network_to_handler_s: Sender<Packet>,
+    mqtt_handler: MqttHandler,
 
     to_network_r: Receiver<Packet>,
 }
@@ -39,35 +42,55 @@ where
         options: ConnectOptions,
         network_to_handler_s: Sender<Packet>,
         to_network_r: Receiver<Packet>,
+        connected: Arc<AtomicBool>,
     ) -> Self {
+
+        let (mqtt_handler, apkid) = MqttHandler::new(&options);
         Self {
             network: None,
 
             options,
 
+            connected,
             last_network_action: Instant::now(),
             await_pingresp: None,
             perform_keep_alive: true,
 
-            network_to_handler_s,
+            mqtt_handler,
+
             to_network_r,
         }
     }
 
-    pub fn reset(&mut self) {
-        self.network = None;
-    }
 
+    /// There is a possibility that when a disconnect and connect (aka reconnect) occurs that there are
+    /// still messages in the channel that were supposed to be send on the previous connection.
     pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
         let (network, connack) = TokioStream::connect(&self.options, stream).await?;
 
         self.network = Some(network);
-        self.network_to_handler_s.send(connack).await?;
+
+        
+        // self.network_to_handler_s.send(connack).await?;
+
         self.last_network_action = Instant::now();
         if self.options.keep_alive_interval_s == 0 {
             self.perform_keep_alive = false;
         }
+        self.clear_channels().await;
         Ok(())
+    }
+
+    async fn clear_channels(&mut self){
+        match self.to_network_r.try_recv() {
+            Ok(packet) => {
+                match packet{
+                    Packet::ConnAck(_) => todo!(),
+                    _ => (),
+                }
+            },
+            Err(_) => {},
+        }
     }
 
     pub async fn run(&mut self) -> Result<NetworkStatus, ConnectionError> {
@@ -78,7 +101,11 @@ where
         match self.select().await {
             Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
             otherwise => {
-                self.reset();
+                
+                self.connected.store(false, Ordering::Release);
+                self.network = None;
+                self.await_pingresp = None;
+
                 otherwise
             }
         }
@@ -87,11 +114,12 @@ where
     async fn select(&mut self) -> Result<NetworkStatus, ConnectionError> {
         let TokioNetwork {
             network,
-            options: _,
+            options,
+            connected,
             last_network_action,
             await_pingresp,
             perform_keep_alive,
-            network_to_handler_s,
+            mqtt_handler,
             to_network_r,
         } = self;
 
@@ -108,19 +136,16 @@ where
             loop {
                 tokio::select! {
                     _ = stream.read_bytes() => {
-                        match stream.parse_messages(network_to_handler_s).await {
+                        match stream.parse_message().await {
                             Err(ReadBytes::Err(err)) => return Err(err),
                             Err(ReadBytes::InsufficientBytes(_)) => continue,
-                            Ok(Some(PacketType::PingResp)) => {
+                            Ok(Packet::PingResp) => {
                                 *await_pingresp = None;
                                 return Ok(NetworkStatus::Active)
                             },
-                            Ok(Some(PacketType::Disconnect)) => {
-                                return Ok(NetworkStatus::IncomingDisconnect)
+                            Ok(packet) => {
+                                mqtt_handler.handle_incoming_packet();
                             },
-                            Ok(_) => {
-                                return Ok(NetworkStatus::Active)
-                            }
                         };
                     },
                     outgoing = to_network_r.recv() => {

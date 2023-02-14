@@ -70,7 +70,7 @@ where
             }
             let (header, header_length) = FixedHeader::read_fixed_header(self.buffer.iter())?;
 
-            if header.remaining_length > self.buffer.len() {
+            if header.remaining_length + header_length > self.buffer.len() {
                 return Err(ReadBytes::InsufficientBytes(
                     header.remaining_length - self.buffer.len(),
                 ));

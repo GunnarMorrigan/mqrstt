@@ -136,9 +136,21 @@ let (n, h, _) = tokio::join!(
 );
 ```
 
+## FAQ
+
+ - Why are there no implementations for TLS connections?
+   Many examples of creating TLS streams in rust exist with the crates [`async-rustls`](https://crates.io/crates/async-rustls) and [`tokio-rustls`](https://crates.io/crates/tokio-rustls). The focus of this crate is `MQTTv5` and providing a runtime free choice.  
+  
+- What are the advantages over [`rumqttc`](https://crates.io/crates/rumqttc)?
+  - Handling of messages by user before acknowledgement.
+  - Ping req depending on communication
+  - No `rumqttc` packet id collision errors (It is not possible with `rumqtts`).
+  - Runtime agnositc 
+
+ - Please ask :)
+
 ## Important notes:
  - Handlers only get incoming packets.
-
 
 ## Size
 With the smol runtime you can create very small binaries. A simple PingPong smol TCP client can be had for 550\~KB and with TLS you are looking at 1.5\~ MB using the following flags. This makes `mqrstt` extremely usefull for embedded devices! :)

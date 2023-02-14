@@ -14,26 +14,21 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub struct AsyncClient {
-    // Provides this client with an available packet id or waits on it.
+    /// Provides this client with an available packet id or waits on it.
     available_packet_ids: Receiver<u16>,
 
-    // Sends Publish, Subscribe, Unsubscribe to the event handler to handle later.
+    /// Sends Publish, Subscribe, Unsubscribe to the event handler to handle later.
     client_to_handler_s: Sender<Packet>,
-
-    // Sends Publish with QoS 0
-    to_network_s: Sender<Packet>,
 }
 
 impl AsyncClient {
     pub fn new(
         available_packet_ids: Receiver<u16>,
         client_to_handler_s: Sender<Packet>,
-        to_network_s: Sender<Packet>,
     ) -> Self {
         Self {
             available_packet_ids,
             client_to_handler_s,
-            to_network_s,
         }
     }
 
@@ -103,25 +98,14 @@ impl AsyncClient {
             publish_properties: PublishProperties::default(),
             payload: payload.into(),
         };
-        if qos == QoS::AtMostOnce {
-            self.to_network_s
-                .send(Packet::Publish(publish))
-                .await
-                .map_err(|_| ClientError::NoHandler)?;
-            info!(
-                "Published message into network_packet_sender. len {}",
-                self.to_network_s.len()
-            );
-        } else {
-            self.client_to_handler_s
-                .send(Packet::Publish(publish))
-                .await
-                .map_err(|_| ClientError::NoHandler)?;
-            info!(
-                "Published message into handler_packet_sender: len {}",
-                self.client_to_handler_s.len()
-            );
-        }
+        self.client_to_handler_s
+            .send(Packet::Publish(publish))
+            .await
+            .map_err(|_| ClientError::NoHandler)?;
+        info!(
+            "Published message into handler_packet_sender: len {}",
+            self.client_to_handler_s.len()
+        );
         Ok(())
     }
 
@@ -151,17 +135,10 @@ impl AsyncClient {
             publish_properties: properties,
             payload: payload.into(),
         };
-        if qos == QoS::AtMostOnce {
-            self.to_network_s
-                .send(Packet::Publish(publish))
-                .await
-                .map_err(|_| ClientError::NoHandler)?;
-        } else {
-            self.client_to_handler_s
-                .send(Packet::Publish(publish))
-                .await
-                .map_err(|_| ClientError::NoHandler)?;
-        }
+        self.client_to_handler_s
+            .send(Packet::Publish(publish))
+            .await
+            .map_err(|_| ClientError::NoHandler)?;
         Ok(())
     }
 
@@ -256,9 +233,9 @@ mod tests {
         }
 
         let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
-        let (to_network_s, to_network_r) = async_channel::bounded(100);
+        let (_, to_network_r) = async_channel::bounded(100);
 
-        let client = AsyncClient::new(r, client_to_handler_s, to_network_s);
+        let client = AsyncClient::new(r, client_to_handler_s);
 
         (client, client_to_handler_r, to_network_r)
     }

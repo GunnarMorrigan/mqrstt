@@ -1,7 +1,10 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+
 use crate::connect_options::ConnectOptions;
 use crate::error::MqttError;
 use crate::packets::reason_codes::{PubAckReasonCode, PubRecReasonCode};
-use crate::packets::Disconnect;
+use crate::packets::{Disconnect, ConnAck};
 use crate::packets::PubComp;
 use crate::packets::PubRec;
 use crate::packets::PubRel;
@@ -16,10 +19,8 @@ use crate::packets::{PubAck, PubAckProperties};
 use crate::state::State;
 use crate::{AsyncEventHandler, AsyncEventHandlerMut, HandlerStatus};
 
-use futures::FutureExt;
-
-use async_channel::{Receiver, Sender};
-use tracing::error;
+use async_channel::{Receiver, Sender, RecvError};
+use tracing::{error, warn};
 
 #[cfg(test)]
 use tracing::debug;
@@ -28,13 +29,7 @@ use tracing::debug;
 pub struct MqttHandler {
     state: State,
 
-    network_receiver: Receiver<Packet>,
-
-    network_sender: Sender<Packet>,
-
-    client_to_handler_r: Receiver<Packet>,
-
-    disconnect: bool,
+    clean_start: bool,
 }
 
 /// [`MqttHandler`] is used to properly handle incoming and outgoing packets according to the MQTT specifications.
@@ -42,118 +37,112 @@ pub struct MqttHandler {
 impl MqttHandler {
     pub(crate) fn new(
         options: &ConnectOptions,
-        network_receiver: Receiver<Packet>,
-        network_sender: Sender<Packet>,
-        client_to_handler_r: Receiver<Packet>,
     ) -> (Self, Receiver<u16>) {
         let (state, packet_id_channel) = State::new(options.receive_maximum());
 
-        let task = MqttHandler {
+        let handler = MqttHandler {
             state,
 
-            network_receiver,
-            network_sender,
-
-            client_to_handler_r,
-
-            disconnect: false,
+            clean_start: options.clean_start,
         };
-        (task, packet_id_channel)
+        (handler, packet_id_channel)
     }
 
-    // pub fn sync_handle<H: EventHandler>(&self, handler: &mut H) -> Result<(), MqttError> {
-    // 	match self.network_receiver.try_recv() {
-    // 		Ok(event) => {
-    // 			handler.handle(&event);
-    // 		}
-    // 		Err(err) => {
-    // 			if err.is_closed() {
-    // 				return Err(MqttError::IncomingNetworkChannelClosed);
-    // 			}
-    // 		}
-    // 	}
-    // 	match self.client_to_handler_r.try_recv() {
-    // 		Ok(_) => {}
-    // 		Err(err) => {
-    // 			if err.is_closed() {
-    // 				return Err(MqttError::IncomingNetworkChannelClosed);
-    // 			}
-    // 		}
-    // 	}
-    // 	Ok(())
+    // pub async fn handle<H>(&mut self, handler: &H) -> Result<HandlerStatus, MqttError>
+    // where
+    //     H: AsyncEventHandler,
+    // {
+    //     if self.connected.load(Ordering::Acquire){
+    //         futures::select! {
+    //             incoming = self.network_receiver.recv().fuse() => {
+    //                 return self.incoming_select_branch(incoming, handler).await;
+    //             },
+    //             outgoing = self.client_to_handler_r.recv().fuse() => {
+    //                 return self.outgoing_select_branch(outgoing).await;
+    //             }
+    //         }
+    //     }
+    //     else{
+    //         let incoming = self.network_receiver.recv().await;
+    //         return self.incoming_select_branch(incoming, handler).await;
+    //     }
     // }
 
-    pub async fn handle<H>(&mut self, handler: &H) -> Result<HandlerStatus, MqttError>
-    where
-        H: AsyncEventHandler,
-    {
-        futures::select! {
-            incoming = self.network_receiver.recv().fuse() => {
-                match incoming {
-                    Ok(event) => {
-                        // debug!("Event Handler, handling incoming packet: {}", event);
-                        handler.handle(&event).await;
-                        self.handle_incoming_packet(event).await?;
-                    }
-                    Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
-                }
-                if self.disconnect {
-                    self.disconnect = true;
-                    return Ok(HandlerStatus::IncomingDisconnect);
-                }
-            },
-            outgoing = self.client_to_handler_r.recv().fuse() => {
-                match outgoing {
-                    Ok(event) => {
-                        // debug!("Event Handler, handling outgoing packet: {}", event);
-                        self.handle_outgoing_packet(event).await?
-                    }
-                    Err(_) => return Err(MqttError::ClientChannelClosed),
-                }
-                if self.disconnect {
-                    self.disconnect = true;
-                    return Ok(HandlerStatus::OutgoingDisconnect);
-                }
-            }
-        }
-        Ok(HandlerStatus::Active)
-    }
+    // pub async fn handle_mut<H>(&mut self, handler: &mut H) -> Result<HandlerStatus, MqttError>
+    // where
+    //     H: AsyncEventHandlerMut,
+    // {
+    //     futures::select! {
+    //         incoming = self.network_receiver.recv().fuse() => {
+    //             match incoming {
+    //                 Ok(event) => {
+    //                     // debug!("Event Handler, handling incoming packet: {}", event);
+    //                     let mut handle = true;
+    //                     if let Packet::Publish(p) = &event {
+    //                         if p.qos == QoS::ExactlyOnce && p.dup {
+    //                             handle = false;
+    //                         }
+    //                     }
+    //                     if handle {
+    //                         handler.handle(&event).await;
+    //                     }
+    //                     self.handle_incoming_packet(event).await?;
+    //                 }
+    //                 Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
+    //             }
+    //             if self.disconnect {
+    //                 self.disconnect = true;
+    //                 return Ok(HandlerStatus::IncomingDisconnect);
+    //             }
+    //         },
+    //         outgoing = self.client_to_handler_r.recv().fuse() => {
+    //             return self.outgoing_select_branch(outgoing).await;
+    //         }
+    //     }
+    //     Ok(HandlerStatus::Active)
+    // }
 
-    pub async fn handle_mut<H>(&mut self, handler: &mut H) -> Result<HandlerStatus, MqttError>
-    where
-        H: AsyncEventHandlerMut,
-    {
-        futures::select! {
-            incoming = self.network_receiver.recv().fuse() => {
-                match incoming {
-                    Ok(event) => {
-                        // debug!("Event Handler, handling incoming packet: {}", event);
-                        handler.handle(&event).await;
-                        self.handle_incoming_packet(event).await?;
-                    }
-                    Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
-                }
-                if self.disconnect {
-                    self.disconnect = true;
-                    return Ok(HandlerStatus::IncomingDisconnect);
-                }
-            },
-            outgoing = self.client_to_handler_r.recv().fuse() => {
-                match outgoing {
-                    Ok(event) => {
-                        // debug!("Event Handler, handling outgoing packet: {}", event);
-                        self.handle_outgoing_packet(event).await?
-                    }
-                    Err(_) => return Err(MqttError::ClientChannelClosed),
-                }
-                if self.disconnect {
-                    self.disconnect = true;
-                    return Ok(HandlerStatus::OutgoingDisconnect);
-                }
-            }
-        }
-        Ok(HandlerStatus::Active)
-    }
+
+    // async fn incoming_select_branch<H>(&mut self, incoming: Result<Packet, RecvError>, handler: &H) -> Result<HandlerStatus, MqttError>
+    // where
+    //     H: AsyncEventHandler,
+    // {
+    //     match incoming {
+    //         Ok(event) => {
+    //             let mut handle = true;
+    //             if let Packet::Publish(p) = &event {
+    //                 if p.qos == QoS::ExactlyOnce && p.dup {
+    //                     handle = false;
+    //                 }
+    //             }
+    //             if handle {
+    //                 handler.handle(&event).await;
+    //             }
+    //             self.handle_incoming_packet(event).await?;
+    //         }
+    //         Err(_) => return Err(MqttError::IncomingNetworkChannelClosed),
+    //     }
+    //     if self.disconnect {
+    //         self.disconnect = true;
+    //         return Ok(HandlerStatus::IncomingDisconnect);
+    //     }
+    //     Ok(HandlerStatus::Active)
+    // }
+
+    // async fn outgoing_select_branch(&mut self, outgoing: Result<Packet, RecvError>) -> Result<HandlerStatus, MqttError>{
+    //     match outgoing {
+    //         Ok(event) => {
+    //             // debug!("Event Handler, handling outgoing packet: {}", event);
+    //             self.handle_outgoing_packet(event).await?
+    //         }
+    //         Err(_) => return Err(MqttError::ClientChannelClosed),
+    //     }
+    //     if self.disconnect {
+    //         self.disconnect = true;
+    //         return Ok(HandlerStatus::OutgoingDisconnect);
+    //     }
+    //     Ok(HandlerStatus::Active)
+    // }
 
     async fn handle_incoming_packet(&mut self, packet: Packet) -> Result<(), MqttError> {
         match packet {
@@ -165,10 +154,8 @@ impl MqttHandler {
             Packet::SubAck(suback) => self.handle_incoming_suback(suback).await?,
             Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback).await?,
             Packet::PingResp => (),
-            Packet::ConnAck(_) => (),
-            Packet::Disconnect(_) => {
-                self.disconnect = true;
-            }
+            Packet::ConnAck(connack) => self.handle_incoming_connack(connack).await?,
+            Packet::Disconnect(disconnect) => self.handle_incoming_disconnect(disconnect).await?,
             a => unreachable!("Should not receive {}", a),
         };
         Ok(())
@@ -193,7 +180,7 @@ impl MqttHandler {
                     .packet_identifier
                     .ok_or(MqttError::MissingPacketId)?;
                 if !self.state.incoming_pub.insert(pkid) && !publish.dup {
-                    error!(
+                    warn!(
                         "Received publish with an packet ID ({}) that is in use and the packet was not a duplicate",
                         pkid,
                     );
@@ -219,10 +206,7 @@ impl MqttHandler {
                 "Publish {:?} has been acknowledged",
                 puback.packet_identifier
             );
-            self.state
-                .apkid
-                .mark_available(puback.packet_identifier)
-                .await?;
+            self.state.make_pkid_available(puback.packet_identifier)?;
             Ok(())
         } else {
             error!(
@@ -272,9 +256,7 @@ impl MqttHandler {
     async fn handle_incoming_pubcomp(&mut self, pubcomp: &PubComp) -> Result<(), MqttError> {
         if self.state.outgoing_rel.remove(&pubcomp.packet_identifier) {
             self.state
-                .apkid
-                .mark_available(pubcomp.packet_identifier)
-                .await?;
+                .make_pkid_available(pubcomp.packet_identifier)?;
             Ok(())
         } else {
             error!(
@@ -296,9 +278,7 @@ impl MqttHandler {
             .is_some()
         {
             self.state
-                .apkid
-                .mark_available(suback.packet_identifier)
-                .await?;
+                .make_pkid_available(suback.packet_identifier)?;
             Ok(())
         } else {
             error!(
@@ -320,9 +300,7 @@ impl MqttHandler {
             .is_some()
         {
             self.state
-                .apkid
-                .mark_available(unsuback.packet_identifier)
-                .await?;
+                .make_pkid_available(unsuback.packet_identifier)?;
             Ok(())
         } else {
             error!(
@@ -336,6 +314,24 @@ impl MqttHandler {
         }
     }
 
+    async fn handle_incoming_connack(&mut self, packet: ConnAck) -> Result<(), MqttError> {
+        
+        if packet.connack_flags.session_present && !self.clean_start {
+            // self.state.outgoing_pub.
+        }
+        else{
+        }
+        self.state.incoming_pub.clear();
+
+        todo!()
+    }
+
+
+    async fn handle_incoming_disconnect(&mut self, packet: Disconnect) -> Result<(), MqttError> {
+        self.disconnect = true;
+        Ok(())
+    }
+    
     async fn handle_outgoing_packet(&mut self, packet: Packet) -> Result<(), MqttError> {
         match packet {
             Packet::Publish(publish) => self.handle_outgoing_publish(publish).await,

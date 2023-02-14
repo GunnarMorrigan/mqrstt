@@ -57,6 +57,21 @@ where
         }
     }
 
+    pub async fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>>{
+        let (header, header_length) = FixedHeader::read_fixed_header(self.buffer.iter())?;
+
+        if header.remaining_length + header_length > self.buffer.len() {
+            return Err(ReadBytes::InsufficientBytes(
+                header.remaining_length - self.buffer.len(),
+            ));
+        }
+
+        self.buffer.advance(header_length);
+
+        let buf = self.buffer.split_to(header.remaining_length);
+        Ok(Packet::read(header, buf.into())?)
+    }
+
     pub async fn parse_messages(
         &mut self,
         incoming_packet_sender: &async_channel::Sender<Packet>,
@@ -68,7 +83,7 @@ where
             }
             let (header, header_length) = FixedHeader::read_fixed_header(self.buffer.iter())?;
 
-            if header.remaining_length > self.buffer.len() {
+            if header.remaining_length + header_length > self.buffer.len() {
                 return Err(ReadBytes::InsufficientBytes(
                     header.remaining_length - self.buffer.len(),
                 ));
