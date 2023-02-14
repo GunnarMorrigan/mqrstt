@@ -143,8 +143,11 @@ where
                                 *await_pingresp = None;
                                 return Ok(NetworkStatus::Active)
                             },
+
+                            todo!
+
                             Ok(packet) => {
-                                mqtt_handler.handle_incoming_packet();
+                                mqtt_handler.handle_incoming_packet()
                             },
                         };
                     },
