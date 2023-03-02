@@ -4,8 +4,7 @@ use rstest::*;
 
 use crate::packets::{
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
-    Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties,
-    QoS, Subscribe, Subscription,
+    ConnAck, Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties, QoS, Subscribe, Subscription, Unsubscribe,
 };
 
 fn publish_packet_1() -> Packet {
@@ -96,12 +95,12 @@ pub fn create_subscribe_packet(packet_identifier: u16) -> Packet {
     Packet::Subscribe(sub)
 }
 
-pub fn create_publish_packet(
-    qos: QoS,
-    dup: bool,
-    retain: bool,
-    packet_identifier: Option<u16>,
-) -> Packet {
+pub fn create_unsubscribe_packet(packet_identifier: u16) -> Packet {
+    let sub = Unsubscribe::new(packet_identifier, vec!["test/topic".to_string()]);
+    Packet::Unsubscribe(sub)
+}
+
+pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifier: Option<u16>) -> Packet {
     Packet::Publish(Publish {
         dup,
         qos,
@@ -128,6 +127,13 @@ pub fn create_puback_packet(packet_identifier: u16) -> Packet {
         reason_code: PubAckReasonCode::Success,
         properties: PubAckProperties::default(),
     })
+}
+
+pub fn create_connack_packet(session_present: bool) -> Packet {
+    let mut connack = ConnAck::default();
+    connack.connack_flags.session_present = session_present;
+
+    Packet::ConnAck(connack)
 }
 
 pub fn create_disconnect_packet() -> Packet {

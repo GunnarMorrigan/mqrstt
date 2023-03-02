@@ -19,11 +19,7 @@ pub struct SubAck {
 }
 
 impl VariableHeaderRead for SubAck {
-    fn read(
-        _: u8,
-        _: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubAckProperties::read(&mut buf)?;
         let mut reason_codes = vec![];
@@ -78,11 +74,7 @@ impl MqttRead for SubAckProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "SubAckProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("SubAckProperties".to_string(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);
@@ -95,16 +87,11 @@ impl MqttRead for SubAckProperties {
 
                         properties.subscription_id = Some(subscription_id);
                     } else {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::SubscriptionIdentifier,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifier));
                     }
                 }
                 PropertyType::UserProperty => {
-                    properties.user_properties.push((
-                        String::read(&mut properties_data)?,
-                        String::read(&mut properties_data)?,
-                    ));
+                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
                 }
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::SubAck)),
             }

@@ -1,9 +1,9 @@
 #[cfg(all(feature = "quic"))]
 pub mod quic;
-#[cfg(feature = "smol")]
-pub mod smol_stream;
-#[cfg(feature = "tokio")]
-pub mod tokio_stream;
+// #[cfg(feature = "smol")]
+pub mod smol;
+// #[cfg(feature = "tokio")]
+pub mod tokio;
 
 use crate::connect_options::ConnectOptions;
 use crate::packets::Connect;

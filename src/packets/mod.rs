@@ -163,11 +163,7 @@ impl MqttRead for Bytes {
         let len = buf.get_u16() as usize;
 
         if len > buf.len() {
-            return Err(DeserializeError::InsufficientData(
-                "Bytes".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("Bytes".to_string(), buf.len(), len));
         }
 
         Ok(buf.split_to(len))
@@ -228,11 +224,7 @@ impl MqttRead for u8 {
 impl MqttRead for u16 {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 2 {
-            return Err(DeserializeError::InsufficientData(
-                "u16".to_string(),
-                buf.len(),
-                2,
-            ));
+            return Err(DeserializeError::InsufficientData("u16".to_string(), buf.len(), 2));
         }
         Ok(buf.get_u16())
     }
@@ -241,19 +233,13 @@ impl MqttRead for u16 {
 impl MqttRead for u32 {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 4 {
-            return Err(DeserializeError::InsufficientData(
-                "u32".to_string(),
-                buf.len(),
-                4,
-            ));
+            return Err(DeserializeError::InsufficientData("u32".to_string(), buf.len(), 4));
         }
         Ok(buf.get_u32())
     }
 }
 
-pub fn read_fixed_header_rem_len(
-    mut buf: Iter<u8>,
-) -> Result<(usize, usize), ReadBytes<DeserializeError>> {
+pub fn read_fixed_header_rem_len(mut buf: Iter<u8>) -> Result<(usize, usize), ReadBytes<DeserializeError>> {
     let mut integer = 0;
     let mut length = 0;
 
@@ -359,11 +345,7 @@ pub enum PropertyType {
 impl MqttRead for PropertyType {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "PropertyType".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("PropertyType".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -631,51 +613,21 @@ impl Packet {
 
     pub fn read(header: FixedHeader, buf: Bytes) -> Result<Packet, DeserializeError> {
         let packet = match header.packet_type {
-            PacketType::Connect => {
-                Packet::Connect(Connect::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::ConnAck => {
-                Packet::ConnAck(ConnAck::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::Publish => {
-                Packet::Publish(Publish::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::PubAck => {
-                Packet::PubAck(PubAck::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::PubRec => {
-                Packet::PubRec(PubRec::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::PubRel => {
-                Packet::PubRel(PubRel::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::PubComp => {
-                Packet::PubComp(PubComp::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::Subscribe => {
-                Packet::Subscribe(Subscribe::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::SubAck => {
-                Packet::SubAck(SubAck::read(header.flags, header.remaining_length, buf)?)
-            }
-            PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::read(
-                header.flags,
-                header.remaining_length,
-                buf,
-            )?),
-            PacketType::UnsubAck => {
-                Packet::UnsubAck(UnsubAck::read(header.flags, header.remaining_length, buf)?)
-            }
+            PacketType::Connect => Packet::Connect(Connect::read(header.flags, header.remaining_length, buf)?),
+            PacketType::ConnAck => Packet::ConnAck(ConnAck::read(header.flags, header.remaining_length, buf)?),
+            PacketType::Publish => Packet::Publish(Publish::read(header.flags, header.remaining_length, buf)?),
+            PacketType::PubAck => Packet::PubAck(PubAck::read(header.flags, header.remaining_length, buf)?),
+            PacketType::PubRec => Packet::PubRec(PubRec::read(header.flags, header.remaining_length, buf)?),
+            PacketType::PubRel => Packet::PubRel(PubRel::read(header.flags, header.remaining_length, buf)?),
+            PacketType::PubComp => Packet::PubComp(PubComp::read(header.flags, header.remaining_length, buf)?),
+            PacketType::Subscribe => Packet::Subscribe(Subscribe::read(header.flags, header.remaining_length, buf)?),
+            PacketType::SubAck => Packet::SubAck(SubAck::read(header.flags, header.remaining_length, buf)?),
+            PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::read(header.flags, header.remaining_length, buf)?),
+            PacketType::UnsubAck => Packet::UnsubAck(UnsubAck::read(header.flags, header.remaining_length, buf)?),
             PacketType::PingReq => Packet::PingReq,
             PacketType::PingResp => Packet::PingResp,
-            PacketType::Disconnect => Packet::Disconnect(Disconnect::read(
-                header.flags,
-                header.remaining_length,
-                buf,
-            )?),
-            PacketType::Auth => {
-                Packet::Auth(Auth::read(header.flags, header.remaining_length, buf)?)
-            }
+            PacketType::Disconnect => Packet::Disconnect(Disconnect::read(header.flags, header.remaining_length, buf)?),
+            PacketType::Auth => Packet::Auth(Auth::read(header.flags, header.remaining_length, buf)?),
         };
         Ok(packet)
     }
@@ -683,9 +635,7 @@ impl Packet {
     pub fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
         let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
         if header.remaining_length + header_length > buffer.len() {
-            return Err(ReadBytes::InsufficientBytes(
-                header.remaining_length + header_length - buffer.len(),
-            ));
+            return Err(ReadBytes::InsufficientBytes(header.remaining_length + header_length - buffer.len()));
         }
         buffer.advance(header_length);
 
@@ -697,10 +647,18 @@ impl Packet {
 
 impl Display for Packet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self{
-            Packet::Connect(c) => write!(f, "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})", c.protocol_version, c.clean_start, c.username, c.password, c.keep_alive, c.client_id),
+        match self {
+            Packet::Connect(c) => write!(
+                f,
+                "Connect(version: {:?}, clean: {}, username: {:?}, password: {:?}, keep_alive: {}, client_id: {})",
+                c.protocol_version, c.clean_start, c.username, c.password, c.keep_alive, c.client_id
+            ),
             Packet::ConnAck(c) => write!(f, "ConnAck(session:{:?}, reason code{:?})", c.connack_flags, c.reason_code),
-            Packet::Publish(p) => write!(f, "Publish(topic: {}, qos: {:?}, dup: {:?}, retain: {:?}, packet id: {:?})", &p.topic, p.qos, p.dup, p.retain, p.packet_identifier),
+            Packet::Publish(p) => write!(
+                f,
+                "Publish(topic: {}, qos: {:?}, dup: {:?}, retain: {:?}, packet id: {:?})",
+                &p.topic, p.qos, p.dup, p.retain, p.packet_identifier
+            ),
             Packet::PubAck(p) => write!(f, "PubAck(id:{:?}, reason code: {:?})", p.packet_identifier, p.reason_code),
             Packet::PubRec(p) => write!(f, "PubRec(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
             Packet::PubRel(p) => write!(f, "PubRel(id: {}, reason code: {:?})", p.packet_identifier, p.reason_code),
@@ -736,9 +694,7 @@ pub struct FixedHeader {
 }
 
 impl FixedHeader {
-    pub fn read_fixed_header(
-        mut header: Iter<u8>,
-    ) -> Result<(Self, usize), ReadBytes<DeserializeError>> {
+    pub fn read_fixed_header(mut header: Iter<u8>) -> Result<(Self, usize), ReadBytes<DeserializeError>> {
         if header.len() < 2 {
             return Err(ReadBytes::InsufficientBytes(2 - header.len()));
         }
@@ -746,20 +702,12 @@ impl FixedHeader {
         let mut header_length = 1;
         let first_byte = header.next().unwrap();
 
-        let (packet_type, flags) =
-            PacketType::from_first_byte(*first_byte).map_err(ReadBytes::Err)?;
+        let (packet_type, flags) = PacketType::from_first_byte(*first_byte).map_err(ReadBytes::Err)?;
 
         let (remaining_length, length) = read_fixed_header_rem_len(header)?;
         header_length += length;
 
-        Ok((
-            Self {
-                packet_type,
-                flags,
-                remaining_length,
-            },
-            header_length,
-        ))
+        Ok((Self { packet_type, flags, remaining_length }, header_length))
     }
 }
 
@@ -821,8 +769,7 @@ mod tests {
     #[test]
     fn test_connack_read() {
         let connack = [
-            0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01,
-            0x29, 0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
+            0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01, 0x29, 0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
         ];
         let mut buf = BytesMut::new();
         buf.extend(connack);
@@ -832,7 +779,7 @@ mod tests {
         let res = res.unwrap();
 
         let expected = ConnAck {
-            connack_flags: ConnAckFlags{ session_present: true },
+            connack_flags: ConnAckFlags { session_present: true },
             reason_code: ConnAckReasonCode::Success,
             connack_properties: ConnAckProperties {
                 session_expiry_interval: None,
@@ -918,9 +865,8 @@ mod tests {
     #[test]
     fn test_publish_read() {
         let packet = [
-            0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74,
-            0x65, 0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01,
-            0x01, 0x09, 0x00, 0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
+            0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01, 0x01, 0x09, 0x00,
+            0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
         ];
 
         let mut buf = BytesMut::new();

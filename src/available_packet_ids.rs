@@ -1,7 +1,7 @@
-use async_channel::{Receiver, Sender};
+use async_channel::{Receiver, Sender, TrySendError};
 use tracing::error;
 
-use crate::error::MqttError;
+use crate::error::HandlerError;
 
 #[derive(Debug, Clone)]
 pub struct AvailablePacketIds {
@@ -36,18 +36,20 @@ impl AvailablePacketIds {
     // 	}
     // }
 
-    pub async fn mark_available(&self, pkid: u16) -> Result<(), MqttError> {
-        match self.sender.send(pkid).await {
+    pub fn mark_available(&self, pkid: u16) -> Result<(), HandlerError> {
+        match self.sender.try_send(pkid) {
             Ok(_) => {
                 Ok(())
                 // debug!("Marked packet id as available: {}", pkid);
             }
-            Err(err) => {
-                error!(
-                    "Encountered an error while marking an packet id as available. Error: {}",
-                    err
-                );
-                Err(MqttError::PacketIdError(err.0))
+            Err(TrySendError::Closed(pkid)) => {
+                error!("Packet Id channel was closed");
+                Err(HandlerError::PacketIdError(pkid))
+            }
+            Err(TrySendError::Full(_)) => {
+                // There can never be more than the predetermined number of packet ids.
+                // Meaning that they then all fit in the channel
+                unreachable!()
             }
         }
     }

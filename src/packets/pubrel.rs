@@ -26,11 +26,7 @@ impl PubRel {
 }
 
 impl VariableHeaderRead for PubRel {
-    fn read(
-        _: u8,
-        remaining_length: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, DeserializeError> {
+    fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2 {
             Ok(Self {
@@ -58,14 +54,9 @@ impl VariableHeaderWrite for PubRel {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
 
-        if self.reason_code == PubRelReasonCode::Success
-            && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+        if self.reason_code == PubRelReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             // Nothing here
-        } else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+        } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             self.reason_code.write(buf)?;
         } else {
             self.reason_code.write(buf)?;
@@ -77,14 +68,9 @@ impl VariableHeaderWrite for PubRel {
 
 impl WireLength for PubRel {
     fn wire_len(&self) -> usize {
-        if self.reason_code == PubRelReasonCode::Success
-            && self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+        if self.reason_code == PubRelReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             2
-        } else if self.properties.reason_string.is_none()
-            && self.properties.user_properties.is_empty()
-        {
+        } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             3
         } else {
             2 + 1 + self.properties.wire_len()
@@ -112,11 +98,7 @@ impl MqttRead for PubRelProperties {
             return Ok(Self::default());
         }
         if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "PubRelProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("PubRelProperties".to_string(), buf.len(), len));
         }
 
         let mut properties = PubRelProperties::default();
@@ -125,15 +107,11 @@ impl MqttRead for PubRelProperties {
             match PropertyType::from_u8(u8::read(buf)?)? {
                 PropertyType::ReasonString => {
                     if properties.reason_string.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ReasonString,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
                     }
                     properties.reason_string = Some(String::read(buf)?);
                 }
-                PropertyType::UserProperty => properties
-                    .user_properties
-                    .push((String::read(buf)?, String::read(buf)?)),
+                PropertyType::UserProperty => properties.user_properties.push((String::read(buf)?, String::read(buf)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubRel)),
             }
             if buf.is_empty() {
@@ -292,20 +270,12 @@ mod tests {
     #[test]
     fn test_properties() {
         let mut properties_data = BytesMut::new();
-        PropertyType::ReasonString
-            .write(&mut properties_data)
-            .unwrap();
-        "reason string, test 1-2-3."
-            .write(&mut properties_data)
-            .unwrap();
-        PropertyType::UserProperty
-            .write(&mut properties_data)
-            .unwrap();
+        PropertyType::ReasonString.write(&mut properties_data).unwrap();
+        "reason string, test 1-2-3.".write(&mut properties_data).unwrap();
+        PropertyType::UserProperty.write(&mut properties_data).unwrap();
         "This is the key".write(&mut properties_data).unwrap();
         "This is the value".write(&mut properties_data).unwrap();
-        PropertyType::UserProperty
-            .write(&mut properties_data)
-            .unwrap();
+        PropertyType::UserProperty.write(&mut properties_data).unwrap();
         "Another thingy".write(&mut properties_data).unwrap();
         "The thingy".write(&mut properties_data).unwrap();
 

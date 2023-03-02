@@ -24,11 +24,7 @@ impl Default for Disconnect {
 }
 
 impl VariableHeaderRead for Disconnect {
-    fn read(
-        _: u8,
-        remaining_length: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let reason_code;
         let properties;
         if remaining_length == 0 {
@@ -39,17 +35,12 @@ impl VariableHeaderRead for Disconnect {
             properties = DisconnectProperties::read(&mut buf)?;
         }
 
-        Ok(Self {
-            reason_code,
-            properties,
-        })
+        Ok(Self { reason_code, properties })
     }
 }
 impl VariableHeaderWrite for Disconnect {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        if self.reason_code != DisconnectReasonCode::NormalDisconnection
-            || self.properties.wire_len() != 0
-        {
+        if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
             self.reason_code.write(buf)?;
             self.properties.write(buf)?;
         }
@@ -58,9 +49,7 @@ impl VariableHeaderWrite for Disconnect {
 }
 impl WireLength for Disconnect {
     fn wire_len(&self) -> usize {
-        if self.reason_code != DisconnectReasonCode::NormalDisconnection
-            || self.properties.wire_len() != 0
-        {
+        if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
             let property_len = self.properties.wire_len();
             // reasoncode, length of property length, property length
             1 + variable_integer_len(property_len) + property_len
@@ -86,11 +75,7 @@ impl MqttRead for DisconnectProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "DisconnectProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("DisconnectProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -99,38 +84,24 @@ impl MqttRead for DisconnectProperties {
             match PropertyType::from_u8(u8::read(&mut property_data)?)? {
                 PropertyType::SessionExpiryInterval => {
                     if properties.session_expiry_interval.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::SessionExpiryInterval,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
                     }
                     properties.session_expiry_interval = Some(u32::read(&mut property_data)?);
                 }
                 PropertyType::ReasonString => {
                     if properties.reason_string.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ReasonString,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
                     }
                     properties.reason_string = Some(String::read(&mut property_data)?);
                 }
                 PropertyType::ServerReference => {
                     if properties.server_reference.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ServerReference,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ServerReference));
                     }
                     properties.server_reference = Some(String::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((
-                    String::read(&mut property_data)?,
-                    String::read(&mut property_data)?,
-                )),
-                e => {
-                    return Err(DeserializeError::UnexpectedProperty(
-                        e,
-                        PacketType::Disconnect,
-                    ))
-                }
+                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Disconnect)),
             }
 
             if property_data.is_empty() {

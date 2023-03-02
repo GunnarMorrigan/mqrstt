@@ -3,8 +3,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use super::{
     error::{DeserializeError, SerializeError},
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
-    ProtocolVersion, QoS, WireLength,
+    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, ProtocolVersion, QoS, WireLength,
 };
 
 /// Variable connect header:
@@ -99,9 +98,7 @@ impl Default for Connect {
 impl VariableHeaderRead for Connect {
     fn read(_: u8, _: usize, mut buf: Bytes) -> Result<Self, DeserializeError> {
         if String::read(&mut buf)? != "MQTT" {
-            return Err(DeserializeError::MalformedPacketWithInfo(
-                "Protocol not MQTT".to_string(),
-            ));
+            return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_string()));
         }
 
         let protocol_version = ProtocolVersion::read(&mut buf)?;
@@ -121,16 +118,8 @@ impl VariableHeaderRead for Connect {
             last_will = Some(LastWill::read(connect_flags.will_qos, retain, &mut buf)?);
         }
 
-        let username = if connect_flags.username {
-            Some(String::read(&mut buf)?)
-        } else {
-            None
-        };
-        let password = if connect_flags.password {
-            Some(String::read(&mut buf)?)
-        } else {
-            None
-        };
+        let username = if connect_flags.username { Some(String::read(&mut buf)?) } else { None };
+        let password = if connect_flags.password { Some(String::read(&mut buf)?) } else { None };
 
         let connect = Connect {
             protocol_version,
@@ -153,9 +142,11 @@ impl VariableHeaderWrite for Connect {
 
         self.protocol_version.write(buf)?;
 
-        let mut connect_flags = ConnectFlags::default();
+        let mut connect_flags = ConnectFlags {
+            clean_start: self.clean_start,
+            ..Default::default()
+        };
 
-        connect_flags.clean_start = self.clean_start;
         if let Some(last_will) = &self.last_will {
             connect_flags.will_flag = true;
             connect_flags.will_retain = last_will.retain;
@@ -214,7 +205,7 @@ impl WireLength for Connect {
 /// ║     ║ User Name ║ Password ║ Will Retain ║ Will QoS ║ Will Flag ║ Clean Start ║ Reserved ║
 /// ╚═════╩═══════════╩══════════╩═════════════╩══════════╩═══════════╩═════════════╩══════════╝
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct ConnectFlags{
+pub struct ConnectFlags {
     pub clean_start: bool,
     pub will_flag: bool,
     pub will_qos: QoS,
@@ -223,27 +214,25 @@ pub struct ConnectFlags{
     pub username: bool,
 }
 
-impl ConnectFlags{
-    pub fn from_u8(value: u8) -> Result<Self, DeserializeError>{
-        Ok(
-            Self{
-                clean_start: ((value & 0b00000010) >> 1) != 0,
-                will_flag: ((value & 0b00000100) >> 2) != 0,
-                will_qos: QoS::from_u8((value & 0b00011000) >> 3)?,
-                will_retain: ((value & 0b00100000) >> 5) != 0,
-                password: ((value & 0b01000000) >> 6) != 0,
-                username: ((value & 0b10000000) >> 7) != 0,
-            }
-        )
+impl ConnectFlags {
+    pub fn from_u8(value: u8) -> Result<Self, DeserializeError> {
+        Ok(Self {
+            clean_start: ((value & 0b00000010) >> 1) != 0,
+            will_flag: ((value & 0b00000100) >> 2) != 0,
+            will_qos: QoS::from_u8((value & 0b00011000) >> 3)?,
+            will_retain: ((value & 0b00100000) >> 5) != 0,
+            password: ((value & 0b01000000) >> 6) != 0,
+            username: ((value & 0b10000000) >> 7) != 0,
+        })
     }
 
-    pub fn into_u8(&self) -> Result<u8, SerializeError>{
+    pub fn into_u8(&self) -> Result<u8, SerializeError> {
         let byte = ((self.clean_start as u8) << 1)
-        | ((self.will_flag as u8) << 2)
-        | (self.will_qos.into_u8() << 3)
-        | ((self.will_retain as u8) << 5)
-        | ((self.password as u8) << 6)
-        | ((self.username as u8) << 7);
+            | ((self.will_flag as u8) << 2)
+            | (self.will_qos.into_u8() << 3)
+            | ((self.will_retain as u8) << 5)
+            | ((self.password as u8) << 6)
+            | ((self.username as u8) << 7);
         Ok(byte)
     }
 }
@@ -264,11 +253,7 @@ impl Default for ConnectFlags {
 impl MqttRead for ConnectFlags {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "ConnectFlags".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("ConnectFlags".to_string(), 0, 1));
         }
 
         let byte = buf.get_u8();
@@ -388,11 +373,7 @@ impl MqttRead for ConnectProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "ConnectProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("ConnectProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -401,69 +382,50 @@ impl MqttRead for ConnectProperties {
             match PropertyType::read(&mut property_data)? {
                 PropertyType::SessionExpiryInterval => {
                     if properties.session_expiry_interval.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::SessionExpiryInterval,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
                     }
                     properties.session_expiry_interval = Some(property_data.get_u32());
                 }
                 PropertyType::ReceiveMaximum => {
                     if properties.receive_maximum.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ReceiveMaximum,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReceiveMaximum));
                     }
                     properties.receive_maximum = Some(property_data.get_u16());
                 }
                 PropertyType::MaximumPacketSize => {
                     if properties.maximum_packet_size.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::MaximumPacketSize,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::MaximumPacketSize));
                     }
                     properties.maximum_packet_size = Some(property_data.get_u32());
                 }
                 PropertyType::TopicAliasMaximum => {
                     if properties.topic_alias_maximum.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::TopicAliasMaximum,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::TopicAliasMaximum));
                     }
                     properties.topic_alias_maximum = Some(property_data.get_u16());
                 }
                 PropertyType::RequestResponseInformation => {
                     if properties.request_response_information.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::RequestResponseInformation,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::RequestResponseInformation));
                     }
                     properties.request_response_information = Some(property_data.get_u8());
                 }
                 PropertyType::RequestProblemInformation => {
                     if properties.request_problem_information.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::RequestProblemInformation,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::RequestProblemInformation));
                     }
                     properties.request_problem_information = Some(property_data.get_u8());
                 }
-                PropertyType::UserProperty => properties.user_properties.push((
-                    String::read(&mut property_data)?,
-                    String::read(&mut property_data)?,
-                )),
+                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
                 PropertyType::AuthenticationMethod => {
                     if properties.authentication_method.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::AuthenticationMethod,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
                     }
                     properties.authentication_method = Some(String::read(&mut property_data)?);
                 }
                 PropertyType::AuthenticationData => {
                     if properties.authentication_data.is_empty() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::AuthenticationData,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
                     }
                     properties.authentication_data = Bytes::read(&mut property_data)?;
                 }
@@ -475,11 +437,8 @@ impl MqttRead for ConnectProperties {
             }
         }
 
-        if !properties.authentication_data.is_empty() && properties.authentication_method.is_none()
-        {
-            return Err(DeserializeError::MalformedPacketWithInfo(
-                "Authentication data is not empty while authentication method is".to_string(),
-            ));
+        if !properties.authentication_data.is_empty() && properties.authentication_method.is_none() {
+            return Err(DeserializeError::MalformedPacketWithInfo("Authentication data is not empty while authentication method is".to_string()));
         }
 
         Ok(properties)
@@ -540,12 +499,7 @@ pub struct LastWill {
 }
 
 impl LastWill {
-    pub fn new<T: Into<String>, P: Into<Vec<u8>>>(
-        qos: QoS,
-        retain: bool,
-        topic: T,
-        payload: P,
-    ) -> LastWill {
+    pub fn new<T: Into<String>, P: Into<Vec<u8>>>(qos: QoS, retain: bool, topic: T, payload: P) -> LastWill {
         Self {
             qos,
             retain,
@@ -582,10 +536,7 @@ impl WireLength for LastWill {
     fn wire_len(&self) -> usize {
         let property_len = self.last_will_properties.wire_len();
 
-        self.topic.wire_len()
-            + self.payload.wire_len()
-            + variable_integer_len(property_len)
-            + property_len
+        self.topic.wire_len() + self.payload.wire_len() + variable_integer_len(property_len) + property_len
     }
 }
 
@@ -615,11 +566,7 @@ impl MqttRead for LastWillProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "LastWillProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("LastWillProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -628,56 +575,41 @@ impl MqttRead for LastWillProperties {
             match PropertyType::read(&mut property_data)? {
                 PropertyType::WillDelayInterval => {
                     if properties.delay_interval.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::WillDelayInterval,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::WillDelayInterval));
                     }
                     properties.delay_interval = Some(u32::read(&mut property_data)?);
                 }
                 PropertyType::PayloadFormatIndicator => {
                     if properties.payload_format_indicator.is_none() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::PayloadFormatIndicator,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator));
                     }
                     properties.payload_format_indicator = Some(u8::read(&mut property_data)?);
                 }
                 PropertyType::MessageExpiryInterval => {
                     if properties.message_expiry_interval.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::MessageExpiryInterval,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval));
                     }
                     properties.message_expiry_interval = Some(u32::read(&mut property_data)?);
                 }
                 PropertyType::ContentType => {
                     if properties.content_type.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ContentType,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ContentType));
                     }
                     properties.content_type = Some(String::read(&mut property_data)?);
                 }
                 PropertyType::ResponseTopic => {
                     if properties.response_topic.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ResponseTopic,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic));
                     }
                     properties.response_topic = Some(String::read(&mut property_data)?);
                 }
                 PropertyType::CorrelationData => {
                     if properties.correlation_data.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::CorrelationData,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::CorrelationData));
                     }
                     properties.correlation_data = Some(Bytes::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((
-                    String::read(&mut property_data)?,
-                    String::read(&mut property_data)?,
-                )),
+                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
             }
 
@@ -743,18 +675,9 @@ impl WireLength for LastWillProperties {
             len += 5;
         }
         // +1 for the property type
-        len += self
-            .content_type
-            .as_ref()
-            .map_or_else(|| 0, |s| s.wire_len() + 1);
-        len += self
-            .response_topic
-            .as_ref()
-            .map_or_else(|| 0, |s| s.wire_len() + 1);
-        len += self
-            .correlation_data
-            .as_ref()
-            .map_or_else(|| 0, |b| b.wire_len() + 1);
+        len += self.content_type.as_ref().map_or_else(|| 0, |s| s.wire_len() + 1);
+        len += self.response_topic.as_ref().map_or_else(|| 0, |s| s.wire_len() + 1);
+        len += self.correlation_data.as_ref().map_or_else(|| 0, |b| b.wire_len() + 1);
         for (key, value) in &self.user_properties {
             len += key.wire_len() + value.wire_len() + 1;
         }
@@ -770,7 +693,7 @@ mod tests {
         QoS,
     };
 
-    use super::{Connect, LastWill, ConnectFlags};
+    use super::{Connect, ConnectFlags, LastWill};
 
     #[test]
     fn read_connect() {
@@ -920,15 +843,11 @@ mod tests {
     #[test]
     fn read_and_write_connect2() {
         let _packet = [
-            0x10, 0x1d, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11,
-            0xff, 0xff, 0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54,
-            0x65, 0x73, 0x74,
+            0x10, 0x1d, 0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff, 0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73, 0x74,
         ];
 
         let data = [
-            0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff,
-            0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73,
-            0x74,
+            0x00, 0x04, 0x4d, 0x51, 0x54, 0x54, 0x05, 0x80, 0x00, 0x3c, 0x05, 0x11, 0xff, 0xff, 0xff, 0xff, 0x00, 0x05, 0x39, 0x2e, 0x30, 0x2e, 0x31, 0x00, 0x04, 0x54, 0x65, 0x73, 0x74,
         ];
 
         let mut buf = bytes::BytesMut::new();
@@ -965,7 +884,7 @@ mod tests {
     }
 
     #[test]
-    fn connect_flag(){
+    fn connect_flag() {
         let byte = 0b1100_1110;
         let flags = ConnectFlags::from_u8(byte).unwrap();
         assert_eq!(byte, flags.into_u8().unwrap());

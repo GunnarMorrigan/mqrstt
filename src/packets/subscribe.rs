@@ -1,8 +1,7 @@
 use super::{
     error::DeserializeError,
     mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
-    QoS,
+    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 use bytes::{Buf, BufMut};
 
@@ -24,11 +23,7 @@ impl Subscribe {
 }
 
 impl VariableHeaderRead for Subscribe {
-    fn read(
-        _: u8,
-        _: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubscribeProperties::read(&mut buf)?;
         let mut topics = vec![];
@@ -97,11 +92,7 @@ impl MqttRead for SubscribeProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "SubscribeProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("SubscribeProperties".to_string(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);
@@ -114,23 +105,13 @@ impl MqttRead for SubscribeProperties {
 
                         properties.subscription_id = Some(subscription_id);
                     } else {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::SubscriptionIdentifier,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifier));
                     }
                 }
                 PropertyType::UserProperty => {
-                    properties.user_properties.push((
-                        String::read(&mut properties_data)?,
-                        String::read(&mut properties_data)?,
-                    ));
+                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
                 }
-                e => {
-                    return Err(DeserializeError::UnexpectedProperty(
-                        e,
-                        PacketType::Subscribe,
-                    ))
-                }
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Subscribe)),
             }
 
             if properties_data.is_empty() {
@@ -192,11 +173,7 @@ impl Default for SubscriptionOptions {
 impl MqttRead for SubscriptionOptions {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "SubscriptionOptions".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("SubscriptionOptions".to_string(), 0, 1));
         }
 
         let byte = buf.get_u8();
@@ -219,10 +196,7 @@ impl MqttRead for SubscriptionOptions {
 
 impl MqttWrite for SubscriptionOptions {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        let byte = (self.retain_handling.into_u8() << 4)
-            | ((self.retain_as_publish as u8) << 3)
-            | ((self.no_local as u8) << 2)
-            | self.qos.into_u8();
+        let byte = (self.retain_handling.into_u8() << 4) | ((self.retain_as_publish as u8) << 3) | ((self.no_local as u8) << 2) | self.qos.into_u8();
 
         buf.put_u8(byte);
         Ok(())
@@ -282,12 +256,7 @@ impl From<&str> for Subscription {
 
 impl From<&[&str]> for Subscription {
     fn from(value: &[&str]) -> Self {
-        Self(
-            value
-                .iter()
-                .map(|topic| (topic.to_string(), SubscriptionOptions::default()))
-                .collect(),
-        )
+        Self(value.iter().map(|topic| (topic.to_string(), SubscriptionOptions::default())).collect())
     }
 }
 
@@ -307,15 +276,12 @@ mod tests {
     #[test]
     fn test_read_write_subscribe() {
         let _entire_sub_packet = [
-            0x82, 0x1e, 0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63,
-            0x72, 0x69, 0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74,
-            0x65, 0x73, 0x74, 0x15,
+            0x82, 0x1e, 0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73, 0x74,
+            0x15,
         ];
 
         let sub_data = [
-            0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69,
-            0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73,
-            0x74, 0x15,
+            0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x15,
         ];
 
         // let sub_data = &[0x35, 0xd6, 0x02, 0x0b, 0x01, 0x00, 0x16, 0x73,
@@ -345,10 +311,7 @@ mod tests {
 
     #[test]
     fn test_write() {
-        let expected_bytes = [
-            0x82, 0x0e, 0x00, 0x01, 0x00, 0x00, 0x08, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32,
-            0x33, 0x00,
-        ];
+        let expected_bytes = [0x82, 0x0e, 0x00, 0x01, 0x00, 0x00, 0x08, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x00];
 
         let sub = Subscribe {
             packet_identifier: 1,

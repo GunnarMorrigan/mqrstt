@@ -12,12 +12,18 @@ pub struct Unsubscribe {
     pub topics: Vec<String>,
 }
 
+impl Unsubscribe {
+    pub fn new(packet_identifier: u16, topics: Vec<String>) -> Self {
+        Self {
+            packet_identifier,
+            properties: UnsubscribeProperties::default(),
+            topics,
+        }
+    }
+}
+
 impl VariableHeaderRead for Unsubscribe {
-    fn read(
-        _: u8,
-        _: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubscribeProperties::read(&mut buf)?;
         let mut topics = vec![];
@@ -54,8 +60,7 @@ impl VariableHeaderWrite for Unsubscribe {
 
 impl WireLength for Unsubscribe {
     fn wire_len(&self) -> usize {
-        let mut len =
-            2 + variable_integer_len(self.properties.wire_len()) + self.properties.wire_len();
+        let mut len = 2 + variable_integer_len(self.properties.wire_len()) + self.properties.wire_len();
         for topic in &self.topics {
             len += topic.wire_len();
         }
@@ -77,11 +82,7 @@ impl MqttRead for UnsubscribeProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "UnsubscribeProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("UnsubscribeProperties".to_string(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);
@@ -89,17 +90,9 @@ impl MqttRead for UnsubscribeProperties {
         loop {
             match PropertyType::read(&mut properties_data)? {
                 PropertyType::UserProperty => {
-                    properties.user_properties.push((
-                        String::read(&mut properties_data)?,
-                        String::read(&mut properties_data)?,
-                    ));
+                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
                 }
-                e => {
-                    return Err(DeserializeError::UnexpectedProperty(
-                        e,
-                        PacketType::Unsubscribe,
-                    ))
-                }
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Unsubscribe)),
             }
 
             if properties_data.is_empty() {
@@ -190,8 +183,7 @@ mod tests {
     #[test]
     fn read_write_unsubscribe() {
         let unsubscribe_packet = &[
-            0x35, 0xd7, 0x00, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65,
-            0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73, 0x74,
+            0x35, 0xd7, 0x00, 0x00, 0x16, 0x73, 0x75, 0x62, 0x73, 0x63, 0x72, 0x69, 0x62, 0x65, 0x2f, 0x65, 0x78, 0x61, 0x6d, 0x70, 0x6c, 0x65, 0x2f, 0x74, 0x65, 0x73, 0x74,
         ];
 
         let mut bufmut = BytesMut::new();
