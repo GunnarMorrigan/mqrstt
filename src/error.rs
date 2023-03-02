@@ -8,37 +8,6 @@ use crate::packets::{
     {Packet, PacketType},
 };
 
-/// Errors that the [`mqrstt::EventHandler`] can emit
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum MqttError {
-    #[error("Missing Packet ID")]
-    MissingPacketId,
-
-    #[error("The incoming channel between network and handler is closed")]
-    IncomingNetworkChannelClosed,
-
-    #[error("The outgoing channel between handler and network is closed: {0}")]
-    OutgoingNetworkChannelClosed(#[from] SendError<Packet>),
-
-    #[error("Channel between client and handler closed")]
-    ClientChannelClosed,
-
-    #[error("Packet Id error, pkid: {0}")]
-    PacketIdError(u16),
-
-    #[error("Received unsolicited ack pkid: {0}")]
-    Unsolicited(u16, PacketType),
-}
-
-/// Errors producable by the [`mqrstt::AsyncClient`]
-#[derive(Debug, Clone, thiserror::Error)]
-pub enum ClientError {
-    #[error("One of more of the internal handler channels are closed")]
-    NoHandler,
-
-    #[error("Internal network channel is closed")]
-    NoNetwork,
-}
 
 /// Critical errors that can happen during the operation of the entire client
 #[derive(Debug, thiserror::Error)]
@@ -66,6 +35,42 @@ pub enum ConnectionError {
 
     #[error("Expected ConnAck packet, received: {0:?}")]
     NotConnAck(Packet),
+
+    #[error("The handler encountered an error")]
+    HandlerError(#[from] HandlerError)
+}
+
+
+/// Errors that the [`mqrstt::MqttHandler`] can emit
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum HandlerError {
+    #[error("Missing Packet ID")]
+    MissingPacketId,
+
+    #[error("The incoming channel between network and handler is closed")]
+    IncomingNetworkChannelClosed,
+
+    #[error("The outgoing channel between handler and network is closed: {0}")]
+    OutgoingNetworkChannelClosed(#[from] SendError<Packet>),
+
+    #[error("Channel between client and handler closed")]
+    ClientChannelClosed,
+
+    #[error("Packet Id error, pkid: {0}")]
+    PacketIdError(u16),
+
+    #[error("Packet collision error. packet ID: {0}")]
+    PacketIdCollision(u16),
+
+    #[error("Received unsolicited ack pkid: {0}")]
+    Unsolicited(u16, PacketType),
+}
+
+/// Errors producable by the [`mqrstt::AsyncClient`]
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum ClientError {
+    #[error("Internal network channel is closed")]
+    NoNetwork,
 }
 
 impl From<ReadBytes<DeserializeError>> for ReadBytes<ConnectionError> {

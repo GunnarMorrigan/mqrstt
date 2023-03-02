@@ -20,6 +20,16 @@ pub struct ConnAck {
     pub connack_properties: ConnAckProperties,
 }
 
+impl ConnAck{
+    pub fn new() -> Self {
+        Self{
+            connack_flags: ConnAckFlags { session_present: false },
+            reason_code: ConnAckReasonCode::Success,
+            connack_properties: ConnAckProperties::default(), 
+        }
+    }
+}
+
 impl VariableHeaderRead for ConnAck {
     fn read(_: u8, header_len: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         if header_len > buf.len() {

@@ -14,7 +14,7 @@ description = "Pure rust MQTTv5 client implementation for Smol, Tokio and soon s
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["smol", "tokio"]
+default = ["tokio", "smol"]
 tokio = ["dep:tokio"]
 smol = ["dep:smol"]
 # quic = ["dep:quinn"]
@@ -44,8 +44,11 @@ smol = { version = "1.3.0", optional = true }
 [dev-dependencies]
 pretty_assertions = "1.3.0"
 tokio = { version = "1.24.1", features = ["rt-multi-thread", "rt", "macros", "sync", "io-util", "net", "time"] }
+tokio-test = "0.4.2"
+
 smol = { version = "1.3.0" }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+
 
 rustls = { version = "0.20.7" }
 rustls-pemfile = { version = "1.0.1" }

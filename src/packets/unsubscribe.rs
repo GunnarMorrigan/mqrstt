@@ -12,6 +12,16 @@ pub struct Unsubscribe {
     pub topics: Vec<String>,
 }
 
+impl Unsubscribe{
+    pub fn new(packet_identifier: u16, topics: Vec<String>) -> Self{
+        Self{
+            packet_identifier,
+            properties: UnsubscribeProperties::default(),
+            topics
+        }
+    }
+}
+
 impl VariableHeaderRead for Unsubscribe {
     fn read(
         _: u8,

@@ -13,22 +13,22 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-pub struct AsyncClient {
+pub struct MqttClient {
     /// Provides this client with an available packet id or waits on it.
     available_packet_ids: Receiver<u16>,
 
     /// Sends Publish, Subscribe, Unsubscribe to the event handler to handle later.
-    client_to_handler_s: Sender<Packet>,
+    to_network_s: Sender<Packet>,
 }
 
-impl AsyncClient {
+impl MqttClient {
     pub fn new(
         available_packet_ids: Receiver<u16>,
-        client_to_handler_s: Sender<Packet>,
+        to_network_s: Sender<Packet>,
     ) -> Self {
         Self {
             available_packet_ids,
-            client_to_handler_s,
+            to_network_s,
         }
     }
 
@@ -40,13 +40,13 @@ impl AsyncClient {
             .available_packet_ids
             .recv()
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         let subscription: Subscription = into_subscribtions.into();
         let sub = Subscribe::new(pkid, subscription.0);
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Subscribe(sub))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 
@@ -59,16 +59,16 @@ impl AsyncClient {
             .available_packet_ids
             .recv()
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         let sub = Subscribe {
             packet_identifier: pkid,
             properties,
             topics: into_sub.into().0,
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Subscribe(sub))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 
@@ -85,7 +85,7 @@ impl AsyncClient {
                 self.available_packet_ids
                     .recv()
                     .await
-                    .map_err(|_| ClientError::NoHandler)?,
+                    .map_err(|_| ClientError::NoNetwork)?,
             ),
         };
         info!("Published message with ID: {:?}", pkid);
@@ -98,13 +98,13 @@ impl AsyncClient {
             publish_properties: PublishProperties::default(),
             payload: payload.into(),
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Publish(publish))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         info!(
             "Published message into handler_packet_sender: len {}",
-            self.client_to_handler_s.len()
+            self.to_network_s.len()
         );
         Ok(())
     }
@@ -123,7 +123,7 @@ impl AsyncClient {
                 self.available_packet_ids
                     .recv()
                     .await
-                    .map_err(|_| ClientError::NoHandler)?,
+                    .map_err(|_| ClientError::NoNetwork)?,
             ),
         };
         let publish = Publish {
@@ -135,10 +135,10 @@ impl AsyncClient {
             publish_properties: properties,
             payload: payload.into(),
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Publish(publish))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 
@@ -150,16 +150,16 @@ impl AsyncClient {
             .available_packet_ids
             .recv()
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         let unsub = Unsubscribe {
             packet_identifier: pkid,
             properties: UnsubscribeProperties::default(),
             topics: into_topics.into().0,
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Unsubscribe(unsub))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 
@@ -172,16 +172,16 @@ impl AsyncClient {
             .available_packet_ids
             .recv()
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         let unsub = Unsubscribe {
             packet_identifier: pkid,
             properties,
             topics: into_topics.into().0,
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Unsubscribe(unsub))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 
@@ -190,10 +190,10 @@ impl AsyncClient {
             reason_code: DisconnectReasonCode::NormalDisconnection,
             properties: DisconnectProperties::default(),
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Disconnect(disconnect))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 
@@ -206,10 +206,10 @@ impl AsyncClient {
             reason_code,
             properties,
         };
-        self.client_to_handler_s
+        self.to_network_s
             .send(Packet::Disconnect(disconnect))
             .await
-            .map_err(|_| ClientError::NoHandler)?;
+            .map_err(|_| ClientError::NoNetwork)?;
         Ok(())
     }
 }
@@ -223,9 +223,9 @@ mod tests {
         UnsubscribeProperties,
     };
 
-    use super::AsyncClient;
+    use super::MqttClient;
 
-    fn create_new_test_client() -> (AsyncClient, Receiver<Packet>, Receiver<Packet>) {
+    fn create_new_test_client() -> (MqttClient, Receiver<Packet>, Receiver<Packet>) {
         let (s, r) = async_channel::bounded(100);
 
         for i in 1..=100 {
@@ -235,7 +235,7 @@ mod tests {
         let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
         let (_, to_network_r) = async_channel::bounded(100);
 
-        let client = AsyncClient::new(r, client_to_handler_s);
+        let client = MqttClient::new(r, client_to_handler_s);
 
         (client, client_to_handler_r, to_network_r)
     }
