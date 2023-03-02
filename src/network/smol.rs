@@ -62,7 +62,7 @@ impl<S> Network<S>
     where S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin {
     
     pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
-        let (network, _) = Stream::connect(&self.options, stream).await?;
+        let (network, connack) = Stream::connect(&self.options, stream).await?;
 
         self.network = Some(network);
 
@@ -70,6 +70,10 @@ impl<S> Network<S>
         if self.options.keep_alive_interval_s == 0 {
             self.perform_keep_alive = false;
         }
+
+        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer).await?;
+
+
         Ok(())
     }
 
