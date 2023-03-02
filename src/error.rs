@@ -8,7 +8,6 @@ use crate::packets::{
     {Packet, PacketType},
 };
 
-
 /// Critical errors that can happen during the operation of the entire client
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectionError {
@@ -37,9 +36,8 @@ pub enum ConnectionError {
     NotConnAck(Packet),
 
     #[error("The handler encountered an error")]
-    HandlerError(#[from] HandlerError)
+    HandlerError(#[from] HandlerError),
 }
-
 
 /// Errors that the [`mqrstt::MqttHandler`] can emit
 #[derive(Debug, Clone, thiserror::Error)]

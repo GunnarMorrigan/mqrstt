@@ -1,2 +1,2 @@
-pub mod tokio;
 pub mod smol;
+pub mod tokio;

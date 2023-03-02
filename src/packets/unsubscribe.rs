@@ -12,12 +12,12 @@ pub struct Unsubscribe {
     pub topics: Vec<String>,
 }
 
-impl Unsubscribe{
-    pub fn new(packet_identifier: u16, topics: Vec<String>) -> Self{
-        Self{
+impl Unsubscribe {
+    pub fn new(packet_identifier: u16, topics: Vec<String>) -> Self {
+        Self {
             packet_identifier,
             properties: UnsubscribeProperties::default(),
-            topics
+            topics,
         }
     }
 }

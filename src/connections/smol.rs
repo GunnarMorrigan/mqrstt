@@ -26,14 +26,13 @@ pub struct Stream<S> {
 
     /// Write buffer
     read_buffer: BytesMut,
-    
+
     /// Write buffer
     write_buffer: BytesMut,
 }
 
-impl<S> Stream<S>{
-
-    pub async fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>>{
+impl<S> Stream<S> {
+    pub async fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
         let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
 
         if header.remaining_length + header_length > self.read_buffer.len() {
@@ -72,18 +71,17 @@ impl<S> Stream<S>{
             let packet_type = read_packet.packet_type();
             incoming_packet_buffer.push(read_packet);
 
-            match packet_type {
-                PacketType::Disconnect => return Ok(()),
-                _ => (),
+            if packet_type == PacketType::Disconnect {
+                return Ok(());
             }
         }
     }
 }
 
 impl<S> Stream<S>
-where S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin {
-
-    
+where
+    S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin,
+{
     pub async fn connect(
         options: &ConnectOptions,
         stream: S,
@@ -111,17 +109,19 @@ where S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin {
         }
     }
 
-
     pub async fn read(&mut self) -> io::Result<Packet> {
         loop {
-            let (header, header_length) = match FixedHeader::read_fixed_header(self.read_buffer.iter()) {
-                Ok(header) => header,
-                Err(ReadBytes::InsufficientBytes(required_len)) => {
-                    self.read_required_bytes(required_len).await?;
-                    continue;
-                }
-                Err(ReadBytes::Err(err)) => return Err(Error::new(ErrorKind::InvalidData, err)),
-            };
+            let (header, header_length) =
+                match FixedHeader::read_fixed_header(self.read_buffer.iter()) {
+                    Ok(header) => header,
+                    Err(ReadBytes::InsufficientBytes(required_len)) => {
+                        self.read_required_bytes(required_len).await?;
+                        continue;
+                    }
+                    Err(ReadBytes::Err(err)) => {
+                        return Err(Error::new(ErrorKind::InvalidData, err))
+                    }
+                };
 
             self.read_buffer.advance(header_length);
 
@@ -145,7 +145,8 @@ where S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin {
                 "Connection reset by peer",
             ))
         } else {
-            self.read_buffer.extend_from_slice(&self.const_buffer[0..read]);
+            self.read_buffer
+                .extend_from_slice(&self.const_buffer[0..read]);
             Ok(read)
         }
     }
@@ -174,14 +175,14 @@ where S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin {
     }
 
     pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
-        let writes = packets.drain(0..).map(|packet|{
+        let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
             trace!("Sending packet {}", packet);
 
             Ok::<(), ConnectionError>(())
         });
 
-        for write in writes{
+        for write in writes {
             write?;
         }
 

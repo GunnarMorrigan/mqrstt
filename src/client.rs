@@ -22,10 +22,7 @@ pub struct MqttClient {
 }
 
 impl MqttClient {
-    pub fn new(
-        available_packet_ids: Receiver<u16>,
-        to_network_s: Sender<Packet>,
-    ) -> Self {
+    pub fn new(available_packet_ids: Receiver<u16>, to_network_s: Sender<Packet>) -> Self {
         Self {
             available_packet_ids,
             to_network_s,

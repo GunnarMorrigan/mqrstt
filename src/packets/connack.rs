@@ -1,13 +1,13 @@
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, VariableHeaderRead, MqttWrite},
+    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead},
     read_variable_integer,
     reason_codes::ConnAckReasonCode,
     PacketType, PropertyType, QoS,
 };
-use bytes::{Buf, Bytes, BufMut};
+use bytes::{Buf, BufMut, Bytes};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ConnAck {
     /// 3.2.2.1 Connect Acknowledge Flags
     pub connack_flags: ConnAckFlags,
@@ -18,16 +18,6 @@ pub struct ConnAck {
 
     /// 3.2.2.3 CONNACK Properties
     pub connack_properties: ConnAckProperties,
-}
-
-impl ConnAck{
-    pub fn new() -> Self {
-        Self{
-            connack_flags: ConnAckFlags { session_present: false },
-            reason_code: ConnAckReasonCode::Success,
-            connack_properties: ConnAckProperties::default(), 
-        }
-    }
 }
 
 impl VariableHeaderRead for ConnAck {
@@ -289,17 +279,9 @@ impl MqttRead for ConnAckProperties {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct ConnAckFlags{
+#[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
+pub struct ConnAckFlags {
     pub session_present: bool,
-}
-
-impl Default for ConnAckFlags {
-    fn default() -> Self {
-        Self {
-           session_present: false,
-        }
-    }
 }
 
 impl MqttRead for ConnAckFlags {
@@ -314,8 +296,8 @@ impl MqttRead for ConnAckFlags {
 
         let byte = buf.get_u8();
 
-        Ok(Self { 
-            session_present:  (byte & 0b00000001) != 0,
+        Ok(Self {
+            session_present: (byte & 0b00000001) != 0,
         })
     }
 }

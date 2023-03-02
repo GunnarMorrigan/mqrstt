@@ -4,8 +4,8 @@ use rstest::*;
 
 use crate::packets::{
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
-    Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties,
-    QoS, Subscribe, Subscription, Unsubscribe, ConnAck,
+    ConnAck, Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish,
+    PublishProperties, QoS, Subscribe, Subscription, Unsubscribe,
 };
 
 fn publish_packet_1() -> Packet {
@@ -127,8 +127,6 @@ pub fn create_publish_packet(
     })
 }
 
-
-
 pub fn create_puback_packet(packet_identifier: u16) -> Packet {
     Packet::PubAck(PubAck {
         packet_identifier,
@@ -137,8 +135,8 @@ pub fn create_puback_packet(packet_identifier: u16) -> Packet {
     })
 }
 
-pub fn create_connack_packet(session_present: bool) -> Packet{
-    let mut connack = ConnAck::new();
+pub fn create_connack_packet(session_present: bool) -> Packet {
+    let mut connack = ConnAck::default();
     connack.connack_flags.session_present = session_present;
 
     Packet::ConnAck(connack)

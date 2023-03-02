@@ -832,7 +832,9 @@ mod tests {
         let res = res.unwrap();
 
         let expected = ConnAck {
-            connack_flags: ConnAckFlags{ session_present: true },
+            connack_flags: ConnAckFlags {
+                session_present: true,
+            },
             reason_code: ConnAckReasonCode::Success,
             connack_properties: ConnAckProperties {
                 session_expiry_interval: None,

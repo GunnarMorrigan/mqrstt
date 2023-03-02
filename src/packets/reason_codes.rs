@@ -3,9 +3,11 @@ use bytes::{Buf, BufMut};
 use super::error::DeserializeError;
 use super::mqtt_traits::{MqttRead, MqttWrite};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ConnAckReasonCode {
+    #[default]
     Success,
+
     UnspecifiedError,
     MalformedPacket,
     ProtocolError,

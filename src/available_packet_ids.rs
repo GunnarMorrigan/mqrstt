@@ -43,16 +43,14 @@ impl AvailablePacketIds {
                 // debug!("Marked packet id as available: {}", pkid);
             }
             Err(TrySendError::Closed(pkid)) => {
-                error!(
-                    "Packet Id channel was closed"
-                );
+                error!("Packet Id channel was closed");
                 Err(HandlerError::PacketIdError(pkid))
             }
             Err(TrySendError::Full(_)) => {
                 // There can never be more than the predetermined number of packet ids.
                 // Meaning that they then all fit in the channel
                 unreachable!()
-            },
+            }
         }
     }
 }

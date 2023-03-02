@@ -3,14 +3,14 @@
 //!
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
 //! The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
-//! 
+//!
 //! Notes:
 //! ----------------------------
 //! - Your handler should not wait too long
 //! - Create a new connection when an error or disconnect is encountered
 //! - Handlers only get incoming packets
-//! 
-//! 
+//!
+//!
 //! Smol example:
 //! ----------------------------
 //! ```rust
@@ -59,10 +59,10 @@
 //!         .await
 //!         .unwrap();
 //!     network.connect(stream).await.unwrap();
-//! 
+//!
 //!     // This subscribe is only processed when we run the network
 //!     client.subscribe("mqrstt").await.unwrap();
-//! 
+//!
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
@@ -88,7 +88,7 @@
 //!  Tokio example:
 //! ----------------------------
 //! ```rust
-//! 
+//!
 //! use mqrstt::{
 //!     MqttClient,
 //!     ConnectOptions,
@@ -99,7 +99,7 @@
 //! use tokio::time::Duration;
 //! use async_trait::async_trait;
 //! use bytes::Bytes;
-//! 
+//!
 //! pub struct PingPong {
 //!     pub client: MqttClient,
 //! }
@@ -129,7 +129,7 @@
 //!         }
 //!     }
 //! }
-//! 
+//!
 //! #[tokio::main]
 //! async fn main() {
 //!     let options = ConnectOptions::new("TokioTcpPingPongExample".to_string());
@@ -147,7 +147,7 @@
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
-//! 
+//!
 //!     let (n, _) = tokio::join!(
 //!         async {
 //!             loop {
@@ -164,9 +164,8 @@
 //!     );
 //!     assert!(n.is_ok());
 //! }
-//! 
+//!
 //! ```
-
 
 mod available_packet_ids;
 mod client;
@@ -174,15 +173,15 @@ mod connect_options;
 pub mod connections;
 pub mod error;
 mod mqtt_handler;
+mod network;
 pub mod packets;
 pub mod state;
 mod util;
-mod network;
 
-use packets::Packet;
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 pub use mqtt_handler::MqttHandler;
+use packets::Packet;
 
 #[cfg(test)]
 pub mod tests;
@@ -217,12 +216,11 @@ pub trait AsyncEventHandler {
 #[cfg(feature = "smol")]
 pub fn new_smol<S>(options: ConnectOptions) -> (network::smol::Network<S>, MqttClient)
 where
-    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin {
+    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+{
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (handler, packet_ids) = MqttHandler::new(
-        &options,
-    );
+    let (handler, packet_ids) = MqttHandler::new(&options);
 
     let network = network::smol::Network::<S>::new(options, handler, to_network_r);
 
@@ -233,8 +231,10 @@ where
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
 #[cfg(feature = "tokio")]
-pub fn new_tokio<S>(options: ConnectOptions) -> (network::tokio::Network<S>, MqttClient,)
-    where S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin {
+pub fn new_tokio<S>(options: ConnectOptions) -> (network::tokio::Network<S>, MqttClient)
+where
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
+{
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
     let (mqtt_handler, apkid) = MqttHandler::new(&options);
@@ -254,17 +254,19 @@ mod lib_test {
     use crate::new_tokio;
 
     use crate::{
-        MqttClient,
-        ConnectOptions,
+        new_smol,
         // new_smol,
         packets::{self, Packet},
         tests::tls::tests::simple_rust_tls,
-        AsyncEventHandler, NetworkStatus, new_smol,
+        AsyncEventHandler,
+        ConnectOptions,
+        MqttClient,
+        NetworkStatus,
     };
     use async_trait::async_trait;
     use bytes::Bytes;
-    use rustls::ServerName;
     use packets::QoS;
+    use rustls::ServerName;
 
     pub struct PingPong {
         pub client: MqttClient,
@@ -330,10 +332,42 @@ mod lib_test {
                     }
                 },
                 async {
-                    client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
-                    client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                    client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                    client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                    client
+                        .publish(
+                            QoS::ExactlyOnce,
+                            false,
+                            "mqrstt".to_string(),
+                            b"ping".repeat(500),
+                        )
+                        .await
+                        .unwrap();
+                    client
+                        .publish(
+                            QoS::AtMostOnce,
+                            true,
+                            "mqrstt".to_string(),
+                            b"ping".to_vec(),
+                        )
+                        .await
+                        .unwrap();
+                    client
+                        .publish(
+                            QoS::AtLeastOnce,
+                            false,
+                            "mqrstt".to_string(),
+                            b"ping".to_vec(),
+                        )
+                        .await
+                        .unwrap();
+                    client
+                        .publish(
+                            QoS::ExactlyOnce,
+                            false,
+                            "mqrstt".to_string(),
+                            b"ping".repeat(500),
+                        )
+                        .await
+                        .unwrap();
 
                     smol::Timer::after(std::time::Duration::from_secs(20)).await;
                     client.unsubscribe("mqrstt").await.unwrap();
@@ -421,10 +455,42 @@ mod lib_test {
                 }
             },
             async {
-                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
-                client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                client
+                    .publish(
+                        QoS::ExactlyOnce,
+                        false,
+                        "mqrstt".to_string(),
+                        b"ping".repeat(500),
+                    )
+                    .await
+                    .unwrap();
+                client
+                    .publish(
+                        QoS::AtMostOnce,
+                        true,
+                        "mqrstt".to_string(),
+                        b"ping".to_vec(),
+                    )
+                    .await
+                    .unwrap();
+                client
+                    .publish(
+                        QoS::AtLeastOnce,
+                        false,
+                        "mqrstt".to_string(),
+                        b"ping".to_vec(),
+                    )
+                    .await
+                    .unwrap();
+                client
+                    .publish(
+                        QoS::ExactlyOnce,
+                        false,
+                        "mqrstt".to_string(),
+                        b"ping".repeat(500),
+                    )
+                    .await
+                    .unwrap();
 
                 client.unsubscribe("mqrstt").await.unwrap();
 
@@ -492,15 +558,14 @@ mod lib_test {
         assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
     }
 
-
     pub struct PingResp {
         pub client: MqttClient,
         pub ping_resp_received: u64,
     }
 
-    impl PingResp{
-        pub fn new(client: MqttClient) -> Self{
-            Self{
+    impl PingResp {
+        pub fn new(client: MqttClient) -> Self {
+            Self {
                 client,
                 ping_resp_received: 0,
             }
@@ -514,7 +579,7 @@ mod lib_test {
             match event {
                 PingResp => {
                     self.ping_resp_received += 1;
-                },
+                }
                 _ => (),
             }
         }
@@ -535,36 +600,33 @@ mod lib_test {
 
         let mut pingresp = PingResp::new(client.clone());
 
-        let futs = tokio::task::spawn(
-            async {
-                tokio::join!(
-                    async move {
-                        loop {
-                            match network.poll(&mut pingresp).await {
-                                Ok(NetworkStatus::Active) => continue,
-                                Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
-                                Ok(NetworkStatus::NoPingResp) => panic!(),
-                                Ok(NetworkStatus::IncomingDisconnect) => panic!(),
-                                Err(err) => return Err(err),
-                            }
+        let futs = tokio::task::spawn(async {
+            tokio::join!(
+                async move {
+                    loop {
+                        match network.poll(&mut pingresp).await {
+                            Ok(NetworkStatus::Active) => continue,
+                            Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                            Ok(NetworkStatus::NoPingResp) => panic!(),
+                            Ok(NetworkStatus::IncomingDisconnect) => panic!(),
+                            Err(err) => return Err(err),
                         }
-                    },
-                    async move {
-                        smol::Timer::after(std::time::Duration::from_secs(125)).await;
-                        client.disconnect().await.unwrap();
                     }
-                )
-            }
-        );
-        
+                },
+                async move {
+                    smol::Timer::after(std::time::Duration::from_secs(125)).await;
+                    client.disconnect().await.unwrap();
+                }
+            )
+        });
+
         tokio::time::sleep(Duration::new(125, 0)).await;
-        
+
         let (n, _) = futs.await.unwrap();
         assert!(n.is_ok());
         let pingresp = n.unwrap();
         assert_eq!(2, pingresp.ping_resp_received);
     }
-
 
     #[test]
     fn test_smol_ping_req() {

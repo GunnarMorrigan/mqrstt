@@ -153,9 +153,11 @@ impl VariableHeaderWrite for Connect {
 
         self.protocol_version.write(buf)?;
 
-        let mut connect_flags = ConnectFlags::default();
+        let mut connect_flags = ConnectFlags {
+            clean_start: self.clean_start,
+            ..Default::default()
+        };
 
-        connect_flags.clean_start = self.clean_start;
         if let Some(last_will) = &self.last_will {
             connect_flags.will_flag = true;
             connect_flags.will_retain = last_will.retain;
@@ -214,7 +216,7 @@ impl WireLength for Connect {
 /// ║     ║ User Name ║ Password ║ Will Retain ║ Will QoS ║ Will Flag ║ Clean Start ║ Reserved ║
 /// ╚═════╩═══════════╩══════════╩═════════════╩══════════╩═══════════╩═════════════╩══════════╝
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub struct ConnectFlags{
+pub struct ConnectFlags {
     pub clean_start: bool,
     pub will_flag: bool,
     pub will_qos: QoS,
@@ -223,27 +225,25 @@ pub struct ConnectFlags{
     pub username: bool,
 }
 
-impl ConnectFlags{
-    pub fn from_u8(value: u8) -> Result<Self, DeserializeError>{
-        Ok(
-            Self{
-                clean_start: ((value & 0b00000010) >> 1) != 0,
-                will_flag: ((value & 0b00000100) >> 2) != 0,
-                will_qos: QoS::from_u8((value & 0b00011000) >> 3)?,
-                will_retain: ((value & 0b00100000) >> 5) != 0,
-                password: ((value & 0b01000000) >> 6) != 0,
-                username: ((value & 0b10000000) >> 7) != 0,
-            }
-        )
+impl ConnectFlags {
+    pub fn from_u8(value: u8) -> Result<Self, DeserializeError> {
+        Ok(Self {
+            clean_start: ((value & 0b00000010) >> 1) != 0,
+            will_flag: ((value & 0b00000100) >> 2) != 0,
+            will_qos: QoS::from_u8((value & 0b00011000) >> 3)?,
+            will_retain: ((value & 0b00100000) >> 5) != 0,
+            password: ((value & 0b01000000) >> 6) != 0,
+            username: ((value & 0b10000000) >> 7) != 0,
+        })
     }
 
-    pub fn into_u8(&self) -> Result<u8, SerializeError>{
+    pub fn into_u8(&self) -> Result<u8, SerializeError> {
         let byte = ((self.clean_start as u8) << 1)
-        | ((self.will_flag as u8) << 2)
-        | (self.will_qos.into_u8() << 3)
-        | ((self.will_retain as u8) << 5)
-        | ((self.password as u8) << 6)
-        | ((self.username as u8) << 7);
+            | ((self.will_flag as u8) << 2)
+            | (self.will_qos.into_u8() << 3)
+            | ((self.will_retain as u8) << 5)
+            | ((self.password as u8) << 6)
+            | ((self.username as u8) << 7);
         Ok(byte)
     }
 }
@@ -770,7 +770,7 @@ mod tests {
         QoS,
     };
 
-    use super::{Connect, LastWill, ConnectFlags};
+    use super::{Connect, ConnectFlags, LastWill};
 
     #[test]
     fn read_connect() {
@@ -965,7 +965,7 @@ mod tests {
     }
 
     #[test]
-    fn connect_flag(){
+    fn connect_flag() {
         let byte = 0b1100_1110;
         let flags = ConnectFlags::from_u8(byte).unwrap();
         assert_eq!(byte, flags.into_u8().unwrap());

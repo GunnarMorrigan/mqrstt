@@ -1,4 +1,4 @@
-use async_channel::{Receiver};
+use async_channel::Receiver;
 
 use futures::FutureExt;
 
@@ -11,9 +11,9 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::{MqttHandler, NetworkStatus, AsyncEventHandler};
+use crate::{AsyncEventHandler, MqttHandler, NetworkStatus};
 
-/// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`]. 
+/// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
@@ -34,7 +34,7 @@ pub struct Network<S> {
     to_network_r: Receiver<Packet>,
 }
 
-impl<S> Network<S>{
+impl<S> Network<S> {
     pub fn new(
         options: ConnectOptions,
         mqtt_handler: MqttHandler,
@@ -59,8 +59,9 @@ impl<S> Network<S>{
 }
 
 impl<S> Network<S>
-    where S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin {
-    
+where
+    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+{
     pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
         let (network, connack) = Stream::connect(&self.options, stream).await?;
 
@@ -71,13 +72,17 @@ impl<S> Network<S>
             self.perform_keep_alive = false;
         }
 
-        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer).await?;
-
+        self.mqtt_handler
+            .handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)
+            .await?;
 
         Ok(())
     }
 
-    pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>  where H: AsyncEventHandler {
+    pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    where
+        H: AsyncEventHandler,
+    {
         if self.network.is_none() {
             return Err(ConnectionError::NoNetwork);
         }
@@ -95,7 +100,10 @@ impl<S> Network<S>
         }
     }
 
-    async fn smol_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError> where H: AsyncEventHandler {
+    async fn smol_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    where
+        H: AsyncEventHandler,
+    {
         let Network {
             network,
             options: _,
@@ -127,7 +135,7 @@ impl<S> Network<S>
                         Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
                         Ok(_) => (),
                     }
-                    
+
                     for packet in incoming_packet_buffer.drain(0..){
                         use Packet::*;
                         match packet{
@@ -146,10 +154,10 @@ impl<S> Network<S>
                             }
                         }
                     }
-                    
+
                     stream.write_all(outgoing_packet_buffer).await?;
                     *last_network_action = Instant::now();
-                    
+
                     Ok(NetworkStatus::Active)
                 },
                 outgoing = to_network_r.recv().fuse() => {
