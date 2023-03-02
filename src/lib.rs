@@ -27,7 +27,7 @@
 //! You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
 //!
 //! Smol example:
-//! ```
+//! ```rust
 //! use mqrstt::{
 //!     MqttClient,
 //!     ConnectOptions,
