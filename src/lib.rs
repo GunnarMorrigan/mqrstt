@@ -9,7 +9,6 @@
 //! - The client - which is used to send messages from different places.
 //!
 //! To Do:
-//! - Rebroadcast unacked packets
 //! - Enforce size of outbound messages (e.g. Publish)
 //! - Sync API
 //! - More testing
@@ -178,7 +177,7 @@
 //!     );
 //! }
 //! 
-// //! ```
+//! ```
 
 
 mod available_packet_ids;
