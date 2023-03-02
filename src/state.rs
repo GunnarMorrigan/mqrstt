@@ -134,7 +134,7 @@ impl State {
 
         if retransmission {
             for i in outgoing_pub_order {
-                let mut packet = outgoing_pub[(*i - 1) as usize].take().unwrap();
+                let mut packet = outgoing_pub[(*i - 1) as usize].clone().unwrap();
                 packet.dup = true;
                 retransmit.push(Packet::Publish(packet));
             }
@@ -145,7 +145,7 @@ impl State {
         } else {
             freeable_ids.extend(outgoing_pub_order.iter());
 
-            outgoing_pub.clear();
+            *outgoing_pub = vec![None; outgoing_pub.len()];
             outgoing_pub_order.clear();
             outgoing_rel.clear();
         }
