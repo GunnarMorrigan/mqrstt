@@ -19,10 +19,7 @@ impl VariableHeaderRead for Auth {
         let reason_code = AuthReasonCode::read(&mut buf)?;
         let properties = AuthProperties::read(&mut buf)?;
 
-        Ok(Self {
-            reason_code,
-            properties,
-        })
+        Ok(Self { reason_code, properties })
     }
 }
 
@@ -77,29 +74,20 @@ impl MqttRead for AuthProperties {
             match PropertyType::read(&mut property_data)? {
                 PropertyType::ReasonString => {
                     if properties.reason_string.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::SessionExpiryInterval,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
                     }
                     properties.reason_string = Some(String::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((
-                    String::read(&mut property_data)?,
-                    String::read(&mut property_data)?,
-                )),
+                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
                 PropertyType::AuthenticationMethod => {
                     if properties.authentication_method.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::AuthenticationMethod,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
                     }
                     properties.authentication_method = Some(String::read(&mut property_data)?);
                 }
                 PropertyType::AuthenticationData => {
                     if properties.authentication_data.is_empty() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::AuthenticationData,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
                     }
                     properties.authentication_data = Bytes::read(&mut property_data)?;
                 }

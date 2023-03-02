@@ -1,13 +1,8 @@
 use bytes::BufMut;
 
 use super::error::{DeserializeError, SerializeError};
-use super::mqtt_traits::{
-    MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength,
-};
-use super::{
-    read_variable_integer, reason_codes::UnsubAckReasonCode, write_variable_integer, PacketType,
-    PropertyType,
-};
+use super::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
+use super::{read_variable_integer, reason_codes::UnsubAckReasonCode, write_variable_integer, PacketType, PropertyType};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct UnsubAck {
@@ -17,11 +12,7 @@ pub struct UnsubAck {
 }
 
 impl VariableHeaderRead for UnsubAck {
-    fn read(
-        _: u8,
-        _: usize,
-        mut buf: bytes::Bytes,
-    ) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubAckProperties::read(&mut buf)?;
         let mut reason_codes = vec![];
@@ -72,11 +63,7 @@ impl MqttRead for UnsubAckProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "UnsubAckProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("UnsubAckProperties".to_string(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);
@@ -87,23 +74,13 @@ impl MqttRead for UnsubAckProperties {
                     if properties.reason_string.is_none() {
                         properties.reason_string = Some(String::read(&mut properties_data)?);
                     } else {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::SubscriptionIdentifier,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifier));
                     }
                 }
                 PropertyType::UserProperty => {
-                    properties.user_properties.push((
-                        String::read(&mut properties_data)?,
-                        String::read(&mut properties_data)?,
-                    ));
+                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
                 }
-                e => {
-                    return Err(DeserializeError::UnexpectedProperty(
-                        e,
-                        PacketType::UnsubAck,
-                    ))
-                }
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::UnsubAck)),
             }
 
             if buf.is_empty() {

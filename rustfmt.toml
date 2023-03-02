@@ -1,3 +1,4 @@
-unstable_features = true
-brace_style = "PreferSameLine"
-control_brace_style = "ClosingNextLine"
+# unstable_features = true
+# brace_style = "PreferSameLine"
+# control_brace_style = "ClosingNextLine"
+max_width = 200

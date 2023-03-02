@@ -279,15 +279,7 @@ mod lib_test {
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                         if payload.to_lowercase().contains("ping") {
-                            self.client
-                                .publish(
-                                    p.qos,
-                                    p.retain,
-                                    p.topic.clone(),
-                                    Bytes::from_static(b"pong"),
-                                )
-                                .await
-                                .unwrap();
+                            self.client.publish(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).await.unwrap();
                             // println!("Received Ping, Send pong!");
                         }
                     }
@@ -310,17 +302,13 @@ mod lib_test {
 
             let (mut network, client) = new_smol(options);
 
-            let stream = smol::net::TcpStream::connect((address, port))
-                .await
-                .unwrap();
+            let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
 
             network.connect(stream).await.unwrap();
 
             client.subscribe("mqrstt").await.unwrap();
 
-            let mut pingpong = PingPong {
-                client: client.clone(),
-            };
+            let mut pingpong = PingPong { client: client.clone() };
 
             let (n, _) = futures::join!(
                 async {
@@ -332,42 +320,10 @@ mod lib_test {
                     }
                 },
                 async {
-                    client
-                        .publish(
-                            QoS::ExactlyOnce,
-                            false,
-                            "mqrstt".to_string(),
-                            b"ping".repeat(500),
-                        )
-                        .await
-                        .unwrap();
-                    client
-                        .publish(
-                            QoS::AtMostOnce,
-                            true,
-                            "mqrstt".to_string(),
-                            b"ping".to_vec(),
-                        )
-                        .await
-                        .unwrap();
-                    client
-                        .publish(
-                            QoS::AtLeastOnce,
-                            false,
-                            "mqrstt".to_string(),
-                            b"ping".to_vec(),
-                        )
-                        .await
-                        .unwrap();
-                    client
-                        .publish(
-                            QoS::ExactlyOnce,
-                            false,
-                            "mqrstt".to_string(),
-                            b"ping".repeat(500),
-                        )
-                        .await
-                        .unwrap();
+                    client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                    client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
+                    client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
+                    client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
 
                     smol::Timer::after(std::time::Duration::from_secs(20)).await;
                     client.unsubscribe("mqrstt").await.unwrap();
@@ -389,24 +345,19 @@ mod lib_test {
 
             let (mut network, client) = new_smol(options);
 
-            let arc_client_config =
-                simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
+            let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
 
             let domain = ServerName::try_from(address).unwrap();
             let connector = async_rustls::TlsConnector::from(arc_client_config);
 
-            let stream = smol::net::TcpStream::connect((address, port))
-                .await
-                .unwrap();
+            let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
             let connection = connector.connect(domain, stream).await.unwrap();
 
             network.connect(connection).await.unwrap();
 
             client.subscribe("mqrstt").await.unwrap();
 
-            let mut pingpong = PingPong {
-                client: client.clone(),
-            };
+            let mut pingpong = PingPong { client: client.clone() };
 
             let (n, _) = futures::join!(
                 async {
@@ -433,17 +384,13 @@ mod lib_test {
 
         let (mut network, client) = new_tokio(options);
 
-        let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
-            .await
-            .unwrap();
+        let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
         network.connect(stream).await.unwrap();
 
         client.subscribe("mqrstt").await.unwrap();
 
-        let mut pingpong = PingPong {
-            client: client.clone(),
-        };
+        let mut pingpong = PingPong { client: client.clone() };
 
         let (n, _) = tokio::join!(
             async {
@@ -455,42 +402,10 @@ mod lib_test {
                 }
             },
             async {
-                client
-                    .publish(
-                        QoS::ExactlyOnce,
-                        false,
-                        "mqrstt".to_string(),
-                        b"ping".repeat(500),
-                    )
-                    .await
-                    .unwrap();
-                client
-                    .publish(
-                        QoS::AtMostOnce,
-                        true,
-                        "mqrstt".to_string(),
-                        b"ping".to_vec(),
-                    )
-                    .await
-                    .unwrap();
-                client
-                    .publish(
-                        QoS::AtLeastOnce,
-                        false,
-                        "mqrstt".to_string(),
-                        b"ping".to_vec(),
-                    )
-                    .await
-                    .unwrap();
-                client
-                    .publish(
-                        QoS::ExactlyOnce,
-                        false,
-                        "mqrstt".to_string(),
-                        b"ping".repeat(500),
-                    )
-                    .await
-                    .unwrap();
+                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
+                client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
+                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
 
                 client.unsubscribe("mqrstt").await.unwrap();
 
@@ -514,35 +429,26 @@ mod lib_test {
 
         let (mut network, client) = new_tokio(options);
 
-        let arc_client_config =
-            simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
+        let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
 
         let domain = ServerName::try_from(address).unwrap();
         let connector = tokio_rustls::TlsConnector::from(arc_client_config);
 
-        let stream = tokio::net::TcpStream::connect((address, port))
-            .await
-            .unwrap();
+        let stream = tokio::net::TcpStream::connect((address, port)).await.unwrap();
         let connection = connector.connect(domain, stream).await.unwrap();
 
         network.connect(connection).await.unwrap();
 
         client.subscribe("mqrstt").await.unwrap();
 
-        let mut pingpong = PingPong {
-            client: client.clone(),
-        };
+        let mut pingpong = PingPong { client: client.clone() };
 
         let (n, _) = tokio::join!(
             async {
                 loop {
                     return match network.poll(&mut pingpong).await {
-                        Ok(NetworkStatus::IncomingDisconnect) => {
-                            Ok(NetworkStatus::IncomingDisconnect)
-                        }
-                        Ok(NetworkStatus::OutgoingDisconnect) => {
-                            Ok(NetworkStatus::OutgoingDisconnect)
-                        }
+                        Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
+                        Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
                         Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
                         Ok(NetworkStatus::Active) => continue,
                         Err(a) => Err(a),
@@ -565,10 +471,7 @@ mod lib_test {
 
     impl PingResp {
         pub fn new(client: MqttClient) -> Self {
-            Self {
-                client,
-                ping_resp_received: 0,
-            }
+            Self { client, ping_resp_received: 0 }
         }
     }
 
@@ -592,9 +495,7 @@ mod lib_test {
 
         let (mut network, client) = new_tokio(options);
 
-        let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
-            .await
-            .unwrap();
+        let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
         network.connect(stream).await.unwrap();
 
@@ -638,9 +539,7 @@ mod lib_test {
 
             let (mut network, client) = new_smol(options);
 
-            let stream = smol::net::TcpStream::connect((address, port))
-                .await
-                .unwrap();
+            let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
 
             network.connect(stream).await.unwrap();
 

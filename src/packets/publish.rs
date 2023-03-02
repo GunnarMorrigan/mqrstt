@@ -1,12 +1,9 @@
 use bytes::{BufMut, Bytes};
 
-use super::mqtt_traits::{
-    MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength,
-};
+use super::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
 use super::{
     error::{DeserializeError, SerializeError},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
-    QoS,
+    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,14 +31,7 @@ pub struct Publish {
 }
 
 impl Publish {
-    pub fn new(
-        qos: QoS,
-        retain: bool,
-        topic: String,
-        packet_identifier: Option<u16>,
-        publish_properties: PublishProperties,
-        payload: Bytes,
-    ) -> Self {
+    pub fn new(qos: QoS, retain: bool, topic: String, packet_identifier: Option<u16>, publish_properties: PublishProperties, payload: Bytes) -> Self {
         Self {
             dup: false,
             qos,
@@ -154,11 +144,7 @@ impl MqttRead for PublishProperties {
         if len == 0 {
             return Ok(Self::default());
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(
-                "PublishProperties".to_string(),
-                buf.len(),
-                len,
-            ));
+            return Err(DeserializeError::InsufficientData("PublishProperties".to_string(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -169,58 +155,41 @@ impl MqttRead for PublishProperties {
             match PropertyType::from_u8(u8::read(&mut property_data)?)? {
                 PropertyType::PayloadFormatIndicator => {
                     if properties.payload_format_indicator.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::PayloadFormatIndicator,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator));
                     }
                     properties.payload_format_indicator = Some(u8::read(&mut property_data)?);
                 }
                 PropertyType::MessageExpiryInterval => {
                     if properties.message_expiry_interval.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::MessageExpiryInterval,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval));
                     }
                     properties.message_expiry_interval = Some(u32::read(&mut property_data)?);
                 }
                 PropertyType::TopicAlias => {
                     if properties.topic_alias.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::TopicAlias,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::TopicAlias));
                     }
                     properties.topic_alias = Some(u16::read(&mut property_data)?);
                 }
                 PropertyType::ResponseTopic => {
                     if properties.response_topic.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ResponseTopic,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic));
                     }
                     properties.response_topic = Some(String::read(&mut property_data)?);
                 }
                 PropertyType::CorrelationData => {
                     if properties.correlation_data.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::CorrelationData,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::CorrelationData));
                     }
                     properties.correlation_data = Some(Bytes::read(&mut property_data)?);
                 }
                 PropertyType::SubscriptionIdentifier => {
-                    properties
-                        .subscription_identifier
-                        .push(read_variable_integer(&mut property_data)?.0);
+                    properties.subscription_identifier.push(read_variable_integer(&mut property_data)?.0);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((
-                    String::read(&mut property_data)?,
-                    String::read(&mut property_data)?,
-                )),
+                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
                 PropertyType::ContentType => {
                     if properties.content_type.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(
-                            PropertyType::ContentType,
-                        ));
+                        return Err(DeserializeError::DuplicateProperty(PropertyType::ContentType));
                     }
                     properties.content_type = Some(String::read(&mut property_data)?);
                 }

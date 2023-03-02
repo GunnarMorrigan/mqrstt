@@ -49,62 +49,27 @@ impl MqttHandler {
     /// In some cases (retransmitted Publish packets) the users handler should not be called to avoid duplicate delivery.
     /// true is returned if the users handler should be called
     /// false otherwise
-    pub async fn handle_incoming_packet(
-        &mut self,
-        packet: &Packet,
-        outgoing_packet_buffer: &mut Vec<Packet>,
-    ) -> Result<bool, HandlerError> {
+    pub async fn handle_incoming_packet(&mut self, packet: &Packet, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<bool, HandlerError> {
         match packet {
-            Packet::Publish(publish) => {
-                return self
-                    .handle_incoming_publish(publish, outgoing_packet_buffer)
-                    .await
-            }
-            Packet::PubAck(puback) => {
-                self.handle_incoming_puback(puback, outgoing_packet_buffer)
-                    .await?
-            }
-            Packet::PubRec(pubrec) => {
-                self.handle_incoming_pubrec(pubrec, outgoing_packet_buffer)
-                    .await?
-            }
-            Packet::PubRel(pubrel) => {
-                self.handle_incoming_pubrel(pubrel, outgoing_packet_buffer)
-                    .await?
-            }
-            Packet::PubComp(pubcomp) => {
-                self.handle_incoming_pubcomp(pubcomp, outgoing_packet_buffer)
-                    .await?
-            }
-            Packet::SubAck(suback) => {
-                self.handle_incoming_suback(suback, outgoing_packet_buffer)
-                    .await?
-            }
-            Packet::UnsubAck(unsuback) => {
-                self.handle_incoming_unsuback(unsuback, outgoing_packet_buffer)
-                    .await?
-            }
-            Packet::ConnAck(connack) => {
-                self.handle_incoming_connack(connack, outgoing_packet_buffer)
-                    .await?
-            }
+            Packet::Publish(publish) => return self.handle_incoming_publish(publish, outgoing_packet_buffer).await,
+            Packet::PubAck(puback) => self.handle_incoming_puback(puback, outgoing_packet_buffer).await?,
+            Packet::PubRec(pubrec) => self.handle_incoming_pubrec(pubrec, outgoing_packet_buffer).await?,
+            Packet::PubRel(pubrel) => self.handle_incoming_pubrel(pubrel, outgoing_packet_buffer).await?,
+            Packet::PubComp(pubcomp) => self.handle_incoming_pubcomp(pubcomp, outgoing_packet_buffer).await?,
+            Packet::SubAck(suback) => self.handle_incoming_suback(suback, outgoing_packet_buffer).await?,
+            Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback, outgoing_packet_buffer).await?,
+            Packet::ConnAck(connack) => self.handle_incoming_connack(connack, outgoing_packet_buffer).await?,
             a => unreachable!("Should not receive {}", a),
         };
         Ok(false)
     }
 
-    async fn handle_incoming_publish(
-        &mut self,
-        publish: &Publish,
-        outgoing_packet_buffer: &mut Vec<Packet>,
-    ) -> Result<bool, HandlerError> {
+    async fn handle_incoming_publish(&mut self, publish: &Publish, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<bool, HandlerError> {
         match publish.qos {
             QoS::AtMostOnce => Ok(true),
             QoS::AtLeastOnce => {
                 let puback = PubAck {
-                    packet_identifier: publish
-                        .packet_identifier
-                        .ok_or(HandlerError::MissingPacketId)?,
+                    packet_identifier: publish.packet_identifier.ok_or(HandlerError::MissingPacketId)?,
                     reason_code: PubAckReasonCode::Success,
                     properties: PubAckProperties::default(),
                 };
@@ -113,15 +78,10 @@ impl MqttHandler {
             }
             QoS::ExactlyOnce => {
                 let mut should_client_handle = true;
-                let pkid = publish
-                    .packet_identifier
-                    .ok_or(HandlerError::MissingPacketId)?;
+                let pkid = publish.packet_identifier.ok_or(HandlerError::MissingPacketId)?;
 
                 if !self.state.add_incoming_pub(pkid) && !publish.dup {
-                    warn!(
-                        "Received publish with an packet ID ({}) that is in use and the packet was not a duplicate",
-                        pkid,
-                    );
+                    warn!("Received publish with an packet ID ({}) that is in use and the packet was not a duplicate", pkid,);
                     should_client_handle = false;
                 }
                 outgoing_packet_buffer.push(Packet::PubRec(PubRec::new(pkid)));
@@ -130,40 +90,19 @@ impl MqttHandler {
         }
     }
 
-    async fn handle_incoming_puback(
-        &mut self,
-        puback: &PubAck,
-        _: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
-        if self
-            .state
-            .remove_outgoing_pub(puback.packet_identifier)
-            .is_some()
-        {
+    async fn handle_incoming_puback(&mut self, puback: &PubAck, _: &mut Vec<Packet>) -> Result<(), HandlerError> {
+        if self.state.remove_outgoing_pub(puback.packet_identifier).is_some() {
             #[cfg(test)]
-            debug!(
-                "Publish {:?} has been acknowledged",
-                puback.packet_identifier
-            );
+            debug!("Publish {:?} has been acknowledged", puback.packet_identifier);
             self.state.make_pkid_available(puback.packet_identifier)?;
             Ok(())
         } else {
-            error!(
-                "Publish {:?} was not found, while receiving a PubAck for it",
-                puback.packet_identifier,
-            );
-            Err(HandlerError::Unsolicited(
-                puback.packet_identifier,
-                PacketType::PubAck,
-            ))
+            error!("Publish {:?} was not found, while receiving a PubAck for it", puback.packet_identifier,);
+            Err(HandlerError::Unsolicited(puback.packet_identifier, PacketType::PubAck))
         }
     }
 
-    async fn handle_incoming_pubrec(
-        &mut self,
-        pubrec: &PubRec,
-        outgoing_packet_buffer: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
+    async fn handle_incoming_pubrec(&mut self, pubrec: &PubRec, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<(), HandlerError> {
         match self.state.remove_outgoing_pub(pubrec.packet_identifier) {
             Some(_) => match pubrec.reason_code {
                 PubRecReasonCode::Success | PubRecReasonCode::NoMatchingSubscribers => {
@@ -180,100 +119,53 @@ impl MqttHandler {
                 _ => Ok(()),
             },
             None => {
-                error!(
-                    "Publish {} was not found, while receiving a PubRec for it",
-                    pubrec.packet_identifier,
-                );
-                Err(HandlerError::Unsolicited(
-                    pubrec.packet_identifier,
-                    PacketType::PubRec,
-                ))
+                error!("Publish {} was not found, while receiving a PubRec for it", pubrec.packet_identifier,);
+                Err(HandlerError::Unsolicited(pubrec.packet_identifier, PacketType::PubRec))
             }
         }
     }
 
-    async fn handle_incoming_pubrel(
-        &mut self,
-        pubrel: &PubRel,
-        outgoing_packet_buffer: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
+    async fn handle_incoming_pubrel(&mut self, pubrel: &PubRel, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<(), HandlerError> {
         if self.state.remove_incoming_pub(pubrel.packet_identifier) {
             let pubcomp = PubComp::new(pubrel.packet_identifier);
             outgoing_packet_buffer.push(Packet::PubComp(pubcomp));
             Ok(())
         } else {
-            Err(HandlerError::Unsolicited(
-                pubrel.packet_identifier,
-                PacketType::PubRel,
-            ))
+            Err(HandlerError::Unsolicited(pubrel.packet_identifier, PacketType::PubRel))
         }
     }
 
-    async fn handle_incoming_pubcomp(
-        &mut self,
-        pubcomp: &PubComp,
-        _: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
+    async fn handle_incoming_pubcomp(&mut self, pubcomp: &PubComp, _: &mut Vec<Packet>) -> Result<(), HandlerError> {
         if self.state.remove_outgoing_rel(&pubcomp.packet_identifier) {
             self.state.make_pkid_available(pubcomp.packet_identifier)?;
             Ok(())
         } else {
-            error!(
-                "PubRel {} was not found, while receiving a PubComp for it",
-                pubcomp.packet_identifier,
-            );
-            Err(HandlerError::Unsolicited(
-                pubcomp.packet_identifier,
-                PacketType::PubComp,
-            ))
+            error!("PubRel {} was not found, while receiving a PubComp for it", pubcomp.packet_identifier,);
+            Err(HandlerError::Unsolicited(pubcomp.packet_identifier, PacketType::PubComp))
         }
     }
 
-    async fn handle_incoming_suback(
-        &mut self,
-        suback: &SubAck,
-        _: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
+    async fn handle_incoming_suback(&mut self, suback: &SubAck, _: &mut Vec<Packet>) -> Result<(), HandlerError> {
         if self.state.remove_outgoing_sub(suback.packet_identifier) {
             self.state.make_pkid_available(suback.packet_identifier)?;
             Ok(())
         } else {
-            error!(
-                "Sub {} was not found, while receiving a SubAck for it",
-                suback.packet_identifier,
-            );
-            Err(HandlerError::Unsolicited(
-                suback.packet_identifier,
-                PacketType::SubAck,
-            ))
+            error!("Sub {} was not found, while receiving a SubAck for it", suback.packet_identifier,);
+            Err(HandlerError::Unsolicited(suback.packet_identifier, PacketType::SubAck))
         }
     }
 
-    async fn handle_incoming_unsuback(
-        &mut self,
-        unsuback: &UnsubAck,
-        _: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
+    async fn handle_incoming_unsuback(&mut self, unsuback: &UnsubAck, _: &mut Vec<Packet>) -> Result<(), HandlerError> {
         if self.state.remove_outgoing_unsub(unsuback.packet_identifier) {
             self.state.make_pkid_available(unsuback.packet_identifier)?;
             Ok(())
         } else {
-            error!(
-                "Unsub {} was not found, while receiving a unsuback for it",
-                unsuback.packet_identifier,
-            );
-            Err(HandlerError::Unsolicited(
-                unsuback.packet_identifier,
-                PacketType::UnsubAck,
-            ))
+            error!("Unsub {} was not found, while receiving a unsuback for it", unsuback.packet_identifier,);
+            Err(HandlerError::Unsolicited(unsuback.packet_identifier, PacketType::UnsubAck))
         }
     }
 
-    async fn handle_incoming_connack(
-        &mut self,
-        packet: &ConnAck,
-        outgoing_packet_buffer: &mut Vec<Packet>,
-    ) -> Result<(), HandlerError> {
+    async fn handle_incoming_connack(&mut self, packet: &ConnAck, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<(), HandlerError> {
         if packet.reason_code == ConnAckReasonCode::Success {
             let retransmission = packet.connack_flags.session_present && !self.clean_start;
             let (freeable_ids, mut republish) = self.state.reset(retransmission);
@@ -306,62 +198,34 @@ impl MqttHandler {
         let id = publish.packet_identifier;
         match publish.qos {
             QoS::AtMostOnce => Ok(()),
-            QoS::AtLeastOnce => {
-                match self
-                    .state
-                    .add_outgoing_pub(publish.packet_identifier.unwrap(), publish)
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => {
-                        error!(
-                            "Encountered a colliding packet ID ({:?}) in a publish QoS 1 packet",
-                            id,
-                        );
-                        Err(err)
-                    }
+            QoS::AtLeastOnce => match self.state.add_outgoing_pub(publish.packet_identifier.unwrap(), publish) {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    error!("Encountered a colliding packet ID ({:?}) in a publish QoS 1 packet", id,);
+                    Err(err)
                 }
-            }
-            QoS::ExactlyOnce => {
-                match self
-                    .state
-                    .add_outgoing_pub(publish.packet_identifier.unwrap(), publish)
-                {
-                    Ok(_) => Ok(()),
-                    Err(err) => {
-                        error!(
-                            "Encountered a colliding packet ID ({:?}) in a publish QoS 2 packet",
-                            id,
-                        );
-                        Err(err)
-                    }
+            },
+            QoS::ExactlyOnce => match self.state.add_outgoing_pub(publish.packet_identifier.unwrap(), publish) {
+                Ok(_) => Ok(()),
+                Err(err) => {
+                    error!("Encountered a colliding packet ID ({:?}) in a publish QoS 2 packet", id,);
+                    Err(err)
                 }
-            }
+            },
         }
     }
 
     async fn handle_outgoing_subscribe(&mut self, sub: Subscribe) -> Result<(), HandlerError> {
-        info!(
-            "handling outgoing subscribe with ID: {}",
-            sub.packet_identifier
-        );
+        info!("handling outgoing subscribe with ID: {}", sub.packet_identifier);
         if !self.state.add_outgoing_sub(sub.packet_identifier) {
-            error!(
-                "Encountered a colliding packet ID ({}) in a subscribe packet\n {:?}",
-                sub.packet_identifier, sub,
-            );
+            error!("Encountered a colliding packet ID ({}) in a subscribe packet\n {:?}", sub.packet_identifier, sub,);
         }
         Ok(())
     }
 
-    async fn handle_outgoing_unsubscribe(
-        &mut self,
-        unsub: Unsubscribe,
-    ) -> Result<(), HandlerError> {
+    async fn handle_outgoing_unsubscribe(&mut self, unsub: Unsubscribe) -> Result<(), HandlerError> {
         if !self.state.add_outgoing_unsub(unsub.packet_identifier) {
-            error!(
-                "Encountered a colliding packet ID ({}) in a unsubscribe packet",
-                unsub.packet_identifier,
-            );
+            error!("Encountered a colliding packet ID ({}) in a unsubscribe packet", unsub.packet_identifier,);
         }
         Ok(())
     }
@@ -377,17 +241,10 @@ mod handler_tests {
 
     use crate::{
         packets::{
-            reason_codes::{
-                PubCompReasonCode, PubRecReasonCode, PubRelReasonCode, SubAckReasonCode,
-                UnsubAckReasonCode,
-            },
-            Packet, QoS, UnsubAck, UnsubAckProperties, {PubComp, PubCompProperties},
-            {PubRec, PubRecProperties}, {PubRel, PubRelProperties}, {SubAck, SubAckProperties},
+            reason_codes::{PubCompReasonCode, PubRecReasonCode, PubRelReasonCode, SubAckReasonCode, UnsubAckReasonCode},
+            Packet, QoS, UnsubAck, UnsubAckProperties, {PubComp, PubCompProperties}, {PubRec, PubRecProperties}, {PubRel, PubRelProperties}, {SubAck, SubAckProperties},
         },
-        tests::test_packets::{
-            create_connack_packet, create_puback_packet, create_publish_packet,
-            create_subscribe_packet, create_unsubscribe_packet,
-        },
+        tests::test_packets::{create_connack_packet, create_puback_packet, create_publish_packet, create_subscribe_packet, create_unsubscribe_packet},
         AsyncEventHandler, ConnectOptions, MqttHandler,
     };
 
@@ -428,29 +285,16 @@ mod handler_tests {
         let pkid = apkid.recv().await.unwrap();
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(pkid));
 
-        handler
-            .handle_outgoing_packet(pub_packet.clone())
-            .await
-            .unwrap();
+        handler.handle_outgoing_packet(pub_packet.clone()).await.unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert_eq!(handler.state.outgoing_pub_order().len(), 1);
-        assert_eq!(
-            Packet::Publish(
-                handler.state.outgoing_pub()[pkid as usize - 1]
-                    .clone()
-                    .unwrap()
-            ),
-            pub_packet
-        );
+        assert_eq!(Packet::Publish(handler.state.outgoing_pub()[pkid as usize - 1].clone().unwrap()), pub_packet);
         assert!(handler.state.outgoing_rel().is_empty());
         assert!(handler.state.outgoing_sub().is_empty());
 
         let puback = create_puback_packet(pkid);
-        handler
-            .handle_incoming_packet(&puback, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&puback, &mut resp_vec).await.unwrap();
 
         assert!(resp_vec.is_empty());
         assert!(handler.state.incoming_pub().is_empty());
@@ -467,10 +311,7 @@ mod handler_tests {
 
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
 
-        handler
-            .handle_incoming_packet(&pub_packet, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&pub_packet, &mut resp_vec).await.unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub_order().is_empty());
@@ -490,20 +331,10 @@ mod handler_tests {
         let pkid = apkid.recv().await.unwrap();
         let pub_packet = create_publish_packet(QoS::ExactlyOnce, false, false, Some(pkid));
 
-        handler
-            .handle_outgoing_packet(pub_packet.clone())
-            .await
-            .unwrap();
+        handler.handle_outgoing_packet(pub_packet.clone()).await.unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
-        assert_eq!(
-            pub_packet.clone(),
-            Packet::Publish(
-                handler.state.outgoing_pub()[pkid as usize - 1]
-                    .clone()
-                    .unwrap()
-            )
-        );
+        assert_eq!(pub_packet.clone(), Packet::Publish(handler.state.outgoing_pub()[pkid as usize - 1].clone().unwrap()));
         assert_eq!(1, handler.state.outgoing_pub_order().len());
         assert!(handler.state.outgoing_rel().is_empty());
         assert!(handler.state.outgoing_sub().is_empty());
@@ -514,15 +345,10 @@ mod handler_tests {
             properties: PubRecProperties::default(),
         });
 
-        handler
-            .handle_incoming_packet(&pubrec, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&pubrec, &mut resp_vec).await.unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
-        assert!(handler.state.outgoing_pub()[pkid as usize - 1]
-            .clone()
-            .is_none());
+        assert!(handler.state.outgoing_pub()[pkid as usize - 1].clone().is_none());
         assert_eq!(0, handler.state.outgoing_pub_order().len());
         assert_eq!(1, handler.state.outgoing_rel().len());
         assert_eq!(1, *handler.state.outgoing_rel().first().unwrap());
@@ -541,16 +367,11 @@ mod handler_tests {
             properties: PubCompProperties::default(),
         });
 
-        handler
-            .handle_incoming_packet(&pubcomp, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&pubcomp, &mut resp_vec).await.unwrap();
 
         assert!(resp_vec.is_empty());
         assert!(handler.state.incoming_pub().is_empty());
-        assert!(handler.state.outgoing_pub()[pkid as usize - 1]
-            .clone()
-            .is_none());
+        assert!(handler.state.outgoing_pub()[pkid as usize - 1].clone().is_none());
         assert!(handler.state.outgoing_pub_order().is_empty());
         assert!(handler.state.outgoing_rel().is_empty());
         assert!(handler.state.outgoing_sub().is_empty());
@@ -564,10 +385,7 @@ mod handler_tests {
         let pkid = apkid.recv().await.unwrap();
         let pub_packet = create_publish_packet(QoS::ExactlyOnce, false, false, Some(pkid));
 
-        handler
-            .handle_incoming_packet(&pub_packet, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&pub_packet, &mut resp_vec).await.unwrap();
 
         assert_eq!(1, handler.state.incoming_pub().len());
         assert!(handler.state.outgoing_pub_order().is_empty());
@@ -595,10 +413,7 @@ mod handler_tests {
             properties: PubRelProperties::default(),
         });
 
-        handler
-            .handle_incoming_packet(&pubrel, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&pubrel, &mut resp_vec).await.unwrap();
 
         let pubcomp = Packet::PubComp(PubComp {
             packet_identifier: pkid,
@@ -638,10 +453,7 @@ mod handler_tests {
             properties: SubAckProperties::default(),
         });
 
-        handler
-            .handle_incoming_packet(&suback, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&suback, &mut resp_vec).await.unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub_order().is_empty());
@@ -674,10 +486,7 @@ mod handler_tests {
             properties: UnsubAckProperties::default(),
         });
 
-        handler
-            .handle_incoming_packet(&unsuback, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&unsuback, &mut resp_vec).await.unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub_order().is_empty());
@@ -707,10 +516,7 @@ mod handler_tests {
 
         let connack = create_connack_packet(true);
 
-        handler
-            .handle_incoming_packet(&connack, &mut resp_vec)
-            .await
-            .unwrap();
+        handler.handle_incoming_packet(&connack, &mut resp_vec).await.unwrap();
 
         assert_eq!(stored_published_packets.len(), resp_vec.len());
         for i in 0..stored_published_packets.len() {

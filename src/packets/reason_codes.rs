@@ -34,11 +34,7 @@ pub enum ConnAckReasonCode {
 impl MqttRead for ConnAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "ConAckReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("ConAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -112,11 +108,7 @@ pub enum AuthReasonCode {
 impl MqttRead for AuthReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "AuthReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("AuthReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -178,11 +170,7 @@ pub enum DisconnectReasonCode {
 impl MqttRead for DisconnectReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "DisconnectReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("DisconnectReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -276,11 +264,7 @@ pub enum PubAckReasonCode {
 impl MqttRead for PubAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "PubAckReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("PubAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -327,11 +311,7 @@ pub enum PubCompReasonCode {
 impl MqttRead for PubCompReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "PubCompReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("PubCompReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -370,11 +350,7 @@ pub enum PubRecReasonCode {
 impl MqttRead for PubRecReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "PubRecReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("PubRecReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -420,11 +396,7 @@ pub enum PubRelReasonCode {
 impl MqttRead for PubRelReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "PubRelReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("PubRelReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -466,11 +438,7 @@ pub enum SubAckReasonCode {
 impl MqttRead for SubAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "SubAckReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("SubAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -527,11 +495,7 @@ pub enum UnsubAckReasonCode {
 impl MqttRead for UnsubAckReasonCode {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(
-                "UnsubAckReasonCode".to_string(),
-                0,
-                1,
-            ));
+            return Err(DeserializeError::InsufficientData("UnsubAckReasonCode".to_string(), 0, 1));
         }
 
         match buf.get_u8() {

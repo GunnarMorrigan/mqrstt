@@ -35,11 +35,7 @@ pub struct Network<S> {
 }
 
 impl<S> Network<S> {
-    pub fn new(
-        options: ConnectOptions,
-        mqtt_handler: MqttHandler,
-        to_network_r: Receiver<Packet>,
-    ) -> Self {
+    pub fn new(options: ConnectOptions, mqtt_handler: MqttHandler, to_network_r: Receiver<Packet>) -> Self {
         Self {
             network: None,
 
@@ -76,9 +72,7 @@ where
             self.perform_keep_alive = false;
         }
 
-        self.mqtt_handler
-            .handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)
-            .await?;
+        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer).await?;
 
         Ok(())
     }
@@ -122,11 +116,9 @@ where
 
         let sleep;
         if let Some(instant) = await_pingresp {
-            sleep =
-                *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+            sleep = *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
         } else {
-            sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s)
-                - Instant::now();
+            sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
         }
 
         if let Some(stream) = network {

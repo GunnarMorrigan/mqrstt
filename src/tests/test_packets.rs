@@ -4,8 +4,7 @@ use rstest::*;
 
 use crate::packets::{
     reason_codes::{DisconnectReasonCode, PubAckReasonCode},
-    ConnAck, Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish,
-    PublishProperties, QoS, Subscribe, Subscription, Unsubscribe,
+    ConnAck, Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties, QoS, Subscribe, Subscription, Unsubscribe,
 };
 
 fn publish_packet_1() -> Packet {
@@ -101,12 +100,7 @@ pub fn create_unsubscribe_packet(packet_identifier: u16) -> Packet {
     Packet::Unsubscribe(sub)
 }
 
-pub fn create_publish_packet(
-    qos: QoS,
-    dup: bool,
-    retain: bool,
-    packet_identifier: Option<u16>,
-) -> Packet {
+pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifier: Option<u16>) -> Packet {
     Packet::Publish(Publish {
         dup,
         qos,

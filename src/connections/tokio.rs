@@ -12,10 +12,7 @@ use crate::packets::{
     reason_codes::ConnAckReasonCode,
     {FixedHeader, Packet, PacketType},
 };
-use crate::{
-    connect_options::ConnectOptions, connections::create_connect_from_options,
-    error::ConnectionError,
-};
+use crate::{connect_options::ConnectOptions, connections::create_connect_from_options, error::ConnectionError};
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -36,9 +33,7 @@ impl<S> Stream<S> {
         let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
 
         if header.remaining_length + header_length > self.read_buffer.len() {
-            return Err(ReadBytes::InsufficientBytes(
-                header.remaining_length - self.read_buffer.len(),
-            ));
+            return Err(ReadBytes::InsufficientBytes(header.remaining_length - self.read_buffer.len()));
         }
 
         self.read_buffer.advance(header_length);
@@ -47,10 +42,7 @@ impl<S> Stream<S> {
         Ok(Packet::read(header, buf.into())?)
     }
 
-    pub async fn parse_messages(
-        &mut self,
-        incoming_packet_buffer: &mut Vec<Packet>,
-    ) -> Result<(), ReadBytes<ConnectionError>> {
+    pub async fn parse_messages(&mut self, incoming_packet_buffer: &mut Vec<Packet>) -> Result<(), ReadBytes<ConnectionError>> {
         loop {
             if self.read_buffer.is_empty() {
                 return Ok(());
@@ -58,9 +50,7 @@ impl<S> Stream<S> {
             let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
 
             if header.remaining_length + header_length > self.read_buffer.len() {
-                return Err(ReadBytes::InsufficientBytes(
-                    header.remaining_length - self.read_buffer.len(),
-                ));
+                return Err(ReadBytes::InsufficientBytes(header.remaining_length - self.read_buffer.len()));
             }
 
             self.read_buffer.advance(header_length);
@@ -82,10 +72,7 @@ impl<S> Stream<S>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Sized + Unpin,
 {
-    pub async fn connect(
-        options: &ConnectOptions,
-        stream: S,
-    ) -> Result<(Self, Packet), ConnectionError> {
+    pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, Packet), ConnectionError> {
         let mut s = Self {
             stream,
             const_buffer: [0; 1000],
@@ -111,42 +98,33 @@ where
 
     pub async fn read(&mut self) -> io::Result<Packet> {
         loop {
-            let (header, header_length) =
-                match FixedHeader::read_fixed_header(self.read_buffer.iter()) {
-                    Ok(header) => header,
-                    Err(ReadBytes::InsufficientBytes(required_len)) => {
-                        self.read_required_bytes(required_len).await?;
-                        continue;
-                    }
-                    Err(ReadBytes::Err(err)) => {
-                        return Err(Error::new(ErrorKind::InvalidData, err))
-                    }
-                };
+            let (header, header_length) = match FixedHeader::read_fixed_header(self.read_buffer.iter()) {
+                Ok(header) => header,
+                Err(ReadBytes::InsufficientBytes(required_len)) => {
+                    self.read_required_bytes(required_len).await?;
+                    continue;
+                }
+                Err(ReadBytes::Err(err)) => return Err(Error::new(ErrorKind::InvalidData, err)),
+            };
 
             self.read_buffer.advance(header_length);
 
             if header.remaining_length > self.read_buffer.len() {
-                self.read_required_bytes(header.remaining_length - self.read_buffer.len())
-                    .await?;
+                self.read_required_bytes(header.remaining_length - self.read_buffer.len()).await?;
             }
 
             let buf = self.read_buffer.split_to(header.remaining_length);
 
-            return Packet::read(header, buf.into())
-                .map_err(|err| Error::new(ErrorKind::InvalidData, err));
+            return Packet::read(header, buf.into()).map_err(|err| Error::new(ErrorKind::InvalidData, err));
         }
     }
 
     pub async fn read_bytes(&mut self) -> io::Result<usize> {
         let read = self.stream.read(&mut self.const_buffer).await?;
         if read == 0 {
-            Err(io::Error::new(
-                io::ErrorKind::ConnectionReset,
-                "Connection reset by peer",
-            ))
+            Err(io::Error::new(io::ErrorKind::ConnectionReset, "Connection reset by peer"))
         } else {
-            self.read_buffer
-                .extend_from_slice(&self.const_buffer[0..read]);
+            self.read_buffer.extend_from_slice(&self.const_buffer[0..read]);
             Ok(read)
         }
     }
