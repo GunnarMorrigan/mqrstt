@@ -9,6 +9,9 @@
 
 `mqrstt` is an MQTTv5 client implementation that allows for the smol and tokio runtimes. In the future we will also support a sync implementation.
 
+Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
+The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+
 </div>
 
 ## Features
@@ -18,16 +21,18 @@
   - Lean
   - Keep alive depends on actual communication
   
-### To do
-  - Enforce size of outbound messages (e.g. Publish)
-  - Sync API
-  - More testing
-  - More documentation
-  - Remove logging calls or move all to test flag
+  ### To do
+    - Enforce size of outbound messages (e.g. Publish)
+    - Sync API
+    - More testing
+    - More documentation
+    - Remove logging calls or move all to test flag
 
 ## Examples
-
-You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
+  ### Notes:
+  - Your handler should not wait too long
+  - Create a new connection when an error or disconnect is encountered
+  - Handlers only get incoming packets
 
 ### Smol example:
 ```rust
@@ -100,7 +105,6 @@ smol::block_on(async {
     assert!(n.is_ok());
 });
 ```
-
 
 ### Tokio example:
 ```rust
@@ -195,9 +199,6 @@ async fn main() {
 
  - Please ask :)
 
-## Important notes:
- - Handlers only get incoming packets.
-
 ## Size
 With the smol runtime you can create very small binaries. A simple PingPong smol TCP client can be had for 550\~KB and with TLS you are looking at 1.5\~ MB using the following flags. This makes `mqrstt` extremely usefull for embedded devices! :)
 ```
@@ -209,7 +210,6 @@ strip = true
 ```
 
 ## License
-
 Licensed under
 
 * Mozilla Public License, Version 2.0, [(MPL-2.0)](https://choosealicense.com/licenses/mpl-2.0/)

@@ -1,31 +1,18 @@
-//! A pure rust MQTT client which strives to be as efficient as possible.
-//! This crate strives to provide an ergonomic API and design that fits Rust.
+//! A pure rust MQTT client which strives to be easy to use and efficient.
+//! Providing both async and sync options.
 //!
-//! There are three parts to the design of the MQTT client. The network, the event handler and the client.
-//!
-//! - The network - which simply reads and forms packets from the network.
-//! - The event handler - which makes sure that the MQTT protocol is followed.
-//!   By providing a custom handler messages are handled before they are acked, meaning that they are always handled.
-//! - The client - which is used to send messages from different places.
-//!
-//! To Do:
-//! - Enforce size of outbound messages (e.g. Publish)
-//! - Sync API
-//! - More testing
-//! - More documentation
-//! - Remove logging calls or move all to test flag
-//!
-//! A few questions still remain:
-//! - This crate uses async channels to perform communication across its parts. Is there a better approach?
-//!   These channels do allow the user to decouple the network, handlers, and clients very easily.
-//! - MPL-2.0 vs MIT OR APACHE 2.0 license? [poll](https://github.com/GunnarMorrigan/mqrstt/discussions/2)
-//! - The handler currently only gets INCOMING packets
-//!
-//!
-//!
-//! You want to reconnect (with a new stream) after the network encountered an error or a disconnect took place!
-//!
+//! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
+//! The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+//! 
+//! Notes:
+//! ----------------------------
+//! - Your handler should not wait too long
+//! - Create a new connection when an error or disconnect is encountered
+//! - Handlers only get incoming packets
+//! 
+//! 
 //! Smol example:
+//! ----------------------------
 //! ```rust
 //! use mqrstt::{
 //!     MqttClient,
@@ -175,6 +162,7 @@
 //!             client.disconnect().await.unwrap();
 //!         }
 //!     );
+//!     assert!(n.is_ok());
 //! }
 //! 
 //! ```
