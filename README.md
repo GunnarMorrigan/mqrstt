@@ -192,7 +192,7 @@ async fn main() {
 - What are the advantages over [`rumqttc`](https://crates.io/crates/rumqttc)?
   - Handling of messages by user before acknowledgement.
   - Ping req depending on communication
-  - No `rumqttc` packet id collision errors (It is not possible with `rumqtts`).
+  - No `rumqttc` packet id collision errors (It is not possible with `MQRSTT`).
   - Runtime agnositc 
   - Mqtt version 5 support
 
