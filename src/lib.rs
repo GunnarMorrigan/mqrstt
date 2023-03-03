@@ -479,11 +479,8 @@ mod lib_test {
     impl AsyncEventHandler for PingResp {
         async fn handle(&mut self, event: packets::Packet) -> () {
             use Packet::*;
-            match event {
-                PingResp => {
-                    self.ping_resp_received += 1;
-                }
-                _ => (),
+            if event == PingResp{
+                self.ping_resp_received += 1;
             }
         }
     }

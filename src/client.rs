@@ -146,8 +146,9 @@ mod tests {
     async fn unsubscribe_with_properties_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
 
-        let mut prop = UnsubscribeProperties::default();
-        prop.user_properties = vec![("A".to_string(), "B".to_string())];
+        let prop = UnsubscribeProperties{
+            user_properties: vec![("A".to_string(), "B".to_string())]
+        };
 
         client.unsubscribe_with_properties("Topic", prop.clone()).await.unwrap();
         let unsubscribe = client_to_handler_r.recv().await.unwrap();
@@ -199,8 +200,7 @@ mod tests {
     #[tokio::test]
     async fn disconnect_with_properties_test2() {
         let (client, client_to_handler_r, _) = create_new_test_client();
-        let mut properties = DisconnectProperties::default();
-        properties.reason_string = Some("TestString".to_string());
+        let properties = DisconnectProperties{reason_string: Some("TestString".to_string()), ..Default::default()};
 
         client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, properties.clone()).await.unwrap();
         let disconnect = client_to_handler_r.recv().await.unwrap();
