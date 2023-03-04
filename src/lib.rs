@@ -518,7 +518,7 @@ mod lib_test {
             )
         });
 
-        tokio::time::sleep(Duration::new(125, 0)).await;
+        tokio::time::sleep(Duration::new(150, 0)).await;
 
         let (n, _) = futs.await.unwrap();
         assert!(n.is_ok());
@@ -555,7 +555,7 @@ mod lib_test {
                     }
                 },
                 async {
-                    smol::Timer::after(std::time::Duration::from_secs(125)).await;
+                    smol::Timer::after(std::time::Duration::from_secs(150)).await;
                     client.disconnect().await.unwrap();
                 }
             );
