@@ -31,7 +31,7 @@ impl AvailablePacketIds {
     // 				"Encountered an error while marking an packet id as available. Error: {}",
     // 				err
     // 			);
-    // 			Err(MqttError::PacketIdError(err.into_inner()))
+    // 			Err(MqttError::PacketIdChannelError(err.into_inner()))
     // 		}
     // 	}
     // }
@@ -44,7 +44,7 @@ impl AvailablePacketIds {
             }
             Err(TrySendError::Closed(pkid)) => {
                 error!("Packet Id channel was closed");
-                Err(HandlerError::PacketIdError(pkid))
+                Err(HandlerError::PacketIdChannelError(pkid))
             }
             Err(TrySendError::Full(_)) => {
                 // There can never be more than the predetermined number of packet ids.

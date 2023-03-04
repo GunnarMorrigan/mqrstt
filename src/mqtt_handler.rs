@@ -178,11 +178,6 @@ impl MqttHandler {
         Ok(())
     }
 
-    // async fn handle_incoming_disconnect(&mut self, packet: Disconnect) -> Result<(), MqttError> {
-    //     self.disconnect = true;
-    //     Ok(())
-    // }
-
     pub async fn handle_outgoing_packet(&mut self, packet: Packet) -> Result<(), HandlerError> {
         info!("Handling outgoing packet {}", packet);
         match packet {
@@ -514,9 +509,21 @@ mod handler_tests {
         let pub1 = create_publish_packet(QoS::AtMostOnce, false, false, None);
         handler.handle_outgoing_packet(pub1).await.unwrap();
 
-        let connack = create_connack_packet(true);
+        
+        let pkid = apkid.recv().await.unwrap();
+        let sub1 = create_subscribe_packet(pkid);
+        let pkid = apkid.recv().await.unwrap();
+        let unsub1 = create_unsubscribe_packet(pkid);
+        
+        handler.handle_outgoing_packet(sub1).await.unwrap();
+        handler.handle_outgoing_packet(unsub1).await.unwrap();
 
+        assert_eq!(100 - 4, apkid.len());
+
+        let connack = create_connack_packet(true);
         handler.handle_incoming_packet(&connack, &mut resp_vec).await.unwrap();
+
+        assert_eq!(100 - 2, apkid.len());
 
         assert_eq!(stored_published_packets.len(), resp_vec.len());
         for i in 0..stored_published_packets.len() {

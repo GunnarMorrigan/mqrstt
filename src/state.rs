@@ -21,7 +21,9 @@ pub struct State {
 
     /// Outgoing QoS 1, 2 publishes which aren't acked yet
     outgoing_pub: Vec<Option<Publish>>,
+    /// The order of the publish packets. This needs to be tracked to maintain in order communicaion on retransmit
     outgoing_pub_order: VecDeque<u16>,
+
     /// Packet ids of released QoS 2 publishes
     outgoing_rel: BTreeSet<u16>,
 
@@ -36,12 +38,11 @@ impl State {
         let state = Self {
             apkid,
 
-            // make everything an option. We do not want to use vec::remove because it will shift everything right of the element to the left.
-            // Which because we ussually remove the oldest (most left) items first there will be a lot of shifting!
-            // If we just swap in place with None than we should be good.
             outgoing_sub: BTreeSet::new(),
             outgoing_unsub: BTreeSet::new(),
             outgoing_pub: vec![None; receive_maximum as usize],
+
+            // shifting should be minimal with a vecdeque
             outgoing_pub_order: VecDeque::new(),
             outgoing_rel: BTreeSet::new(),
             incoming_pub: BTreeSet::new(),

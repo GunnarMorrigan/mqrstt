@@ -54,8 +54,8 @@ pub enum HandlerError {
     #[error("Channel between client and handler closed")]
     ClientChannelClosed,
 
-    #[error("Packet Id error, pkid: {0}")]
-    PacketIdError(u16),
+    #[error("Packet Id Channel error, pkid: {0}")]
+    PacketIdChannelError(u16),
 
     #[error("Packet collision error. packet ID: {0}")]
     PacketIdCollision(u16),
