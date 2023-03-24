@@ -12,7 +12,7 @@ use crate::packets::{
     reason_codes::ConnAckReasonCode,
     {FixedHeader, Packet, PacketType},
 };
-use crate::{connect_options::ConnectOptions, stream::create_connect_from_options, error::ConnectionError};
+use crate::{connect_options::ConnectOptions, error::ConnectionError, stream::create_connect_from_options};
 
 #[derive(Debug)]
 pub struct Stream<S> {

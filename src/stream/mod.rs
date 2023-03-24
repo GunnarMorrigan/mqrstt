@@ -2,10 +2,10 @@
 pub mod quic;
 #[cfg(feature = "smol")]
 pub mod smol;
-#[cfg(feature = "tokio")]
-pub mod tokio;
 #[cfg(feature = "sync")]
 pub mod sync;
+#[cfg(feature = "tokio")]
+pub mod tokio;
 
 use crate::connect_options::ConnectOptions;
 use crate::packets::Connect;

@@ -9,7 +9,7 @@ use crate::packets::{
     reason_codes::ConnAckReasonCode,
     {FixedHeader, Packet, PacketType},
 };
-use crate::{connect_options::ConnectOptions, stream::create_connect_from_options, error::ConnectionError};
+use crate::{connect_options::ConnectOptions, error::ConnectionError, stream::create_connect_from_options};
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -125,14 +125,10 @@ where
                     self.read_buffer.extend_from_slice(&self.const_buffer[0..read]);
                     Ok(read)
                 }
-            },
-            Err(err) => {
-                match err.kind() {
-                    ErrorKind::WouldBlock => {
-                        Ok(0)
-                    },
-                    _ => Err(err)
-                }
+            }
+            Err(err) => match err.kind() {
+                ErrorKind::WouldBlock => Ok(0),
+                _ => Err(err),
             },
         }
     }
@@ -154,16 +150,15 @@ where
         packet.write(&mut self.write_buffer)?;
         trace!("Wrote packet {} to write buffer", packet);
 
-        if self.write_buffer.len() >= 1000{
+        if self.write_buffer.len() >= 1000 {
             self.flush_whole_buffer()?;
             Ok(true)
-        }
-        else{
+        } else {
             Ok(false)
         }
     }
 
-    pub fn flush_whole_buffer(&mut self) -> Result<(), ConnectionError>{
+    pub fn flush_whole_buffer(&mut self) -> Result<(), ConnectionError> {
         self.stream.write_all(&self.write_buffer[..])?;
         self.stream.flush()?;
         self.write_buffer.clear();

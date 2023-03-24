@@ -123,7 +123,7 @@ impl MqttClient {
 
 /// Sync functions to perform MQTT operations
 #[cfg(feature = "sync")]
-impl MqttClient{
+impl MqttClient {
     pub fn subscribe_blocking<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?;
         let subscription: Subscription = into_subscribtions.into();
@@ -246,8 +246,8 @@ mod tests {
     async fn unsubscribe_with_properties_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
 
-        let prop = UnsubscribeProperties{
-            user_properties: vec![("A".to_string(), "B".to_string())]
+        let prop = UnsubscribeProperties {
+            user_properties: vec![("A".to_string(), "B".to_string())],
         };
 
         client.unsubscribe_with_properties("Topic", prop.clone()).await.unwrap();
@@ -300,7 +300,10 @@ mod tests {
     #[tokio::test]
     async fn disconnect_with_properties_test2() {
         let (client, client_to_handler_r, _) = create_new_test_client();
-        let properties = DisconnectProperties{reason_string: Some("TestString".to_string()), ..Default::default()};
+        let properties = DisconnectProperties {
+            reason_string: Some("TestString".to_string()),
+            ..Default::default()
+        };
 
         client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, properties.clone()).await.unwrap();
         let disconnect = client_to_handler_r.recv().await.unwrap();

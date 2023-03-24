@@ -232,7 +232,7 @@ impl MqttHandler {
 }
 
 #[cfg(feature = "sync")]
-impl MqttHandler{
+impl MqttHandler {
     // /// This function handles the incoming packet `packet` depending on the packet type.
     // /// Any packets that are produced as a response to the incoming packet are added to the outgoing_packet_buffer.
     // ///
@@ -255,7 +255,6 @@ impl MqttHandler{
     //     };
     //     Ok(false)
     // }
-    
 }
 
 #[cfg(test)]
@@ -537,12 +536,11 @@ mod handler_tests {
         let pub1 = create_publish_packet(QoS::AtMostOnce, false, false, None);
         handler.handle_outgoing_packet(pub1).unwrap();
 
-        
         let pkid = apkid.recv().await.unwrap();
         let sub1 = create_subscribe_packet(pkid);
         let pkid = apkid.recv().await.unwrap();
         let unsub1 = create_unsubscribe_packet(pkid);
-        
+
         handler.handle_outgoing_packet(sub1).unwrap();
         handler.handle_outgoing_packet(unsub1).unwrap();
 

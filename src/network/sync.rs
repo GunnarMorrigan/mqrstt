@@ -1,14 +1,14 @@
 use async_channel::Receiver;
 
-use std::io::{Write, Read};
+use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
 use crate::connect_options::ConnectOptions;
-use crate::stream::sync::Stream;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
+use crate::stream::sync::Stream;
 use crate::{EventHandler, MqttHandler, NetworkStatus};
 
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
@@ -115,19 +115,19 @@ where
                     }
                 }
 
-                for packet in incoming_packet_buffer.drain(0..){
+                for packet in incoming_packet_buffer.drain(0..) {
                     use Packet::*;
-                    match packet{
+                    match packet {
                         PingResp => {
                             handler.handle(packet);
                             *await_pingresp = None;
-                        },
+                        }
                         Disconnect(_) => {
                             handler.handle(packet);
                             return Ok(NetworkStatus::IncomingDisconnect);
                         }
                         packet => {
-                            if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
+                            if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)? {
                                 handler.handle(packet);
                             }
                         }
@@ -140,45 +140,44 @@ where
 
             // Write segment
             let mut flushed = false;
-            while let Ok(packet) = to_network_r.try_recv(){
+            while let Ok(packet) = to_network_r.try_recv() {
                 flushed = stream.extend_write_buffer(&packet)?;
                 let packet_type = packet.packet_type();
                 println!("Handling outgoing packet: {:?}", packet.packet_type());
                 mqtt_handler.handle_outgoing_packet(packet)?;
 
-                if packet_type == PacketType::Disconnect{
-                    if !flushed{
+                if packet_type == PacketType::Disconnect {
+                    if !flushed {
                         stream.flush_whole_buffer()?;
                         *last_network_action = Instant::now();
                     }
-                    return Ok(NetworkStatus::OutgoingDisconnect);   
+                    return Ok(NetworkStatus::OutgoingDisconnect);
                 }
             }
-            if !flushed{
+            if !flushed {
                 stream.flush_whole_buffer()?;
             }
-
 
             // Keepalive process
             if *perform_keep_alive {
                 if let Some(instant) = await_pingresp {
-                    if *instant + Duration::from_secs(self.options.keep_alive_interval_s) < Instant::now(){
-                        let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
+                    if *instant + Duration::from_secs(self.options.keep_alive_interval_s) < Instant::now() {
+                        let disconnect = Disconnect {
+                            reason_code: DisconnectReasonCode::KeepAliveTimeout,
+                            properties: Default::default(),
+                        };
                         stream.write_packet(&Packet::Disconnect(disconnect))?;
                         return Ok(NetworkStatus::NoPingResp);
                     }
-                } 
-                else if *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) < Instant::now(){
+                } else if *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) < Instant::now() {
                     stream.write_packet(&Packet::PingReq)?;
                     *last_network_action = Instant::now();
                     *await_pingresp = Some(Instant::now());
                 }
             }
 
-            
             Ok(NetworkStatus::Active)
-        }
-        else{
+        } else {
             Err(ConnectionError::NoNetwork)
         }
     }

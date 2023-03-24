@@ -170,12 +170,12 @@
 mod available_packet_ids;
 mod client;
 mod connect_options;
-pub mod stream;
 pub mod error;
 mod mqtt_handler;
 mod network;
 pub mod packets;
 pub mod state;
+pub mod stream;
 mod util;
 
 pub use client::MqttClient;
@@ -246,36 +246,36 @@ where
     (network, client)
 }
 
-
 pub fn new_sync<S>(options: ConnectOptions) -> (network::sync::Network<S>, MqttClient)
 where
-    S: std::io::Read + std::io::Write + Sized + Unpin{
+    S: std::io::Read + std::io::Write + Sized + Unpin,
+{
+    let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-        let (to_network_s, to_network_r) = async_channel::bounded(100);
+    let (mqtt_handler, apkid) = MqttHandler::new(&options);
 
-        let (mqtt_handler, apkid) = MqttHandler::new(&options);
+    let network = network::sync::Network::new(options, mqtt_handler, to_network_r);
 
-        let network = network::sync::Network::new(options, mqtt_handler, to_network_r);
+    let client = MqttClient::new(apkid, to_network_s);
 
-        let client = MqttClient::new(apkid, to_network_s);
-
-        (network, client)
-    }
+    (network, client)
+}
 #[cfg(test)]
 mod lib_test {
-    use std::{time::Duration, net::TcpStream, thread::{self}};
+    use std::{
+        net::TcpStream,
+        thread::{self},
+        time::Duration,
+    };
 
     #[cfg(feature = "tokio")]
     use crate::new_tokio;
 
     use crate::{
-        new_smol,
+        new_smol, new_sync,
         packets::{self, Packet},
         tests::tls::tests::simple_rust_tls,
-        AsyncEventHandler,
-        ConnectOptions,
-        MqttClient,
-        NetworkStatus, new_sync, EventHandler,
+        AsyncEventHandler, ConnectOptions, EventHandler, MqttClient, NetworkStatus,
     };
     use async_trait::async_trait;
     use bytes::Bytes;
@@ -306,7 +306,7 @@ mod lib_test {
         }
     }
 
-    impl EventHandler for PingPong{
+    impl EventHandler for PingPong {
         fn handle(&mut self, event: Packet) {
             match event {
                 Packet::Publish(p) => {
@@ -325,7 +325,7 @@ mod lib_test {
     }
 
     #[test]
-    fn test_sync_tcp(){
+    fn test_sync_tcp() {
         let options = ConnectOptions::new("SyncTcpPingPong".to_string());
 
         let address = "broker.emqx.io";
@@ -342,15 +342,13 @@ mod lib_test {
         client.subscribe_blocking("mqrstt").unwrap();
 
         let mut pingpong = PingPong { client: client.clone() };
-        let res_join_handle = thread::spawn(move || {
-            loop {
-                return match network.poll(&mut pingpong) {
-                    Ok(NetworkStatus::Active) => continue,
-                    otherwise => otherwise,
-                };
-            }
+        let res_join_handle = thread::spawn(move || loop {
+            return match network.poll(&mut pingpong) {
+                Ok(NetworkStatus::Active) => continue,
+                otherwise => otherwise,
+            };
         });
-        
+
         client.publish_blocking(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).unwrap();
         client.publish_blocking(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).unwrap();
         client.publish_blocking(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).unwrap();
@@ -555,7 +553,7 @@ mod lib_test {
     impl AsyncEventHandler for PingResp {
         async fn handle(&mut self, event: packets::Packet) -> () {
             use Packet::*;
-            if event == PingResp{
+            if event == PingResp {
                 self.ping_resp_received += 1;
             }
         }
