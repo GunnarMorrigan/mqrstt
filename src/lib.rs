@@ -328,7 +328,13 @@ mod lib_test {
 
     #[test]
     fn test_sync_tcp() {
-        let options = ConnectOptions::new("SyncTcpPingPong".to_string());
+        let mut client_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(7)
+            .map(char::from)
+            .collect();
+        client_id += "_SyncTcpPingPong";
+        let options = ConnectOptions::new(client_id);
 
         let address = "broker.emqx.io";
         let port = 1883;
@@ -371,7 +377,13 @@ mod lib_test {
     #[test]
     fn test_smol_tcp() {
         smol::block_on(async {
-            let options = ConnectOptions::new("SmolTcpPingPong".to_string());
+            let mut client_id: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(7)
+                .map(char::from)
+                .collect();
+            client_id += "_SmolTcpPingPong";
+            let options = ConnectOptions::new(client_id);
 
             let address = "broker.emqx.io";
             let port = 1883;
@@ -414,7 +426,13 @@ mod lib_test {
     #[test]
     fn test_smol_tls() {
         smol::block_on(async {
-            let options = ConnectOptions::new("SmolTlsPingPong".to_string());
+            let mut client_id: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(7)
+                .map(char::from)
+                .collect();
+            client_id += "_SmolTlsPingPong";
+            let options = ConnectOptions::new(client_id);
 
             let address = "broker.emqx.io";
             let port = 8883;
@@ -456,7 +474,13 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_tcp() {
-        let options = ConnectOptions::new("TokioTcpPingPong".to_string());
+        let mut client_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(7)
+            .map(char::from)
+            .collect();
+        client_id += "_TokioTcpPingPong";
+        let options = ConnectOptions::new(client_id);
 
         let (mut network, client) = new_tokio(options);
 
@@ -498,7 +522,13 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_tls() {
-        let options = ConnectOptions::new("TokioTlsPingPong".to_string());
+        let mut client_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(7)
+            .map(char::from)
+            .collect();
+        client_id += "_TokioTlsPingPong";
+        let options = ConnectOptions::new(client_id);
 
         let address = "broker.emqx.io";
         let port = 8883;
