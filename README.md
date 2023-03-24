@@ -16,13 +16,15 @@ The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteE
 
 ## Features
   - MQTT v5
-  - Runtime agnostic
+  - Runtime agnostic (Smol, Tokio)
+  - Sync 
+  - TLS/TCP
   - Lean
   - Keep alive depends on actual communication
   
   ### To do
     - Enforce size of outbound messages (e.g. Publish)
-    - Sync API
+    - QUIC via QUINN
     - More testing
     - More documentation
     - Remove logging calls or move all to test flag

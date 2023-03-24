@@ -14,9 +14,10 @@ description = "Pure rust MQTTv5 client implementation for Smol, Tokio and soon s
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["tokio", "smol"]
+default = ["tokio", "smol", "sync"]
 tokio = ["dep:tokio"]
 smol = ["dep:smol"]
+sync = []
 # quic = ["dep:quinn"]
 
 [dependencies]
