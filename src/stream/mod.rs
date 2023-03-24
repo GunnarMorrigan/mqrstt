@@ -1,9 +1,11 @@
 #[cfg(all(feature = "quic"))]
 pub mod quic;
-// #[cfg(feature = "smol")]
+#[cfg(feature = "smol")]
 pub mod smol;
-// #[cfg(feature = "tokio")]
+#[cfg(feature = "tokio")]
 pub mod tokio;
+#[cfg(feature = "sync")]
+pub mod sync;
 
 use crate::connect_options::ConnectOptions;
 use crate::packets::Connect;
