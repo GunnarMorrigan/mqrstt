@@ -357,7 +357,7 @@ mod handler_tests {
         handler.handle_outgoing_packet(pub_packet.clone()).unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
-        assert_eq!(pub_packet.clone(), Packet::Publish(handler.state.outgoing_pub()[pkid as usize - 1].clone().unwrap()));
+        assert_eq!(pub_packet, Packet::Publish(handler.state.outgoing_pub()[pkid as usize - 1].clone().unwrap()));
         assert_eq!(1, handler.state.outgoing_pub_order().len());
         assert!(handler.state.outgoing_rel().is_empty());
         assert!(handler.state.outgoing_sub().is_empty());

@@ -263,7 +263,7 @@ where
     }
 #[cfg(test)]
 mod lib_test {
-    use std::{time::Duration, net::TcpStream, thread::{Thread, self}};
+    use std::{time::Duration, net::TcpStream, thread::{self}};
 
     #[cfg(feature = "tokio")]
     use crate::new_tokio;

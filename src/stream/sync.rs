@@ -155,7 +155,7 @@ where
         trace!("Wrote packet {} to write buffer", packet);
 
         if self.write_buffer.len() >= 1000{
-            self.flush_whole_buffer();
+            self.flush_whole_buffer()?;
             Ok(true)
         }
         else{

@@ -107,11 +107,12 @@ where
         if let Some(stream) = network {
             // Read segment of stream
             {
-                let read = stream.read_bytes()?;
-                match stream.parse_messages(incoming_packet_buffer) {
-                    Err(ReadBytes::Err(err)) => return Err(err),
-                    Err(ReadBytes::InsufficientBytes(_)) => (),
-                    Ok(_) => (),
+                if stream.read_bytes()? > 0 {
+                    match stream.parse_messages(incoming_packet_buffer) {
+                        Err(ReadBytes::Err(err)) => return Err(err),
+                        Err(ReadBytes::InsufficientBytes(_)) => (),
+                        Ok(_) => (),
+                    }
                 }
 
                 for packet in incoming_packet_buffer.drain(0..){
@@ -157,6 +158,8 @@ where
                 stream.flush_whole_buffer()?;
             }
 
+
+            // Keepalive process
             if *perform_keep_alive {
                 if let Some(instant) = await_pingresp {
                     if *instant + Duration::from_secs(self.options.keep_alive_interval_s) < Instant::now(){
@@ -171,6 +174,8 @@ where
                     *await_pingresp = Some(Instant::now());
                 }
             }
+
+            
             Ok(NetworkStatus::Active)
         }
         else{
