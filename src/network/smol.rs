@@ -4,7 +4,7 @@ use futures::FutureExt;
 
 use std::time::{Duration, Instant};
 
-use crate::connections::smol::Stream;
+use crate::stream::smol::Stream;
 
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
@@ -68,7 +68,7 @@ where
             self.perform_keep_alive = false;
         }
 
-        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer).await?;
+        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)?;
 
         Ok(())
     }
@@ -140,7 +140,7 @@ where
                                 return Ok(NetworkStatus::IncomingDisconnect);
                             }
                             packet => {
-                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer).await?{
+                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
                                     handler.handle(packet).await;
                                 }
                             }
@@ -161,7 +161,7 @@ where
                         disconnect = true;
                     }
 
-                    mqtt_handler.handle_outgoing_packet(packet).await?;
+                    mqtt_handler.handle_outgoing_packet(packet)?;
                     *last_network_action = Instant::now();
 
 

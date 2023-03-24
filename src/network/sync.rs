@@ -4,7 +4,7 @@ use std::io::{Write, Read};
 use std::time::{Duration, Instant};
 
 use crate::connect_options::ConnectOptions;
-use crate::connections::sync::Stream;
+use crate::stream::sync::Stream;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
