@@ -58,7 +58,7 @@ impl<S> Network<S>
 where
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
-    /// Initializes an MQTT connection with the provided configuration an stream 
+    /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
         let (network, connack) = Stream::connect(&self.options, stream).await?;
 
@@ -78,11 +78,11 @@ where
     /// - Read from the stream and parse the bytes to packets for the user to handle
     /// - Write user packets to stream
     /// - Perform keepalive if necessary
-    /// 
+    ///
     /// This function can produce an indication of the state of the network or an error.
     /// When the network is still active (i.e. stream is not closed and no disconnect packet has been processed) the network will return [`NetworkStatus::Active`]
-    /// 
-    /// In all other cases the network is unusable anymore. 
+    ///
+    /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.
     pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where

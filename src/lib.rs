@@ -4,17 +4,17 @@
 //! For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 //! For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
 //!
-//! 
+//!
 //! Features:
 //! ----------------------------
 //!  - MQTT v5
 //!  - Runtime agnostic (Smol, Tokio)
-//!  - Sync 
+//!  - Sync
 //!  - TLS/TCP
 //!  - Lean
 //!  - Keep alive depends on actual communication
 //!  
-//! 
+//!
 //! To do
 //! ----------------------------
 //!  - Enforce size of outbound messages (e.g. Publish)
@@ -22,8 +22,8 @@
 //!  - Even More testing
 //!  - More documentation
 //!  - Remove logging calls or move all to test flag
-//! 
-//! 
+//!
+//!
 //! Notes:
 //! ----------------------------
 //! - Your handler should not wait too long
@@ -187,7 +187,7 @@
 //! }
 //!
 //! ```
-//! 
+//!
 //! Sync example:
 //! ----------------------------
 //! ```rust
@@ -200,11 +200,11 @@
 //! };
 //! use std::net::TcpStream;
 //! use bytes::Bytes;
-//! 
+//!
 //! pub struct PingPong {
 //!     pub client: MqttClient,
 //! }
-//! 
+//!
 //! impl EventHandler for PingPong {
 //!     // Handlers only get INCOMING packets. This can change later.
 //!     fn handle(&mut self, event: packets::Packet) -> () {
@@ -228,26 +228,26 @@
 //!         }
 //!     }
 //! }
-//! 
-//! 
+//!
+//!
 //! let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
 //! let options = ConnectOptions::new(client_id);
-//! 
+//!
 //! let address = "broker.emqx.io";
 //! let port = 1883;
-//! 
+//!
 //! let (mut network, client) = new_sync(options);
-//! 
+//!
 //! // IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
 //! let stream = TcpStream::connect((address, port)).unwrap();
 //! stream.set_nonblocking(true).unwrap();
-//! 
+//!
 //! network.connect(stream).unwrap();
-//! 
+//!
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
-//! let res_join_handle = std::thread::spawn(move || 
+//! let res_join_handle = std::thread::spawn(move ||
 //!     loop {
 //!         match network.poll(&mut pingpong) {
 //!             Ok(NetworkStatus::Active) => continue,
@@ -255,7 +255,7 @@
 //!         }
 //!     }
 //! );
-//! 
+//!
 //! std::thread::sleep(std::time::Duration::from_secs(30));
 //! client.disconnect_blocking().unwrap();
 //! let join_res = res_join_handle.join();
@@ -425,11 +425,7 @@ mod lib_test {
 
     #[test]
     fn test_sync_tcp() {
-        let mut client_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(7)
-            .map(char::from)
-            .collect();
+        let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_SyncTcpPingPong";
         let options = ConnectOptions::new(client_id);
 
@@ -474,11 +470,7 @@ mod lib_test {
     #[test]
     fn test_smol_tcp() {
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(7)
-                .map(char::from)
-                .collect();
+            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
             client_id += "_SmolTcpPingPong";
             let options = ConnectOptions::new(client_id);
 
@@ -523,11 +515,7 @@ mod lib_test {
     #[test]
     fn test_smol_tls() {
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(7)
-                .map(char::from)
-                .collect();
+            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
             client_id += "_SmolTlsPingPong";
             let options = ConnectOptions::new(client_id);
 
@@ -571,11 +559,7 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_tcp() {
-        let mut client_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(7)
-            .map(char::from)
-            .collect();
+        let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTcpPingPong";
         let options = ConnectOptions::new(client_id);
 
@@ -619,11 +603,7 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_tls() {
-        let mut client_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(7)
-            .map(char::from)
-            .collect();
+        let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTlsPingPong";
         let options = ConnectOptions::new(client_id);
 
@@ -689,7 +669,7 @@ mod lib_test {
         }
     }
 
-    impl EventHandler for PingResp{
+    impl EventHandler for PingResp {
         fn handle(&mut self, event: Packet) {
             use Packet::*;
             if event == PingResp {
@@ -701,11 +681,7 @@ mod lib_test {
 
     #[test]
     fn test_sync_ping_req() {
-        let mut client_id: String = rand::thread_rng()
-            .sample_iter(&rand::distributions::Alphanumeric)
-            .take(7)
-            .map(char::from)
-            .collect();
+        let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_SyncTcpPingReqTest";
         let options = ConnectOptions::new(client_id);
 
@@ -714,32 +690,30 @@ mod lib_test {
 
         let (mut network, client) = new_sync(options);
 
-         // IMPORTANT: Set nonblocking to true! Blocking on reads will happen!
-         let stream = TcpStream::connect((address, port)).unwrap();
-         stream.set_nonblocking(true).unwrap();
+        // IMPORTANT: Set nonblocking to true! Blocking on reads will happen!
+        let stream = TcpStream::connect((address, port)).unwrap();
+        stream.set_nonblocking(true).unwrap();
 
         network.connect(stream).unwrap();
 
         let mut pingresp = PingResp::new(client.clone());
-        let res_join_handle = thread::spawn(move || 
+        let res_join_handle = thread::spawn(move || loop {
             loop {
-                loop {
-                    match network.poll(&mut pingresp) {
-                        Ok(NetworkStatus::Active) => continue,
-                        Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
-                        Ok(NetworkStatus::NoPingResp) => panic!(),
-                        Ok(NetworkStatus::IncomingDisconnect) => panic!(),
-                        Err(err) => return Err(err),
-                    }
+                match network.poll(&mut pingresp) {
+                    Ok(NetworkStatus::Active) => continue,
+                    Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                    Ok(NetworkStatus::NoPingResp) => panic!(),
+                    Ok(NetworkStatus::IncomingDisconnect) => panic!(),
+                    Err(err) => return Err(err),
                 }
             }
-        );
+        });
 
         std::thread::sleep(Duration::from_secs(150));
         client.disconnect_blocking().unwrap();
         let join_res = res_join_handle.join();
         assert!(join_res.is_ok());
-        
+
         let res = join_res.unwrap();
         assert!(res.is_ok());
         let pingreq = res.unwrap();
@@ -749,11 +723,7 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_ping_req() {
-        let mut client_id: String = rand::thread_rng()
-        .sample_iter(&rand::distributions::Alphanumeric)
-        .take(7)
-        .map(char::from)
-        .collect();
+        let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTcpPingReqTest";
         let options = ConnectOptions::new(client_id);
 
@@ -796,11 +766,7 @@ mod lib_test {
     #[test]
     fn test_smol_ping_req() {
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng()
-                .sample_iter(&rand::distributions::Alphanumeric)
-                .take(7)
-                .map(char::from)
-                .collect();
+            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
             client_id += "_SmolTcpPingReqTest";
             let options = ConnectOptions::new(client_id);
 
