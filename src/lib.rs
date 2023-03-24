@@ -170,7 +170,7 @@
 mod available_packet_ids;
 mod client;
 mod connect_options;
-pub mod connections;
+pub mod stream;
 pub mod error;
 mod mqtt_handler;
 mod network;
@@ -186,8 +186,8 @@ use packets::Packet;
 #[cfg(test)]
 pub mod tests;
 
-// /// [`NetworkStatus`] Represents status of the Network object.
-// /// It is returned when the run handle returns from performing an operation.
+/// [`NetworkStatus`] Represents status of the Network object.
+/// It is returned when the run handle returns from performing an operation.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NetworkStatus {
     Active,
@@ -208,9 +208,9 @@ pub trait AsyncEventHandler {
     async fn handle(&mut self, event: Packet);
 }
 
-// pub trait EventHandler {
-//     fn handle(&mut self, event: Packet);
-// }
+pub trait EventHandler {
+    fn handle(&mut self, event: Packet);
+}
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
 #[cfg(feature = "smol")]
@@ -246,22 +246,36 @@ where
     (network, client)
 }
 
+
+pub fn new_sync<S>(options: ConnectOptions) -> (network::sync::Network<S>, MqttClient)
+where
+    S: std::io::Read + std::io::Write + Sized + Unpin{
+
+        let (to_network_s, to_network_r) = async_channel::bounded(100);
+
+        let (mqtt_handler, apkid) = MqttHandler::new(&options);
+
+        let network = network::sync::Network::new(options, mqtt_handler, to_network_r);
+
+        let client = MqttClient::new(apkid, to_network_s);
+
+        (network, client)
+    }
 #[cfg(test)]
 mod lib_test {
-    use std::time::Duration;
+    use std::{time::Duration, net::TcpStream, thread::{Thread, self}};
 
     #[cfg(feature = "tokio")]
     use crate::new_tokio;
 
     use crate::{
         new_smol,
-        // new_smol,
         packets::{self, Packet},
         tests::tls::tests::simple_rust_tls,
         AsyncEventHandler,
         ConnectOptions,
         MqttClient,
-        NetworkStatus,
+        NetworkStatus, new_sync, EventHandler,
     };
     use async_trait::async_trait;
     use bytes::Bytes;
@@ -290,6 +304,68 @@ mod lib_test {
                 _ => (),
             }
         }
+    }
+
+    impl EventHandler for PingPong{
+        fn handle(&mut self, event: Packet) {
+            match event {
+                Packet::Publish(p) => {
+                    if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+                        if payload.to_lowercase().contains("ping") {
+                            self.client.publish_blocking(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).unwrap();
+                        }
+                    }
+                }
+                Packet::ConnAck(_) => {
+                    println!("Connected!")
+                }
+                _ => (),
+            }
+        }
+    }
+
+    #[test]
+    fn test_sync_tcp(){
+        let options = ConnectOptions::new("SyncTcpPingPong".to_string());
+
+        let address = "broker.emqx.io";
+        let port = 1883;
+
+        // IMPORTANT: Set nonblocking to true! Blocking on reads will happen!
+        let stream = TcpStream::connect((address, port)).unwrap();
+        stream.set_nonblocking(true).unwrap();
+
+        let (mut network, client) = new_sync(options);
+
+        network.connect(stream).unwrap();
+
+        client.subscribe_blocking("mqrstt").unwrap();
+
+        let mut pingpong = PingPong { client: client.clone() };
+        let res_join_handle = thread::spawn(move || {
+            loop {
+                return match network.poll(&mut pingpong) {
+                    Ok(NetworkStatus::Active) => continue,
+                    otherwise => otherwise,
+                };
+            }
+        });
+        
+        client.publish_blocking(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).unwrap();
+        client.publish_blocking(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).unwrap();
+        client.publish_blocking(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).unwrap();
+        client.publish_blocking(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).unwrap();
+
+        std::thread::sleep(std::time::Duration::from_secs(20));
+        client.unsubscribe_blocking("mqrstt").unwrap();
+        std::thread::sleep(std::time::Duration::from_secs(5));
+        client.disconnect_blocking().unwrap();
+        println!("Disconnect queued");
+
+        let wrapped_res = res_join_handle.join();
+        assert!(wrapped_res.is_ok());
+        let res = dbg!(wrapped_res.unwrap());
+        assert!(res.is_ok());
     }
 
     #[test]
