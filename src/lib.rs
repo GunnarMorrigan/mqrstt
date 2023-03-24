@@ -271,6 +271,8 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     use crate::new_tokio;
 
+    use rand::Rng;
+
     use crate::{
         new_smol, new_sync,
         packets::{self, Packet},
@@ -556,13 +558,20 @@ mod lib_test {
             if event == PingResp {
                 self.ping_resp_received += 1;
             }
+            println!("Received packet: {}", event);
         }
     }
 
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_ping_req() {
-        let options = ConnectOptions::new("TokioTcpPingReqTest".to_string());
+        let mut client_id: String = rand::thread_rng()
+        .sample_iter(&rand::distributions::Alphanumeric)
+        .take(7)
+        .map(char::from)
+        .collect();
+        client_id += "_TokioTcpPingReqTest";
+        let options = ConnectOptions::new(client_id);
 
         let (mut network, client) = new_tokio(options);
 
@@ -603,7 +612,13 @@ mod lib_test {
     #[test]
     fn test_smol_ping_req() {
         smol::block_on(async {
-            let options = ConnectOptions::new("SmolTcpPingReq".to_string());
+            let mut client_id: String = rand::thread_rng()
+                .sample_iter(&rand::distributions::Alphanumeric)
+                .take(7)
+                .map(char::from)
+                .collect();
+            client_id += "_SmolTcpPingReqTest";
+            let options = ConnectOptions::new(client_id);
 
             let address = "broker.emqx.io";
             let port = 1883;
