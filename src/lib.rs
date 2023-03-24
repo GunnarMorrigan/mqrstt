@@ -1,14 +1,35 @@
-//! A pure rust MQTT client which strives to be easy to use and efficient.
-//! Providing both async and sync options.
+//! A pure rust MQTT client which is easy to use, efficient and provides both sync and async options.
 //!
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
-//! The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+//! For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+//! For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
 //!
+//! 
+//! Features:
+//! ----------------------------
+//!  - MQTT v5
+//!  - Runtime agnostic (Smol, Tokio)
+//!  - Sync 
+//!  - TLS/TCP
+//!  - Lean
+//!  - Keep alive depends on actual communication
+//!  
+//! 
+//! To do
+//! ----------------------------
+//!  - Enforce size of outbound messages (e.g. Publish)
+//!  - QUIC via QUINN
+//!  - Even More testing
+//!  - More documentation
+//!  - Remove logging calls or move all to test flag
+//! 
+//! 
 //! Notes:
 //! ----------------------------
 //! - Your handler should not wait too long
 //! - Create a new connection when an error or disconnect is encountered
 //! - Handlers only get incoming packets
+//! - Sync mode requires a non blocking stream
 //!
 //!
 //! Smol example:
@@ -165,6 +186,82 @@
 //!     assert!(n.is_ok());
 //! }
 //!
+//! ```
+//! 
+//! Sync example:
+//! ----------------------------
+//! ```rust
+//! use mqrstt::{
+//!     MqttClient,
+//!     ConnectOptions,
+//!     new_sync,
+//!     packets::{self, Packet},
+//!     EventHandler, NetworkStatus,
+//! };
+//! use std::net::TcpStream;
+//! use bytes::Bytes;
+//! 
+//! pub struct PingPong {
+//!     pub client: MqttClient,
+//! }
+//! 
+//! impl EventHandler for PingPong {
+//!     // Handlers only get INCOMING packets. This can change later.
+//!     fn handle(&mut self, event: packets::Packet) -> () {
+//!         match event {
+//!             Packet::Publish(p) => {
+//!                 if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+//!                     if payload.to_lowercase().contains("ping") {
+//!                         self.client
+//!                             .publish_blocking(
+//!                                 p.qos,
+//!                                 p.retain,
+//!                                 p.topic.clone(),
+//!                                 Bytes::from_static(b"pong"),
+//!                             ).unwrap();
+//!                         println!("Received Ping, Send pong!");
+//!                     }
+//!                 }
+//!             },
+//!             Packet::ConnAck(_) => { println!("Connected!") },
+//!             _ => (),
+//!         }
+//!     }
+//! }
+//! 
+//! 
+//! let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
+//! let options = ConnectOptions::new(client_id);
+//! 
+//! let address = "broker.emqx.io";
+//! let port = 1883;
+//! 
+//! let (mut network, client) = new_sync(options);
+//! 
+//! // IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
+//! let stream = TcpStream::connect((address, port)).unwrap();
+//! stream.set_nonblocking(true).unwrap();
+//! 
+//! network.connect(stream).unwrap();
+//! 
+//! let mut pingpong = PingPong {
+//!     client: client.clone(),
+//! };
+//! let res_join_handle = std::thread::spawn(move || 
+//!     loop {
+//!         match network.poll(&mut pingpong) {
+//!             Ok(NetworkStatus::Active) => continue,
+//!             otherwise => return otherwise,
+//!         }
+//!     }
+//! );
+//! 
+//! std::thread::sleep(std::time::Duration::from_secs(30));
+//! client.disconnect_blocking().unwrap();
+//! let join_res = res_join_handle.join();
+//! assert!(join_res.is_ok());
+//! let res = join_res.unwrap();
+//! assert!(res.is_ok());
 //! ```
 
 mod available_packet_ids;
@@ -592,6 +689,63 @@ mod lib_test {
         }
     }
 
+    impl EventHandler for PingResp{
+        fn handle(&mut self, event: Packet) {
+            use Packet::*;
+            if event == PingResp {
+                self.ping_resp_received += 1;
+            }
+            println!("Received packet: {}", event);
+        }
+    }
+
+    #[test]
+    fn test_sync_ping_req() {
+        let mut client_id: String = rand::thread_rng()
+            .sample_iter(&rand::distributions::Alphanumeric)
+            .take(7)
+            .map(char::from)
+            .collect();
+        client_id += "_SyncTcpPingReqTest";
+        let options = ConnectOptions::new(client_id);
+
+        let address = "broker.emqx.io";
+        let port = 1883;
+
+        let (mut network, client) = new_sync(options);
+
+         // IMPORTANT: Set nonblocking to true! Blocking on reads will happen!
+         let stream = TcpStream::connect((address, port)).unwrap();
+         stream.set_nonblocking(true).unwrap();
+
+        network.connect(stream).unwrap();
+
+        let mut pingresp = PingResp::new(client.clone());
+        let res_join_handle = thread::spawn(move || 
+            loop {
+                loop {
+                    match network.poll(&mut pingresp) {
+                        Ok(NetworkStatus::Active) => continue,
+                        Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                        Ok(NetworkStatus::NoPingResp) => panic!(),
+                        Ok(NetworkStatus::IncomingDisconnect) => panic!(),
+                        Err(err) => return Err(err),
+                    }
+                }
+            }
+        );
+
+        std::thread::sleep(Duration::from_secs(150));
+        client.disconnect_blocking().unwrap();
+        let join_res = res_join_handle.join();
+        assert!(join_res.is_ok());
+        
+        let res = join_res.unwrap();
+        assert!(res.is_ok());
+        let pingreq = res.unwrap();
+        assert_eq!(2, pingreq.ping_resp_received);
+    }
+
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_ping_req() {
@@ -625,7 +779,7 @@ mod lib_test {
                     }
                 },
                 async move {
-                    smol::Timer::after(std::time::Duration::from_secs(125)).await;
+                    smol::Timer::after(std::time::Duration::from_secs(150)).await;
                     client.disconnect().await.unwrap();
                 }
             )

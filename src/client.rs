@@ -26,6 +26,9 @@ impl MqttClient {
         Self { available_packet_ids, to_network_s }
     }
 
+    /// Creates a subscribe packet that is then asynchronously tranfered to the Network stack for transmission
+    /// 
+    /// Can be called with anything that can be converted into [`Subscription`]
     pub async fn subscribe<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetwork)?;
         let subscription: Subscription = into_subscribtions.into();
@@ -34,6 +37,10 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a subscribe packet with additional subscribe packet properties.
+    /// The packet is then asynchronously tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with anything that can be converted into [`Subscription`]
     pub async fn subscribe_with_properties<S: Into<Subscription>>(&self, properties: SubscribeProperties, into_sub: S) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetwork)?;
         let sub = Subscribe {
@@ -45,6 +52,9 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Publish packet which is then asynchronously tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with any payload that can be converted into [`Bytes`]
     pub async fn publish<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
@@ -65,6 +75,10 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Publish packet with additional publish properties.
+    /// The packet is then asynchronously tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with any payload that can be converted into [`Bytes`]
     pub async fn publish_with_properties<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
@@ -83,6 +97,9 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Unsubscribe packet which is then asynchronously tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with anything that can be converted into [`UnsubscribeTopics`]
     pub async fn unsubscribe<T: Into<UnsubscribeTopics>>(&self, into_topics: T) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetwork)?;
         let unsub = Unsubscribe {
@@ -94,6 +111,10 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Unsubscribe packet with additional unsubscribe properties [`UnsubscribeProperties`].
+    /// The packet is then asynchronously tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with anything that can be converted into [`UnsubscribeTopics`]
     pub async fn unsubscribe_with_properties<T: Into<UnsubscribeTopics>>(&self, into_topics: T, properties: UnsubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetwork)?;
         let unsub = Unsubscribe {
@@ -105,6 +126,9 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Disconnect packet which is then asynchronously tranfered to the Network stack for transmission.
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub async fn disconnect(&self) -> Result<(), ClientError> {
         let disconnect = Disconnect {
             reason_code: DisconnectReasonCode::NormalDisconnection,
@@ -114,6 +138,8 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Disconnect packet with additional [`DisconnectReasonCode`] and [`DisconnectProperties`].
+    /// The packet is then asynchronously tranfered to the Network stack for transmission.
     pub async fn disconnect_with_properties(&self, reason_code: DisconnectReasonCode, properties: DisconnectProperties) -> Result<(), ClientError> {
         let disconnect = Disconnect { reason_code, properties };
         self.to_network_s.send(Packet::Disconnect(disconnect)).await.map_err(|_| ClientError::NoNetwork)?;
@@ -124,6 +150,12 @@ impl MqttClient {
 /// Sync functions to perform MQTT operations
 #[cfg(feature = "sync")]
 impl MqttClient {
+
+    /// Creates a subscribe packet that is then tranfered to the Network stack for transmission
+    /// 
+    /// Can be called with anything that can be converted into [`Subscription`]
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn subscribe_blocking<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?;
         let subscription: Subscription = into_subscribtions.into();
@@ -132,6 +164,12 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a subscribe packet with additional subscribe packet properties.
+    /// The packet is then tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with anything that can be converted into [`Subscription`]
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn subscribe_with_properties_blocking<S: Into<Subscription>>(&self, properties: SubscribeProperties, into_sub: S) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?;
         let sub = Subscribe {
@@ -143,6 +181,11 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Publish packet which is then tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with any payload that can be converted into [`Bytes`]
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn publish_blocking<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
@@ -163,6 +206,12 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Publish packet with additional publish properties.
+    /// The packet is then tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with any payload that can be converted into [`Bytes`]
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn publish_with_properties_blocking<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
@@ -181,6 +230,11 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Unsubscribe packet which is then tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with anything that can be converted into [`UnsubscribeTopics`]
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn unsubscribe_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?;
         let unsub = Unsubscribe {
@@ -192,6 +246,12 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Unsubscribe packet with additional unsubscribe properties [`UnsubscribeProperties`].
+    /// The packet is then tranfered to the Network stack for transmission.
+    /// 
+    /// Can be called with anything that can be converted into [`UnsubscribeTopics`]
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn unsubscribe_with_properties_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T, properties: UnsubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?;
         let unsub = Unsubscribe {
@@ -203,6 +263,9 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Disconnect packet which is then tranfered to the Network stack for transmission.
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn disconnect_blocking(&self) -> Result<(), ClientError> {
         let disconnect = Disconnect {
             reason_code: DisconnectReasonCode::NormalDisconnection,
@@ -212,6 +275,10 @@ impl MqttClient {
         Ok(())
     }
 
+    /// Creates a Disconnect packet with additional [`DisconnectReasonCode`] and [`DisconnectProperties`].
+    /// The packet is then tranfered to the Network stack for transmission.
+    /// 
+    /// This function blocks until the packet is queued for transmission
     pub fn disconnect_with_properties_blocking(&self, reason_code: DisconnectReasonCode, properties: DisconnectProperties) -> Result<(), ClientError> {
         let disconnect = Disconnect { reason_code, properties };
         self.to_network_s.send_blocking(Packet::Disconnect(disconnect)).map_err(|_| ClientError::NoNetwork)?;
