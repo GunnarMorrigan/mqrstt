@@ -1,9 +1,6 @@
-use std::io::{self, Error, ErrorKind};
+use std::io::{self, Error, ErrorKind, Read, Write};
 
 use bytes::{Buf, BytesMut};
-
-// use futures::{AsyncReadExt, AsyncWriteExt};
-use smol::io::{AsyncReadExt, AsyncWriteExt};
 
 use tracing::trace;
 
@@ -12,7 +9,7 @@ use crate::packets::{
     reason_codes::ConnAckReasonCode,
     {FixedHeader, Packet, PacketType},
 };
-use crate::{connect_options::ConnectOptions, connections::create_connect_from_options, error::ConnectionError};
+use crate::{connect_options::ConnectOptions, error::ConnectionError, stream::create_connect_from_options};
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -29,7 +26,7 @@ pub struct Stream<S> {
 }
 
 impl<S> Stream<S> {
-    pub async fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
+    pub fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
         let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
 
         if header.remaining_length + header_length > self.read_buffer.len() {
@@ -42,7 +39,7 @@ impl<S> Stream<S> {
         Ok(Packet::read(header, buf.into())?)
     }
 
-    pub async fn parse_messages(&mut self, incoming_packet_buffer: &mut Vec<Packet>) -> Result<(), ReadBytes<ConnectionError>> {
+    pub fn parse_messages(&mut self, incoming_packet_buffer: &mut Vec<Packet>) -> Result<(), ReadBytes<ConnectionError>> {
         loop {
             if self.read_buffer.is_empty() {
                 return Ok(());
@@ -70,9 +67,9 @@ impl<S> Stream<S> {
 
 impl<S> Stream<S>
 where
-    S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin,
+    S: Read + Write + Sized + Unpin,
 {
-    pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, Packet), ConnectionError> {
+    pub fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, Packet), ConnectionError> {
         let mut s = Self {
             stream,
             const_buffer: [0; 1000],
@@ -82,9 +79,9 @@ where
 
         let connect = create_connect_from_options(options);
 
-        s.write(&connect).await?;
+        s.write_packet(&connect)?;
 
-        let packet = s.read().await?;
+        let packet = s.read()?;
         if let Packet::ConnAck(con) = packet {
             if con.reason_code == ConnAckReasonCode::Success {
                 Ok((s, Packet::ConnAck(con)))
@@ -96,12 +93,12 @@ where
         }
     }
 
-    pub async fn read(&mut self) -> io::Result<Packet> {
+    pub fn read(&mut self) -> io::Result<Packet> {
         loop {
             let (header, header_length) = match FixedHeader::read_fixed_header(self.read_buffer.iter()) {
                 Ok(header) => header,
                 Err(ReadBytes::InsufficientBytes(required_len)) => {
-                    self.read_required_bytes(required_len).await?;
+                    self.read_required_bytes(required_len)?;
                     continue;
                 }
                 Err(ReadBytes::Err(err)) => return Err(Error::new(ErrorKind::InvalidData, err)),
@@ -110,7 +107,7 @@ where
             self.read_buffer.advance(header_length);
 
             if header.remaining_length > self.read_buffer.len() {
-                self.read_required_bytes(header.remaining_length - self.read_buffer.len()).await?;
+                self.read_required_bytes(header.remaining_length - self.read_buffer.len())?;
             }
 
             let buf = self.read_buffer.split_to(header.remaining_length);
@@ -119,22 +116,29 @@ where
         }
     }
 
-    pub async fn read_bytes(&mut self) -> io::Result<usize> {
-        let read = self.stream.read(&mut self.const_buffer).await?;
-        if read == 0 {
-            Err(io::Error::new(io::ErrorKind::ConnectionReset, "Connection reset by peer"))
-        } else {
-            self.read_buffer.extend_from_slice(&self.const_buffer[0..read]);
-            Ok(read)
+    pub fn read_bytes(&mut self) -> io::Result<usize> {
+        match self.stream.read(&mut self.const_buffer) {
+            Ok(read) => {
+                if read == 0 {
+                    Err(io::Error::new(io::ErrorKind::ConnectionReset, "Connection reset by peer"))
+                } else {
+                    self.read_buffer.extend_from_slice(&self.const_buffer[0..read]);
+                    Ok(read)
+                }
+            }
+            Err(err) => match err.kind() {
+                ErrorKind::WouldBlock => Ok(0),
+                _ => Err(err),
+            },
         }
     }
 
     /// Reads more than 'required' bytes to frame a packet into self.read buffer
-    pub async fn read_required_bytes(&mut self, required: usize) -> io::Result<usize> {
+    pub fn read_required_bytes(&mut self, required: usize) -> io::Result<usize> {
         let mut total_read = 0;
 
         loop {
-            let read = self.read_bytes().await?;
+            let read = self.read_bytes()?;
             total_read += read;
             if total_read >= required {
                 return Ok(total_read);
@@ -142,17 +146,36 @@ where
         }
     }
 
-    pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
+    pub fn extend_write_buffer(&mut self, packet: &Packet) -> Result<bool, ConnectionError> {
         packet.write(&mut self.write_buffer)?;
-        trace!("Sending packet {}", packet);
+        trace!("Wrote packet {} to write buffer", packet);
 
-        self.stream.write_all(&self.write_buffer[..]).await?;
-        self.stream.flush().await?;
+        if self.write_buffer.len() >= 1000 {
+            self.flush_whole_buffer()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    pub fn flush_whole_buffer(&mut self) -> Result<(), ConnectionError> {
+        self.stream.write_all(&self.write_buffer[..])?;
+        self.stream.flush()?;
         self.write_buffer.clear();
         Ok(())
     }
 
-    pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
+    pub fn write_packet(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
+        packet.write(&mut self.write_buffer)?;
+        trace!("Sending packet {}", packet);
+
+        self.stream.write_all(&self.write_buffer[..])?;
+        self.stream.flush()?;
+        self.write_buffer.clear();
+        Ok(())
+    }
+
+    pub fn write_all_packets(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
             trace!("Sending packet {}", packet);
@@ -164,8 +187,8 @@ where
             write?;
         }
 
-        self.stream.write_all(&self.write_buffer[..]).await?;
-        self.stream.flush().await?;
+        self.stream.write_all(&self.write_buffer[..])?;
+        self.stream.flush()?;
         self.write_buffer.clear();
         Ok(())
     }

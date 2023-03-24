@@ -1,6 +1,6 @@
 [package]
 name = "mqrstt"
-version = "0.1.5"
+version = "0.1.6"
 homepage = "https://github.com/GunnarMorrigan/mqrstt"
 repository = "https://github.com/GunnarMorrigan/mqrstt"
 documentation = "https://docs.rs/mqrstt"
@@ -14,9 +14,10 @@ description = "Pure rust MQTTv5 client implementation for Smol, Tokio and soon s
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["tokio", "smol"]
+default = ["tokio", "smol", "sync"]
 tokio = ["dep:tokio"]
 smol = ["dep:smol"]
+sync = []
 # quic = ["dep:quinn"]
 
 [dependencies]
@@ -55,3 +56,4 @@ webpki = { version = "0.22.0" }
 async-rustls = { version = "0.3.0" }
 tokio-rustls = "0.23.4"
 rstest = "0.16.0"
+rand = "0.8.5"

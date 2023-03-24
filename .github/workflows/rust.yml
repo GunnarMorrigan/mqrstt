@@ -50,7 +50,6 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
-    needs: test
     permissions:
       issues: write
 
@@ -70,7 +69,7 @@ jobs:
       - name: Generate coverage report
         run: |
           cargo llvm-cov clean --workspace
-          cargo llvm-cov test -p mqrstt --no-report --all-features -- --test-threads=1
+          cargo llvm-cov test -p mqrstt --no-report --all-features
           cargo llvm-cov report --lcov > lcov.txt
         env:
           RUSTFLAGS: --cfg __ui_tests

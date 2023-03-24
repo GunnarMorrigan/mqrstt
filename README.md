@@ -1,30 +1,32 @@
 <div align="center">
 
-# `📟 mqrstt`
+# `📟 MQRSTT`
 
 [![Crates.io](https://img.shields.io/crates/v/mqrstt.svg)](https://crates.io/crates/mqrstt)
 [![Docs](https://docs.rs/mqrstt/badge.svg)](https://docs.rs/mqrstt)
 [![dependency status](https://deps.rs/repo/github/GunnarMorrigan/mqrstt/status.svg)](https://deps.rs/repo/github/GunnarMorrigan/mqrstt)
 [![codecov](https://codecov.io/github/GunnarMorrigan/mqrstt/branch/main/graph/badge.svg)](https://app.codecov.io/gh/GunnarMorrigan/mqrstt)
 
-`mqrstt` is an MQTTv5 client implementation that allows for the smol and tokio runtimes. In the future we will also support a sync implementation.
+`MQRSTT` is an MQTTv5 client that provides sync and async (smol and tokio) implementation.
 
 Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
-The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
+For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
 
 </div>
 
 ## Features
   - MQTT v5
-  - TLS
-  - Runtime agnostic
+  - Runtime agnostic (Smol, Tokio)
+  - Sync 
+  - TLS/TCP
   - Lean
   - Keep alive depends on actual communication
   
   ### To do
     - Enforce size of outbound messages (e.g. Publish)
-    - Sync API
-    - More testing
+    - QUIC via QUINN
+    - Even More testing
     - More documentation
     - Remove logging calls or move all to test flag
 
@@ -186,6 +188,80 @@ async fn main() {
 
 ```
 
+### Sync example:
+```rust
+use mqrstt::{
+    MqttClient,
+    ConnectOptions,
+    new_sync,
+    packets::{self, Packet},
+    EventHandler, NetworkStatus,
+};
+use std::net::TcpStream;
+use bytes::Bytes;
+
+pub struct PingPong {
+    pub client: MqttClient,
+}
+
+impl EventHandler for PingPong {
+    // Handlers only get INCOMING packets. This can change later.
+    fn handle(&mut self, event: packets::Packet) -> () {
+        match event {
+            Packet::Publish(p) => {
+                if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+                    if payload.to_lowercase().contains("ping") {
+                        self.client
+                            .publish_blocking(
+                                p.qos,
+                                p.retain,
+                                p.topic.clone(),
+                                Bytes::from_static(b"pong"),
+                            ).unwrap();
+                        println!("Received Ping, Send pong!");
+                    }
+                }
+            },
+            Packet::ConnAck(_) => { println!("Connected!") },
+            _ => (),
+        }
+    }
+}
+
+let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
+let options = ConnectOptions::new(client_id);
+
+let address = "broker.emqx.io";
+let port = 1883;
+
+let (mut network, client) = new_sync(options);
+
+// IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
+let stream = TcpStream::connect((address, port)).unwrap();
+stream.set_nonblocking(true).unwrap();
+
+network.connect(stream).unwrap();
+
+let mut pingpong = PingPong {
+    client: client.clone(),
+};
+let res_join_handle = std::thread::spawn(move || 
+    loop {
+        match network.poll(&mut pingpong) {
+            Ok(NetworkStatus::Active) => continue,
+            otherwise => return otherwise,
+        }
+    }
+);
+
+std::thread::sleep(std::time::Duration::from_secs(30));
+client.disconnect_blocking().unwrap();
+let join_res = res_join_handle.join();
+assert!(join_res.is_ok());
+let res = join_res.unwrap();
+assert!(res.is_ok());
+```
+
 ## FAQ
  - Why are there no implementations for TLS connections?
    Many examples of creating TLS streams in rust exist with the crates [`async-rustls`](https://crates.io/crates/async-rustls) and [`tokio-rustls`](https://crates.io/crates/tokio-rustls). The focus of this crate is `MQTTv5` and providing a runtime free choice.  
@@ -194,20 +270,10 @@ async fn main() {
   - Handling of messages by user before acknowledgement.
   - Ping req depending on communication
   - No `rumqttc` packet id collision errors (It is not possible with `MQRSTT`).
-  - Runtime agnositc 
-  - Mqtt version 5 support
+  - Runtime agnositc and sync implementation
+  - Support for MQTT version 5 
 
  - Please ask :)
-
-## Size
-With the smol runtime you can create very small binaries. A simple PingPong smol TCP client can be had for 550\~KB and with TLS you are looking at 1.5\~ MB using the following flags. This makes `mqrstt` extremely usefull for embedded devices! :)
-```
-[profile.release]
-opt-level = "z"  # Optimize for size.
-lto = true
-codegen-units = 1
-strip = true
-```
 
 ## License
 Licensed under

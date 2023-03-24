@@ -4,7 +4,7 @@ use futures::FutureExt;
 
 use std::time::{Duration, Instant};
 
-use crate::connections::smol::Stream;
+use crate::stream::smol::Stream;
 
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
@@ -58,6 +58,7 @@ impl<S> Network<S>
 where
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
+    /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
         let (network, connack) = Stream::connect(&self.options, stream).await?;
 
@@ -68,11 +69,21 @@ where
             self.perform_keep_alive = false;
         }
 
-        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer).await?;
+        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)?;
 
         Ok(())
     }
 
+    /// A single call to poll will perform one of three tasks:
+    /// - Read from the stream and parse the bytes to packets for the user to handle
+    /// - Write user packets to stream
+    /// - Perform keepalive if necessary
+    ///
+    /// This function can produce an indication of the state of the network or an error.
+    /// When the network is still active (i.e. stream is not closed and no disconnect packet has been processed) the network will return [`NetworkStatus::Active`]
+    ///
+    /// In all other cases the network is unusable anymore.
+    /// The stream will be dropped and the internal buffers will be cleared.
     pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
         H: AsyncEventHandler,
@@ -140,7 +151,7 @@ where
                                 return Ok(NetworkStatus::IncomingDisconnect);
                             }
                             packet => {
-                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer).await?{
+                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
                                     handler.handle(packet).await;
                                 }
                             }
@@ -161,7 +172,7 @@ where
                         disconnect = true;
                     }
 
-                    mqtt_handler.handle_outgoing_packet(packet).await?;
+                    mqtt_handler.handle_outgoing_packet(packet)?;
                     *last_network_action = Instant::now();
 
 

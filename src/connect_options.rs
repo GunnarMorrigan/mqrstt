@@ -1,8 +1,8 @@
 use bytes::Bytes;
 
-#[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
-use crate::connections::transport::TlsConfig;
 use crate::packets::LastWill;
+#[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
+use crate::stream::transport::TlsConfig;
 use crate::util::constants::RECEIVE_MAXIMUM_DEFAULT;
 
 #[derive(Debug, Clone)]
