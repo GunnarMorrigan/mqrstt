@@ -267,7 +267,6 @@
 mod available_packet_ids;
 mod client;
 mod connect_options;
-pub mod error;
 mod mqtt_handler;
 mod util;
 
