@@ -55,7 +55,7 @@ impl MqttClient {
     /// Creates a Publish packet which is then asynchronously tranfered to the Network stack for transmission.
     ///
     /// Can be called with any payload that can be converted into [`Bytes`]
-    pub async fn publish<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P) -> Result<(), ClientError> {
+    pub async fn publish<P: Into<Bytes>>(&self, topic: String, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetwork)?),
@@ -79,7 +79,7 @@ impl MqttClient {
     /// The packet is then asynchronously tranfered to the Network stack for transmission.
     ///
     /// Can be called with any payload that can be converted into [`Bytes`]
-    pub async fn publish_with_properties<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
+    pub async fn publish_with_properties<P: Into<Bytes>>(&self, topic: String, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetwork)?),
@@ -185,7 +185,7 @@ impl MqttClient {
     /// Can be called with any payload that can be converted into [`Bytes`]
     ///
     /// This function blocks until the packet is queued for transmission
-    pub fn publish_blocking<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P) -> Result<(), ClientError> {
+    pub fn publish_blocking<P: Into<Bytes>>(&self, topic: String, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?),
@@ -211,7 +211,7 @@ impl MqttClient {
     /// Can be called with any payload that can be converted into [`Bytes`]
     ///
     /// This function blocks until the packet is queued for transmission
-    pub fn publish_with_properties_blocking<P: Into<Bytes>>(&self, qos: QoS, retain: bool, topic: String, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
+    pub fn publish_with_properties_blocking<P: Into<Bytes>>(&self, topic: String, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetwork)?),
