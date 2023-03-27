@@ -267,6 +267,7 @@
 mod available_packet_ids;
 mod client;
 mod connect_options;
+pub mod error;
 mod mqtt_handler;
 mod util;
 
@@ -278,7 +279,6 @@ pub use network::sync;
 pub mod error;
 pub mod packets;
 pub mod state;
-
 pub mod stream;
 
 pub use client::MqttClient;
@@ -674,7 +674,7 @@ mod lib_test {
             println!("Received packet: {}", event);
         }
     }
-
+    
     impl EventHandler for PingResp {
         fn handle(&mut self, event: Packet) {
             use Packet::*;
@@ -684,7 +684,7 @@ mod lib_test {
             println!("Received packet: {}", event);
         }
     }
-
+    
     #[test]
     fn test_sync_ping_req() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
