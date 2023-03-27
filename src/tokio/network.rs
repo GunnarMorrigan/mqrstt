@@ -1,10 +1,8 @@
 use async_channel::Receiver;
 
-use futures::FutureExt;
+use tracing::debug;
 
 use std::time::{Duration, Instant};
-
-use crate::stream::smol::Stream;
 
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
@@ -12,6 +10,8 @@ use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 use crate::{AsyncEventHandler, MqttHandler, NetworkStatus};
+
+use super::stream::Stream;
 
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
@@ -54,9 +54,11 @@ impl<S> Network<S> {
     }
 }
 
+/// Tokio impl
+#[cfg(feature = "tokio")]
 impl<S> Network<S>
 where
-    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
@@ -92,7 +94,7 @@ where
             return Err(ConnectionError::NoNetwork);
         }
 
-        match self.smol_select(handler).await {
+        match self.tokio_select(handler).await {
             Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
             otherwise => {
                 self.network = None;
@@ -105,7 +107,7 @@ where
         }
     }
 
-    async fn smol_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    async fn tokio_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
         H: AsyncEventHandler,
     {
@@ -122,17 +124,16 @@ where
         } = self;
 
         let sleep;
-        if !(*perform_keep_alive) {
-            sleep = Duration::new(3600, 0);
-        } else if let Some(instant) = await_pingresp {
+        if let Some(instant) = await_pingresp {
             sleep = *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
         } else {
             sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
         }
 
         if let Some(stream) = network {
-            futures::select! {
-                _ = stream.read_bytes().fuse() => {
+            debug!("Select!");
+            tokio::select! {
+                _ = stream.read_bytes() => {
                     match stream.parse_messages(incoming_packet_buffer).await {
                         Err(ReadBytes::Err(err)) => return Err(err),
                         Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
@@ -163,7 +164,7 @@ where
 
                     Ok(NetworkStatus::Active)
                 },
-                outgoing = to_network_r.recv().fuse() => {
+                outgoing = to_network_r.recv() => {
                     let packet = outgoing?;
                     stream.write(&packet).await?;
                     let mut disconnect = false;
@@ -183,20 +184,18 @@ where
                         Ok(NetworkStatus::Active)
                     }
                 },
-                _ = smol::Timer::after(sleep).fuse() => {
-                    if await_pingresp.is_none() && *perform_keep_alive{
-                        let packet = Packet::PingReq;
-                        stream.write(&packet).await?;
-                        *last_network_action = Instant::now();
-                        *await_pingresp = Some(Instant::now());
-                        Ok(NetworkStatus::Active)
-                    }
-                    else{
-                        let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
-                        stream.write(&Packet::Disconnect(disconnect)).await?;
-                        Ok(NetworkStatus::NoPingResp)
-                    }
+                _ = tokio::time::sleep(sleep), if await_pingresp.is_none() && *perform_keep_alive => {
+                    let packet = Packet::PingReq;
+                    stream.write(&packet).await?;
+                    *last_network_action = Instant::now();
+                    *await_pingresp = Some(Instant::now());
+                    Ok(NetworkStatus::Active)
                 },
+                _ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
+                    let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
+                    stream.write(&Packet::Disconnect(disconnect)).await?;
+                    Ok(NetworkStatus::NoPingResp)
+                }
             }
         } else {
             Err(ConnectionError::NoNetwork)

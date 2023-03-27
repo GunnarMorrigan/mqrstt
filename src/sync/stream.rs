@@ -4,12 +4,15 @@ use bytes::{Buf, BytesMut};
 
 use tracing::trace;
 
-use crate::packets::{
-    error::ReadBytes,
-    reason_codes::ConnAckReasonCode,
-    {FixedHeader, Packet, PacketType},
+use crate::{connect_options::ConnectOptions, error::ConnectionError};
+use crate::{
+    create_connect_from_options,
+    packets::{
+        error::ReadBytes,
+        reason_codes::ConnAckReasonCode,
+        {FixedHeader, Packet, PacketType},
+    },
 };
-use crate::{connect_options::ConnectOptions, error::ConnectionError, stream::create_connect_from_options};
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -26,19 +29,6 @@ pub struct Stream<S> {
 }
 
 impl<S> Stream<S> {
-    pub fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
-        let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
-
-        if header.remaining_length + header_length > self.read_buffer.len() {
-            return Err(ReadBytes::InsufficientBytes(header.remaining_length - self.read_buffer.len()));
-        }
-
-        self.read_buffer.advance(header_length);
-
-        let buf = self.read_buffer.split_to(header.remaining_length);
-        Ok(Packet::read(header, buf.into())?)
-    }
-
     pub fn parse_messages(&mut self, incoming_packet_buffer: &mut Vec<Packet>) -> Result<(), ReadBytes<ConnectionError>> {
         loop {
             if self.read_buffer.is_empty() {

@@ -1,17 +1,16 @@
 use async_channel::Receiver;
 
-use tracing::debug;
-
+use std::io::{Read, Write};
 use std::time::{Duration, Instant};
-
-use crate::stream::tokio::Stream;
 
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::{AsyncEventHandler, MqttHandler, NetworkStatus};
+use crate::{EventHandler, MqttHandler, NetworkStatus};
+
+use super::stream::Stream;
 
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
@@ -54,15 +53,13 @@ impl<S> Network<S> {
     }
 }
 
-/// Tokio impl
-#[cfg(feature = "tokio")]
 impl<S> Network<S>
 where
-    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
+    S: Read + Write + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
-        let (network, connack) = Stream::connect(&self.options, stream).await?;
+    pub fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
+        let (network, connack) = Stream::connect(&self.options, stream)?;
 
         self.network = Some(network);
 
@@ -76,7 +73,7 @@ where
         Ok(())
     }
 
-    /// A single call to poll will perform one of three tasks:
+    /// A single call to poll will perform all of the following tasks:
     /// - Read from the stream and parse the bytes to packets for the user to handle
     /// - Write user packets to stream
     /// - Perform keepalive if necessary
@@ -86,15 +83,11 @@ where
     ///
     /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.
-    pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    pub fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
-        H: AsyncEventHandler,
+        H: EventHandler,
     {
-        if self.network.is_none() {
-            return Err(ConnectionError::NoNetwork);
-        }
-
-        match self.tokio_select(handler).await {
+        match self.select(handler) {
             Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
             otherwise => {
                 self.network = None;
@@ -107,9 +100,9 @@ where
         }
     }
 
-    async fn tokio_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    fn select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
-        H: AsyncEventHandler,
+        H: EventHandler,
     {
         let Network {
             network,
@@ -123,80 +116,87 @@ where
             to_network_r,
         } = self;
 
-        let sleep;
-        if let Some(instant) = await_pingresp {
-            sleep = *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
-        } else {
-            sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
-        }
-
         if let Some(stream) = network {
-            debug!("Select!");
-            tokio::select! {
-                _ = stream.read_bytes() => {
-                    match stream.parse_messages(incoming_packet_buffer).await {
+            // Read segment of stream
+            {
+                if stream.read_bytes()? > 0 {
+                    match stream.parse_messages(incoming_packet_buffer) {
                         Err(ReadBytes::Err(err)) => return Err(err),
-                        Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
+                        Err(ReadBytes::InsufficientBytes(_)) => (),
                         Ok(_) => (),
                     }
+                }
 
-                    for packet in incoming_packet_buffer.drain(0..){
-                        use Packet::*;
-                        match packet{
-                            PingResp => {
-                                handler.handle(packet).await;
-                                *await_pingresp = None;
-                            },
-                            Disconnect(_) => {
-                                handler.handle(packet).await;
-                                return Ok(NetworkStatus::IncomingDisconnect);
-                            }
-                            packet => {
-                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
-                                    handler.handle(packet).await;
-                                }
+                let needs_flush = !incoming_packet_buffer.is_empty();
+
+                for packet in incoming_packet_buffer.drain(0..) {
+                    use Packet::*;
+                    match packet {
+                        PingResp => {
+                            handler.handle(packet);
+                            *await_pingresp = None;
+                        }
+                        Disconnect(_) => {
+                            handler.handle(packet);
+                            return Ok(NetworkStatus::IncomingDisconnect);
+                        }
+                        packet => {
+                            if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)? {
+                                handler.handle(packet);
                             }
                         }
                     }
-
-                    stream.write_all(outgoing_packet_buffer).await?;
+                }
+                if needs_flush {
+                    stream.write_all_packets(outgoing_packet_buffer)?;
                     *last_network_action = Instant::now();
-
-                    Ok(NetworkStatus::Active)
-                },
-                outgoing = to_network_r.recv() => {
-                    let packet = outgoing?;
-                    stream.write(&packet).await?;
-                    let mut disconnect = false;
-
-                    if packet.packet_type() == PacketType::Disconnect{
-                        disconnect = true;
-                    }
-
-                    mqtt_handler.handle_outgoing_packet(packet)?;
-                    *last_network_action = Instant::now();
-
-
-                    if disconnect{
-                        Ok(NetworkStatus::OutgoingDisconnect)
-                    }
-                    else{
-                        Ok(NetworkStatus::Active)
-                    }
-                },
-                _ = tokio::time::sleep(sleep), if await_pingresp.is_none() && *perform_keep_alive => {
-                    let packet = Packet::PingReq;
-                    stream.write(&packet).await?;
-                    *last_network_action = Instant::now();
-                    *await_pingresp = Some(Instant::now());
-                    Ok(NetworkStatus::Active)
-                },
-                _ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
-                    let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
-                    stream.write(&Packet::Disconnect(disconnect)).await?;
-                    Ok(NetworkStatus::NoPingResp)
                 }
             }
+
+            // Write segment
+            let mut flushed = false;
+            while let Ok(packet) = to_network_r.try_recv() {
+                flushed = stream.extend_write_buffer(&packet)?;
+                let packet_type = packet.packet_type();
+                println!("Handling outgoing packet: {:?}", packet.packet_type());
+                mqtt_handler.handle_outgoing_packet(packet)?;
+
+                if packet_type == PacketType::Disconnect {
+                    if !flushed {
+                        stream.flush_whole_buffer()?;
+                        *last_network_action = Instant::now();
+                    }
+                    return Ok(NetworkStatus::OutgoingDisconnect);
+                }
+            }
+            if !flushed {
+                stream.flush_whole_buffer()?;
+            }
+
+            // Keepalive process
+            // println!("Ping time {:?} < {:?}, {}",
+            //     (*last_network_action + Duration::from_secs(self.options.keep_alive_interval_s)),
+            //     Instant::now(),
+            //     *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) <= Instant::now()
+            // );
+            if *perform_keep_alive {
+                if let Some(instant) = await_pingresp {
+                    if *instant + Duration::from_secs(self.options.keep_alive_interval_s) <= Instant::now() {
+                        let disconnect = Disconnect {
+                            reason_code: DisconnectReasonCode::KeepAliveTimeout,
+                            properties: Default::default(),
+                        };
+                        stream.write_packet(&Packet::Disconnect(disconnect))?;
+                        return Ok(NetworkStatus::NoPingResp);
+                    }
+                } else if *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) <= Instant::now() {
+                    stream.write_packet(&Packet::PingReq)?;
+                    *last_network_action = Instant::now();
+                    *await_pingresp = Some(Instant::now());
+                }
+            }
+
+            Ok(NetworkStatus::Active)
         } else {
             Err(ConnectionError::NoNetwork)
         }

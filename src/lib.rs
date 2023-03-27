@@ -267,18 +267,21 @@
 mod available_packet_ids;
 mod client;
 mod connect_options;
-pub mod error;
 mod mqtt_handler;
-mod network;
+mod util;
+
+pub mod smol;
+pub mod sync;
+pub mod tokio;
+
+pub mod error;
 pub mod packets;
 pub mod state;
-pub mod stream;
-mod util;
 
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 pub use mqtt_handler::MqttHandler;
-use packets::Packet;
+use packets::{Connect, Packet};
 
 #[cfg(test)]
 pub mod tests;
@@ -311,15 +314,15 @@ pub trait EventHandler {
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
 #[cfg(feature = "smol")]
-pub fn new_smol<S>(options: ConnectOptions) -> (network::smol::Network<S>, MqttClient)
+pub fn new_smol<S>(options: ConnectOptions) -> (smol::Network<S>, MqttClient)
 where
-    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+    S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
 {
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
     let (handler, packet_ids) = MqttHandler::new(&options);
 
-    let network = network::smol::Network::<S>::new(options, handler, to_network_r);
+    let network = smol::Network::<S>::new(options, handler, to_network_r);
 
     let client = MqttClient::new(packet_ids, to_network_s);
 
@@ -328,22 +331,22 @@ where
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
 #[cfg(feature = "tokio")]
-pub fn new_tokio<S>(options: ConnectOptions) -> (network::tokio::Network<S>, MqttClient)
+pub fn new_tokio<S>(options: ConnectOptions) -> (tokio::Network<S>, MqttClient)
 where
-    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
+    S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
 {
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
     let (mqtt_handler, apkid) = MqttHandler::new(&options);
 
-    let network = network::tokio::Network::new(options, mqtt_handler, to_network_r);
+    let network = tokio::Network::new(options, mqtt_handler, to_network_r);
 
     let client = MqttClient::new(apkid, to_network_s);
 
     (network, client)
 }
 
-pub fn new_sync<S>(options: ConnectOptions) -> (network::sync::Network<S>, MqttClient)
+pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
 where
     S: std::io::Read + std::io::Write + Sized + Unpin,
 {
@@ -351,12 +354,29 @@ where
 
     let (mqtt_handler, apkid) = MqttHandler::new(&options);
 
-    let network = network::sync::Network::new(options, mqtt_handler, to_network_r);
+    let network = sync::Network::new(options, mqtt_handler, to_network_r);
 
     let client = MqttClient::new(apkid, to_network_s);
 
     (network, client)
 }
+
+fn create_connect_from_options(options: &ConnectOptions) -> Packet {
+    let mut connect = Connect {
+        client_id: options.client_id.clone(),
+        clean_start: options.clean_start,
+        keep_alive: options.keep_alive_interval_s as u16,
+        username: options.username.clone(),
+        password: options.password.clone(),
+        ..Default::default()
+    };
+
+    connect.connect_properties.request_problem_information = options.request_problem_information;
+    connect.connect_properties.request_response_information = options.request_response_information;
+
+    Packet::Connect(connect)
+}
+
 #[cfg(test)]
 mod lib_test {
     use std::{
