@@ -57,9 +57,9 @@
 //!                     if payload.to_lowercase().contains("ping") {
 //!                         self.client
 //!                             .publish(
+//!                                 p.topic.clone(),
 //!                                 p.qos,
 //!                                 p.retain,
-//!                                 p.topic.clone(),
 //!                                 Bytes::from_static(b"pong"),
 //!                             )
 //!                             .await
@@ -134,9 +134,9 @@
 //!                     if payload.to_lowercase().contains("ping") {
 //!                         self.client
 //!                             .publish(
+//!                                 p.topic.clone(),
 //!                                 p.qos,
 //!                                 p.retain,
-//!                                 p.topic.clone(),
 //!                                 Bytes::from_static(b"pong"),
 //!                             )
 //!                             .await
@@ -214,9 +214,9 @@
 //!                     if payload.to_lowercase().contains("ping") {
 //!                         self.client
 //!                             .publish_blocking(
+//!                                 p.topic.clone(),
 //!                                 p.qos,
 //!                                 p.retain,
-//!                                 p.topic.clone(),
 //!                                 Bytes::from_static(b"pong"),
 //!                             ).unwrap();
 //!                         println!("Received Ping, Send pong!");
@@ -272,10 +272,10 @@ mod util;
 
 #[cfg(feature = "smol")]
 pub mod smol;
-#[cfg(feature = "tokio")]
-pub mod tokio;
 #[cfg(feature = "sync")]
 pub mod sync;
+#[cfg(feature = "tokio")]
+pub mod tokio;
 
 pub mod error;
 pub mod packets;
@@ -415,7 +415,7 @@ mod lib_test {
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                         if payload.to_lowercase().contains("ping") {
-                            self.client.publish(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).await.unwrap();
+                            self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
                             // println!("Received Ping, Send pong!");
                         }
                     }
@@ -434,7 +434,7 @@ mod lib_test {
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                         if payload.to_lowercase().contains("ping") {
-                            self.client.publish_blocking(p.qos, p.retain, p.topic.clone(), Bytes::from_static(b"pong")).unwrap();
+                            self.client.publish_blocking(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).unwrap();
                         }
                     }
                 }
@@ -473,10 +473,10 @@ mod lib_test {
             };
         });
 
-        client.publish_blocking(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).unwrap();
-        client.publish_blocking(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).unwrap();
-        client.publish_blocking(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).unwrap();
-        client.publish_blocking(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).unwrap();
+        client.publish_blocking("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).unwrap();
+        client.publish_blocking("mqrstt".to_string(), QoS::AtMostOnce, true, b"ping".to_vec()).unwrap();
+        client.publish_blocking("mqrstt".to_string(), QoS::AtLeastOnce, false, b"ping".to_vec()).unwrap();
+        client.publish_blocking("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).unwrap();
 
         std::thread::sleep(std::time::Duration::from_secs(20));
         client.unsubscribe_blocking("mqrstt").unwrap();
@@ -520,10 +520,10 @@ mod lib_test {
                     }
                 },
                 async {
-                    client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
-                    client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                    client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                    client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                    client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
+                    client.publish("mqrstt".to_string(), QoS::AtMostOnce, true, b"ping".to_vec()).await.unwrap();
+                    client.publish("mqrstt".to_string(), QoS::AtLeastOnce, false, b"ping".to_vec()).await.unwrap();
+                    client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
 
                     smol::Timer::after(std::time::Duration::from_secs(20)).await;
                     client.unsubscribe("mqrstt").await.unwrap();
@@ -606,10 +606,10 @@ mod lib_test {
                 }
             },
             async {
-                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
-                client.publish(QoS::AtMostOnce, true, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                client.publish(QoS::AtLeastOnce, false, "mqrstt".to_string(), b"ping".to_vec()).await.unwrap();
-                client.publish(QoS::ExactlyOnce, false, "mqrstt".to_string(), b"ping".repeat(500)).await.unwrap();
+                client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
+                client.publish("mqrstt".to_string(), QoS::AtMostOnce, true, b"ping".to_vec()).await.unwrap();
+                client.publish("mqrstt".to_string(), QoS::AtLeastOnce, false, b"ping".to_vec()).await.unwrap();
+                client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
 
                 client.unsubscribe("mqrstt").await.unwrap();
 
