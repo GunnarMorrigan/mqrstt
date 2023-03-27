@@ -267,13 +267,19 @@
 mod available_packet_ids;
 mod client;
 mod connect_options;
-pub mod error;
 mod mqtt_handler;
+mod util;
+
 mod network;
+pub use network::smol;
+pub use network::tokio;
+pub use network::sync;
+
+pub mod error;
 pub mod packets;
 pub mod state;
+
 pub mod stream;
-mod util;
 
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
