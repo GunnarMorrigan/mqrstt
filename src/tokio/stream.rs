@@ -2,7 +2,6 @@ use std::io::{self, Error, ErrorKind};
 
 use bytes::{Buf, BytesMut};
 
-#[cfg(feature = "tokio")]
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 use tracing::trace;

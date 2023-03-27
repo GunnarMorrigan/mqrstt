@@ -236,6 +236,12 @@ impl From<String> for Subscription {
     }
 }
 
+impl From<(&str, QoS)> for Subscription {
+    fn from(value: (&str, QoS)) -> Self {
+        Self(vec![(value.0.to_string(), SubscriptionOptions{qos: value.1, ..Default::default()})])
+    }
+}
+
 impl From<Vec<(String, SubscriptionOptions)>> for Subscription {
     fn from(value: Vec<(String, SubscriptionOptions)>) -> Self {
         Self(value)
@@ -257,6 +263,12 @@ impl From<&str> for Subscription {
 impl From<&[&str]> for Subscription {
     fn from(value: &[&str]) -> Self {
         Self(value.iter().map(|topic| (topic.to_string(), SubscriptionOptions::default())).collect())
+    }
+}
+
+impl From<&[(&str, QoS)]> for Subscription {
+    fn from(value: &[(&str, QoS)]) -> Self {
+        Self(value.iter().map(|(topic, qos)| (topic.to_string(), SubscriptionOptions{qos: *qos, ..Default::default()})).collect())
     }
 }
 

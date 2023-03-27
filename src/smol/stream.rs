@@ -2,7 +2,6 @@ use std::io::{self, Error, ErrorKind};
 
 use bytes::{Buf, BytesMut};
 
-// use futures::{AsyncReadExt, AsyncWriteExt};
 use smol::io::{AsyncReadExt, AsyncWriteExt};
 
 use tracing::trace;

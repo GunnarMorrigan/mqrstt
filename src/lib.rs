@@ -270,9 +270,12 @@ mod connect_options;
 mod mqtt_handler;
 mod util;
 
+#[cfg(feature = "smol")]
 pub mod smol;
-pub mod sync;
+#[cfg(feature = "tokio")]
 pub mod tokio;
+#[cfg(feature = "sync")]
+pub mod sync;
 
 pub mod error;
 pub mod packets;
@@ -305,11 +308,11 @@ pub enum NetworkStatus {
 /// Usefull when you have a single handler
 #[async_trait::async_trait]
 pub trait AsyncEventHandler {
-    async fn handle(&mut self, event: Packet);
+    async fn handle(&mut self, incoming_packet: Packet);
 }
 
 pub trait EventHandler {
-    fn handle(&mut self, event: Packet);
+    fn handle(&mut self, incoming_packet: Packet);
 }
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
