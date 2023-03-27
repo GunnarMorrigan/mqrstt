@@ -4,12 +4,15 @@ use bytes::{Buf, BytesMut};
 
 use tracing::trace;
 
-use crate::{packets::{
-    error::ReadBytes,
-    reason_codes::ConnAckReasonCode,
-    {FixedHeader, Packet, PacketType},
-}, create_connect_from_options};
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
+use crate::{
+    create_connect_from_options,
+    packets::{
+        error::ReadBytes,
+        reason_codes::ConnAckReasonCode,
+        {FixedHeader, Packet, PacketType},
+    },
+};
 
 #[derive(Debug)]
 pub struct Stream<S> {

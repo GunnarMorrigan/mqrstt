@@ -4,7 +4,6 @@ use tracing::debug;
 
 use std::time::{Duration, Instant};
 
-
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
