@@ -2,17 +2,17 @@ use std::io::{self, Error, ErrorKind};
 
 use bytes::{Buf, BytesMut};
 
-#[cfg(feature = "tokio")]
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+// use futures::{AsyncReadExt, AsyncWriteExt};
+use smol::io::{AsyncReadExt, AsyncWriteExt};
 
 use tracing::trace;
 
-use crate::packets::{
+use crate::{packets::{
     error::ReadBytes,
     reason_codes::ConnAckReasonCode,
     {FixedHeader, Packet, PacketType},
-};
-use crate::{connect_options::ConnectOptions, error::ConnectionError, stream::create_connect_from_options};
+}, create_connect_from_options};
+use crate::{connect_options::ConnectOptions, error::ConnectionError};
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -70,7 +70,7 @@ impl<S> Stream<S> {
 
 impl<S> Stream<S>
 where
-    S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Sized + Unpin,
+    S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin,
 {
     pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, Packet), ConnectionError> {
         let mut s = Self {

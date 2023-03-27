@@ -4,7 +4,6 @@ use tracing::debug;
 
 use std::time::{Duration, Instant};
 
-use crate::stream::tokio::Stream;
 
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
@@ -12,6 +11,8 @@ use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 use crate::{AsyncEventHandler, MqttHandler, NetworkStatus};
+
+use super::stream::Stream;
 
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
