@@ -24,7 +24,6 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
   - Keep alive depends on actual communication
   
   ### To do
-    - Enforce size of outbound messages (e.g. Publish)
     - QUIC via QUINN
     - Even More testing
     - More documentation

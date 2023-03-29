@@ -145,6 +145,10 @@ impl MqttRead for String {
 
 impl MqttWrite for String {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        if self.len() > 65535{
+            return Err(SerializeError::StringTooLong(self.len()));
+        }
+
         buf.put_u16(self.len() as u16);
         buf.extend(self.as_bytes());
         Ok(())

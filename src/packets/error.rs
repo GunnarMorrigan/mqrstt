@@ -66,6 +66,9 @@ pub enum SerializeError {
     #[error("Can not write {0} in a 4 byte variable integer.")]
     VariableIntegerOverflow(usize),
 
+    #[error("UTF-8 encoded strings was {0} bytes long, max length is 65535 bytes")]
+    StringTooLong(usize),
+
     #[error("Authentication data without authentication method")]
     AuthDataWithoutAuthMethod,
 }
