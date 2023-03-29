@@ -325,9 +325,11 @@ where
 
     let (handler, packet_ids) = MqttHandler::new(&options);
 
+    let max_packet_size = options.maximum_packet_size;
+
     let network = smol::Network::<S>::new(options, handler, to_network_r);
 
-    let client = MqttClient::new(packet_ids, to_network_s);
+    let client = MqttClient::new(packet_ids, to_network_s, max_packet_size);
 
     (network, client)
 }
@@ -342,9 +344,11 @@ where
 
     let (mqtt_handler, apkid) = MqttHandler::new(&options);
 
+    let max_packet_size = options.maximum_packet_size;
+
     let network = tokio::Network::new(options, mqtt_handler, to_network_r);
 
-    let client = MqttClient::new(apkid, to_network_s);
+    let client = MqttClient::new(apkid, to_network_s, max_packet_size);
 
     (network, client)
 }
@@ -357,9 +361,11 @@ where
 
     let (mqtt_handler, apkid) = MqttHandler::new(&options);
 
+    let max_packet_size = options.maximum_packet_size;
+
     let network = sync::Network::new(options, mqtt_handler, to_network_r);
 
-    let client = MqttClient::new(apkid, to_network_s);
+    let client = MqttClient::new(apkid, to_network_s, max_packet_size);
 
     (network, client)
 }
