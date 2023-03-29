@@ -68,7 +68,9 @@ pub enum HandlerError {
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum ClientError {
     #[error("Internal network channel is closed")]
-    NoNetwork,
+    NoNetworkChannel,
+    #[error("Packet size is larger than allowed")]
+    MaxPacketSize(Packet)
 }
 
 impl From<ReadBytes<DeserializeError>> for ReadBytes<ConnectionError> {
