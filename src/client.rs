@@ -339,7 +339,7 @@ mod tests {
         let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
         let (_, to_network_r) = async_channel::bounded(100);
 
-        let client = MqttClient::new(r, client_to_handler_s, None);
+        let client = MqttClient::new(r, client_to_handler_s, Some(500000));
 
         (client, client_to_handler_r, to_network_r)
     }
@@ -384,6 +384,16 @@ mod tests {
         let res = client.subscribe(topics.as_slice()).await;
 
         assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn publish_with_too_large_mqtt_packet() {
+        let (client, _client_to_handler_r, _) = create_new_test_client();
+
+        let res = client.publish("way".repeat(21845).to_string(), QoS::ExactlyOnce, false, "hello".repeat(86893)).await;
+
+        assert!(res.is_err());
+        assert_eq!(ClientError::ValidationError(PacketValidationError::MaxPacketSize(500005)), res.unwrap_err())
     }
 
     #[tokio::test]
