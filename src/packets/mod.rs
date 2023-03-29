@@ -145,7 +145,7 @@ impl MqttRead for String {
 
 impl MqttWrite for String {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        if self.len() > 65535{
+        if self.len() > 65535 {
             return Err(SerializeError::StringTooLong(self.len()));
         }
 
