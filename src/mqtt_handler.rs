@@ -27,7 +27,6 @@ pub struct MqttHandler {
     clean_start: bool,
 }
 
-#[cfg(any(feature = "smol", feature = "tokio"))]
 /// [`MqttHandler`] is used to properly handle incoming and outgoing packets according to the MQTT specifications.
 /// Only the incoming messages are shown to the user via the user provided handler.
 impl MqttHandler {
@@ -229,32 +228,6 @@ impl MqttHandler {
     fn handle_outgoing_disconnect(&mut self, _: Disconnect) -> Result<(), HandlerError> {
         Ok(())
     }
-}
-
-#[cfg(feature = "sync")]
-impl MqttHandler {
-    // /// This function handles the incoming packet `packet` depending on the packet type.
-    // /// Any packets that are produced as a response to the incoming packet are added to the outgoing_packet_buffer.
-    // ///
-    // /// # Return value
-    // /// This function returns either an error or an indication wether the users handler needs to be called on this packet.
-    // /// In some cases (retransmitted Publish packets) the users handler should not be called to avoid duplicate delivery.
-    // /// true is returned if the users handler should be called
-    // /// false otherwise
-    // pub fn handle_incoming_packet_sync(&mut self, packet: &Packet, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<bool, HandlerError> {
-    //     match packet {
-    //         Packet::Publish(publish) => return self.handle_incoming_publish(publish, outgoing_packet_buffer),
-    //         Packet::PubAck(puback) => self.handle_incoming_puback(puback, outgoing_packet_buffer)?,
-    //         Packet::PubRec(pubrec) => self.handle_incoming_pubrec(pubrec, outgoing_packet_buffer)?,
-    //         Packet::PubRel(pubrel) => self.handle_incoming_pubrel(pubrel, outgoing_packet_buffer)?,
-    //         Packet::PubComp(pubcomp) => self.handle_incoming_pubcomp(pubcomp, outgoing_packet_buffer)?,
-    //         Packet::SubAck(suback) => self.handle_incoming_suback(suback, outgoing_packet_buffer)?,
-    //         Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback, outgoing_packet_buffer)?,
-    //         Packet::ConnAck(connack) => self.handle_incoming_connack(connack, outgoing_packet_buffer)?,
-    //         a => unreachable!("Should not receive {}", a),
-    //     };
-    //     Ok(false)
-    // }
 }
 
 #[cfg(test)]
