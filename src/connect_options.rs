@@ -3,7 +3,7 @@ use bytes::Bytes;
 use crate::packets::LastWill;
 #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 use crate::stream::transport::TlsConfig;
-use crate::util::constants::RECEIVE_MAXIMUM_DEFAULT;
+use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
 
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
@@ -69,6 +69,6 @@ impl ConnectOptions {
     }
 
     pub fn receive_maximum(&self) -> u16 {
-        self.receive_maximum.unwrap_or(RECEIVE_MAXIMUM_DEFAULT)
+        self.receive_maximum.unwrap_or(DEFAULT_RECEIVE_MAXIMUM)
     }
 }
