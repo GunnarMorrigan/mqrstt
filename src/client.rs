@@ -17,15 +17,19 @@ pub struct MqttClient {
 
     /// Sends Publish, Subscribe, Unsubscribe to the event handler to handle later.
     to_network_s: Sender<Packet>,
+impl MqttClient{
+    pub fn new(available_packet_ids: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: Option<u32>) -> Self {
+        Self {
+            available_packet_ids,
+            to_network_s,
+            max_packet_size: max_packet_size.unwrap_or(DEFAULT_MAX_PACKET_SIZE),
+        }
+    }
 }
 
 /// Async functions to perform MQTT operations
 #[cfg(any(feature = "tokio", feature = "smol"))]
 impl MqttClient {
-    pub fn new(available_packet_ids: Receiver<u16>, to_network_s: Sender<Packet>) -> Self {
-        Self { available_packet_ids, to_network_s }
-    }
-
     /// Creates a subscribe packet that is then asynchronously tranfered to the Network stack for transmission
     ///
     /// Can be called with anything that can be converted into [`Subscription`]
