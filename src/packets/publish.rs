@@ -1,6 +1,9 @@
 use bytes::{BufMut, Bytes};
 
-use super::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
+use crate::error::PacketValidationError;
+use crate::util::constants::MAXIMUM_TOPIC_SIZE;
+
+use super::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength, PacketValidation};
 use super::{
     error::{DeserializeError, SerializeError},
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
@@ -99,6 +102,21 @@ impl WireLength for Publish {
         len += properties_len;
         len += self.payload.len();
         len
+    }
+}
+
+impl PacketValidation for Publish{
+    fn validate(&self, max_packet_size: usize) -> Result<(), PacketValidationError> {
+        use PacketValidationError::*;
+        if self.wire_len() > max_packet_size{
+            Err(MaxPacketSize(self.wire_len()))
+        }
+        else if self.topic.len() > MAXIMUM_TOPIC_SIZE{
+            Err(TopicSize(self.topic.len()))
+        }
+        else{
+            Ok(())
+        }
     }
 }
 

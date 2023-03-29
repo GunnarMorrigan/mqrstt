@@ -22,9 +22,6 @@ pub trait MqttWrite: Sized {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 
-#[deprecated(note = "Implement MqttRead or MqttWrite.")]
-pub trait SimpleSerialize: Sized {
-    fn read(buf: &mut Bytes) -> Result<Self, String>;
-
-    fn write(&self, buf: &mut BytesMut);
+pub trait PacketValidation: Sized{
+    fn validate(&self, max_packet_size: usize) -> Result<(), crate::error::PacketValidationError>;
 }
