@@ -70,16 +70,16 @@ pub enum ClientError {
     #[error("Internal network channel is closed")]
     NoNetworkChannel,
     #[error("Packet validation error: {0}")]
-    ValidationError(#[from] PacketValidationError)
+    ValidationError(#[from] PacketValidationError),
 }
 
 /// Errors that can be produced if the packet does not conform to the specifications.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum PacketValidationError{
+pub enum PacketValidationError {
     #[error("Packet size is larger than allowed {0}")]
     MaxPacketSize(usize),
     #[error("Topic too large: {0}")]
-    TopicSize(usize)
+    TopicSize(usize),
 }
 
 impl From<ReadBytes<DeserializeError>> for ReadBytes<ConnectionError> {

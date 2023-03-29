@@ -22,6 +22,6 @@ pub trait MqttWrite: Sized {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError>;
 }
 
-pub trait PacketValidation: Sized{
+pub trait PacketValidation: Sized {
     fn validate(&self, max_packet_size: usize) -> Result<(), crate::error::PacketValidationError>;
 }

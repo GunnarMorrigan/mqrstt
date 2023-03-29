@@ -5,9 +5,11 @@ use tracing::info;
 use crate::{
     error::ClientError,
     packets::{
+        mqtt_traits::PacketValidation,
         reason_codes::DisconnectReasonCode,
-        Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, Subscription}, {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics}, mqtt_traits::{PacketValidation},
-    }, util::constants::{DEFAULT_MAX_PACKET_SIZE},
+        Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, Subscription}, {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
+    },
+    util::constants::DEFAULT_MAX_PACKET_SIZE,
 };
 
 #[derive(Debug, Clone)]
@@ -22,7 +24,7 @@ pub struct MqttClient {
     max_packet_size: usize,
 }
 
-impl MqttClient{
+impl MqttClient {
     pub fn new(available_packet_ids: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: Option<u32>) -> Self {
         Self {
             available_packet_ids,
@@ -320,7 +322,10 @@ impl MqttClient {
 mod tests {
     use async_channel::Receiver;
 
-    use crate::{packets::{reason_codes::DisconnectReasonCode, DisconnectProperties, Packet, PacketType, UnsubscribeProperties, QoS}, error::{PacketValidationError, ClientError}};
+    use crate::{
+        error::{ClientError, PacketValidationError},
+        packets::{reason_codes::DisconnectReasonCode, DisconnectProperties, Packet, PacketType, QoS, UnsubscribeProperties},
+    };
 
     use super::MqttClient;
 
@@ -339,11 +344,10 @@ mod tests {
         (client, client_to_handler_r, to_network_r)
     }
 
-
     #[tokio::test]
     async fn publish_with_just_right_topic_len() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
-        
+
         let res = client.publish("way".repeat(21845).to_string(), QoS::ExactlyOnce, false, "hello").await;
 
         assert!(res.is_ok());
@@ -352,7 +356,7 @@ mod tests {
     #[tokio::test]
     async fn publish_with_too_long_topic() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
-        
+
         let res = client.publish("way".repeat(21846).to_string(), QoS::ExactlyOnce, false, "hello").await;
 
         assert!(res.is_err());
@@ -362,7 +366,7 @@ mod tests {
     #[tokio::test]
     async fn subscribe_with_too_long_topic() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
-        
+
         let topics = ["WAYYY TOOO LONG".repeat(10000), "hello".to_string()];
 
         let res = client.subscribe(topics.as_slice()).await;
@@ -374,14 +378,13 @@ mod tests {
     #[tokio::test]
     async fn subscribe_with_just_right_topic_len() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
-        
+
         let topics = ["way".repeat(21845), "hello".to_string()];
 
         let res = client.subscribe(topics.as_slice()).await;
 
         assert!(res.is_ok());
     }
-
 
     #[tokio::test]
     async fn unsubscribe_with_properties_test() {

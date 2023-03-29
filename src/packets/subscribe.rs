@@ -2,7 +2,7 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength, PacketValidation},
+    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 use bytes::{Buf, BufMut};
@@ -74,13 +74,13 @@ impl WireLength for Subscribe {
     }
 }
 
-impl PacketValidation for Subscribe{
+impl PacketValidation for Subscribe {
     fn validate(&self, max_packet_size: usize) -> Result<(), PacketValidationError> {
-        if self.wire_len() > max_packet_size{
+        if self.wire_len() > max_packet_size {
             return Err(PacketValidationError::MaxPacketSize(self.wire_len()));
         }
-        for (topic, _) in &self.topics{
-            if topic.len() > MAXIMUM_TOPIC_SIZE{
+        for (topic, _) in &self.topics {
+            if topic.len() > MAXIMUM_TOPIC_SIZE {
                 return Err(PacketValidationError::TopicSize(topic.len()));
             }
         }
