@@ -224,7 +224,7 @@ impl MqttClient {
             payload: payload.into(),
         };
 
-        publish.validate(self.max_packet_size as usize)?;
+        publish.validate(self.max_packet_size)?;
         self.to_network_s.send_blocking(Packet::Publish(publish)).map_err(|_| ClientError::NoNetworkChannel)?;
         Ok(())
     }
@@ -250,7 +250,7 @@ impl MqttClient {
             payload: payload.into(),
         };
 
-        publish.validate(self.max_packet_size as usize)?;
+        publish.validate(self.max_packet_size)?;
         self.to_network_s.send_blocking(Packet::Publish(publish)).map_err(|_| ClientError::NoNetworkChannel)?;
         Ok(())
     }
