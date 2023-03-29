@@ -1,6 +1,6 @@
 [package]
 name = "mqrstt"
-version = "0.1.7"
+version = "0.1.8"
 homepage = "https://github.com/GunnarMorrigan/mqrstt"
 repository = "https://github.com/GunnarMorrigan/mqrstt"
 documentation = "https://docs.rs/mqrstt"
@@ -48,7 +48,6 @@ tokio = { version = "1.26.0", features = ["rt-multi-thread", "rt", "macros", "sy
 
 smol = { version = "1.3.0" }
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
-
 
 rustls = { version = "0.20.7" }
 rustls-pemfile = { version = "1.0.1" }

@@ -1,6 +1,8 @@
+use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
+
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
 };
 use bytes::BufMut;
@@ -65,6 +67,20 @@ impl WireLength for Unsubscribe {
             len += topic.wire_len();
         }
         len
+    }
+}
+
+impl PacketValidation for Unsubscribe {
+    fn validate(&self, max_packet_size: usize) -> Result<(), PacketValidationError> {
+        if self.wire_len() > max_packet_size {
+            return Err(PacketValidationError::MaxPacketSize(self.wire_len()));
+        }
+        for topic in &self.topics {
+            if topic.len() > MAXIMUM_TOPIC_SIZE {
+                return Err(PacketValidationError::TopicSize(topic.len()));
+            }
+        }
+        Ok(())
     }
 }
 
