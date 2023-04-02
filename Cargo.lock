@@ -70,15 +70,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-mutex"
-version = "1.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "479db852db25d9dbf6204e6cb6253698f175c15726470f78af0d918e99d6156e"
-dependencies = [
- "event-listener",
-]
-
-[[package]]
 name = "async-net"
 version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -442,7 +433,6 @@ name = "mqrstt"
 version = "0.1.8"
 dependencies = [
  "async-channel",
- "async-mutex",
  "async-rustls",
  "async-trait",
  "bytes",
