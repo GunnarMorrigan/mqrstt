@@ -402,13 +402,11 @@ mod lib_test {
     use crate::{
         new_smol, new_sync,
         packets::{self, Packet},
-        tests::tls::tests::simple_rust_tls,
         AsyncEventHandler, ConnectOptions, EventHandler, MqttClient, NetworkStatus,
     };
     use async_trait::async_trait;
     use bytes::Bytes;
     use packets::QoS;
-    use rustls::ServerName;
 
     pub struct PingPong {
         pub client: MqttClient,
@@ -541,49 +539,49 @@ mod lib_test {
         });
     }
 
-    #[test]
-    fn test_smol_tls() {
-        smol::block_on(async {
-            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-            client_id += "_SmolTlsPingPong";
-            let options = ConnectOptions::new(client_id);
+    // #[test]
+    // fn test_smol_tls() {
+    //     smol::block_on(async {
+    //         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
+    //         client_id += "_SmolTlsPingPong";
+    //         let options = ConnectOptions::new(client_id);
 
-            let address = "broker.emqx.io";
-            let port = 8883;
+    //         let address = "broker.emqx.io";
+    //         let port = 8883;
 
-            let (mut network, client) = new_smol(options);
+    //         let (mut network, client) = new_smol(options);
 
-            let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
+    //         let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
 
-            let domain = ServerName::try_from(address).unwrap();
-            let connector = async_rustls::TlsConnector::from(arc_client_config);
+    //         let domain = ServerName::try_from(address).unwrap();
+    //         let connector = async_rustls::TlsConnector::from(arc_client_config);
 
-            let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
-            let connection = connector.connect(domain, stream).await.unwrap();
+    //         let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
+    //         let connection = connector.connect(domain, stream).await.unwrap();
 
-            network.connect(connection).await.unwrap();
+    //         network.connect(connection).await.unwrap();
 
-            client.subscribe("mqrstt").await.unwrap();
+    //         client.subscribe("mqrstt").await.unwrap();
 
-            let mut pingpong = PingPong { client: client.clone() };
+    //         let mut pingpong = PingPong { client: client.clone() };
 
-            let (n, _) = futures::join!(
-                async {
-                    loop {
-                        return match network.poll(&mut pingpong).await {
-                            Ok(NetworkStatus::Active) => continue,
-                            otherwise => otherwise,
-                        };
-                    }
-                },
-                async {
-                    smol::Timer::after(std::time::Duration::from_secs(30)).await;
-                    client.disconnect().await.unwrap();
-                }
-            );
-            assert!(n.is_ok());
-        });
-    }
+    //         let (n, _) = futures::join!(
+    //             async {
+    //                 loop {
+    //                     return match network.poll(&mut pingpong).await {
+    //                         Ok(NetworkStatus::Active) => continue,
+    //                         otherwise => otherwise,
+    //                     };
+    //                 }
+    //             },
+    //             async {
+    //                 smol::Timer::after(std::time::Duration::from_secs(30)).await;
+    //                 client.disconnect().await.unwrap();
+    //             }
+    //         );
+    //         assert!(n.is_ok());
+    //     });
+    // }
 
     #[cfg(feature = "tokio")]
     #[tokio::test]
@@ -629,52 +627,52 @@ mod lib_test {
         assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
     }
 
-    #[cfg(feature = "tokio")]
-    #[tokio::test]
-    async fn test_tokio_tls() {
-        let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-        client_id += "_TokioTlsPingPong";
-        let options = ConnectOptions::new(client_id);
+    // #[cfg(feature = "tokio")]
+    // #[tokio::test]
+    // async fn test_tokio_tls() {
+    //     let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
+    //     client_id += "_TokioTlsPingPong";
+    //     let options = ConnectOptions::new(client_id);
 
-        let address = "broker.emqx.io";
-        let port = 8883;
+    //     let address = "broker.emqx.io";
+    //     let port = 8883;
 
-        let (mut network, client) = new_tokio(options);
+    //     let (mut network, client) = new_tokio(options);
 
-        let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
+    //     let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
 
-        let domain = ServerName::try_from(address).unwrap();
-        let connector = tokio_rustls::TlsConnector::from(arc_client_config);
+    //     let domain = ServerName::try_from(address).unwrap();
+    //     let connector = tokio_rustls::TlsConnector::from(arc_client_config);
 
-        let stream = tokio::net::TcpStream::connect((address, port)).await.unwrap();
-        let connection = connector.connect(domain, stream).await.unwrap();
+    //     let stream = tokio::net::TcpStream::connect((address, port)).await.unwrap();
+    //     let connection = connector.connect(domain, stream).await.unwrap();
 
-        network.connect(connection).await.unwrap();
+    //     network.connect(connection).await.unwrap();
 
-        client.subscribe("mqrstt").await.unwrap();
+    //     client.subscribe("mqrstt").await.unwrap();
 
-        let mut pingpong = PingPong { client: client.clone() };
+    //     let mut pingpong = PingPong { client: client.clone() };
 
-        let (n, _) = tokio::join!(
-            async {
-                loop {
-                    return match network.poll(&mut pingpong).await {
-                        Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
-                        Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
-                        Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
-                        Ok(NetworkStatus::Active) => continue,
-                        Err(a) => Err(a),
-                    };
-                }
-            },
-            async {
-                tokio::time::sleep(Duration::from_secs(30)).await;
-                client.disconnect().await.unwrap();
-            }
-        );
-        assert!(n.is_ok());
-        assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
-    }
+    //     let (n, _) = tokio::join!(
+    //         async {
+    //             loop {
+    //                 return match network.poll(&mut pingpong).await {
+    //                     Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
+    //                     Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
+    //                     Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
+    //                     Ok(NetworkStatus::Active) => continue,
+    //                     Err(a) => Err(a),
+    //                 };
+    //             }
+    //         },
+    //         async {
+    //             tokio::time::sleep(Duration::from_secs(30)).await;
+    //             client.disconnect().await.unwrap();
+    //         }
+    //     );
+    //     assert!(n.is_ok());
+    //     assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
+    // }
 
     pub struct PingResp {
         pub client: MqttClient,

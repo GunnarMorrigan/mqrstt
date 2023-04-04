@@ -45,6 +45,10 @@ impl Publish {
             payload,
         }
     }
+
+    pub fn payload_to_vec(&self) -> Vec<u8>{
+        self.payload.to_vec()
+    }
 }
 
 impl VariableHeaderRead for Publish {
@@ -122,35 +126,35 @@ impl PacketValidation for Publish {
 pub struct PublishProperties {
     /// 3.3.2.3.2 Payload Format Indicator
     /// 1 (0x01) Byte, Identifier of the Payload Format Indicator.
-    pub(crate) payload_format_indicator: Option<u8>,
+    pub payload_format_indicator: Option<u8>,
 
     /// 3.3.2.3.3 Message Expiry Interval
     /// 2 (0x02) Byte, Identifier of the Message Expiry Interval.
-    pub(crate) message_expiry_interval: Option<u32>,
+    pub message_expiry_interval: Option<u32>,
 
     /// 3.3.2.3.4 Topic Alias
     /// 35 (0x23) Byte, Identifier of the Topic Alias.
-    pub(crate) topic_alias: Option<u16>,
+    pub topic_alias: Option<u16>,
 
     /// 3.3.2.3.5 Response Topic
     /// 8 (0x08) Byte, Identifier of the Response Topic.
-    pub(crate) response_topic: Option<String>,
+    pub response_topic: Option<String>,
 
     /// 3.3.2.3.6 Correlation Data
     /// 9 (0x09) Byte, Identifier of the Correlation Data.
-    pub(crate) correlation_data: Option<Bytes>,
+    pub correlation_data: Option<Bytes>,
 
     /// 3.3.2.3.8 Subscription Identifier
     /// 11 (0x0B), Identifier of the Subscription Identifier.
-    pub(crate) subscription_identifier: Vec<usize>,
+    pub subscription_identifier: Vec<usize>,
 
     /// 3.3.2.3.7 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub(crate) user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(String, String)>,
 
     /// 3.3.2.3.9 Content Type
     /// 3 (0x03) Identifier of the Content Type
-    pub(crate) content_type: Option<String>,
+    pub content_type: Option<String>,
 }
 
 impl MqttRead for PublishProperties {
