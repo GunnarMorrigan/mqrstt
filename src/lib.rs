@@ -162,14 +162,15 @@
 //!     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
 //!         .unwrap();
-//!     
-//!     network.connect(stream).await.unwrap();
-//!     
-//!     client.subscribe("mqrstt").await.unwrap();
-//!     
+
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
+//!     
+//!     network.connect(stream, &mut pingpong).await.unwrap();
+//!     
+//!     client.subscribe("mqrstt").await.unwrap();
+//!     
 //!
 //!     let (n, _) = tokio::join!(
 //!         async {
@@ -463,12 +464,12 @@ mod lib_test {
         stream.set_nonblocking(true).unwrap();
 
         let (mut network, client) = new_sync(options);
+        let mut pingpong = PingPong { client: client.clone() };
 
-        network.connect(stream).unwrap();
+        network.connect(stream, &mut pingpong).unwrap();
 
         client.subscribe_blocking("mqrstt").unwrap();
 
-        let mut pingpong = PingPong { client: client.clone() };
         let res_join_handle = thread::spawn(move || loop {
             return match network.poll(&mut pingpong) {
                 Ok(NetworkStatus::Active) => continue,
@@ -506,12 +507,12 @@ mod lib_test {
             let (mut network, client) = new_smol(options);
 
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
+            let mut pingpong = PingPong { client: client.clone() };
 
-            network.connect(stream).await.unwrap();
+            network.connect(stream, &mut pingpong).await.unwrap();
 
             client.subscribe("mqrstt").await.unwrap();
 
-            let mut pingpong = PingPong { client: client.clone() };
 
             let (n, _) = futures::join!(
                 async {
@@ -720,9 +721,10 @@ mod lib_test {
         let stream = TcpStream::connect((address, port)).unwrap();
         stream.set_nonblocking(true).unwrap();
 
-        network.connect(stream).unwrap();
-
         let mut pingresp = PingResp::new(client.clone());
+
+        network.connect(stream, &mut pingresp).unwrap();
+
         let res_join_handle = thread::spawn(move || loop {
             loop {
                 match network.poll(&mut pingresp) {
@@ -800,12 +802,12 @@ mod lib_test {
             let port = 1883;
 
             let (mut network, client) = new_smol(options);
-
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
 
-            network.connect(stream).await.unwrap();
-
             let mut pingresp = PingResp::new(client.clone());
+
+            network.connect(stream, &mut pingresp).await.unwrap();
+
 
             let (n, _) = futures::join!(
                 async {

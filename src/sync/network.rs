@@ -58,7 +58,7 @@ where
     S: Read + Write + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
+    pub fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> where H: EventHandler {
         let (network, connack) = Stream::connect(&self.options, stream)?;
 
         self.network = Some(network);
@@ -69,6 +69,7 @@ where
         }
 
         self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)?;
+        handler.handle(connack);
 
         Ok(())
     }
