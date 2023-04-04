@@ -402,13 +402,11 @@ mod lib_test {
     use crate::{
         new_smol, new_sync,
         packets::{self, Packet},
-        tests::tls::tests::simple_rust_tls,
         AsyncEventHandler, ConnectOptions, EventHandler, MqttClient, NetworkStatus,
     };
     use async_trait::async_trait;
     use bytes::Bytes;
     use packets::QoS;
-    use rustls::ServerName;
 
     pub struct PingPong {
         pub client: MqttClient,
