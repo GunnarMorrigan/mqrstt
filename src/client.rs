@@ -58,14 +58,14 @@ impl MqttClient {
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
     /// mqtt_client.subscribe(("test/topic", QoS::ExactlyOnce)).await;
     /// 
-    /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
+    /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtMostOnce)];
     /// mqtt_client.subscribe(vec).await;
     /// 
-    /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
+    /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtLeastOnce)];
     /// mqtt_client.subscribe(vec.as_slice()).await;
     /// 
     /// let sub_options = SubscriptionOptions{
-    ///   retain_handling: RetainHandling::ZERO,
+    ///   retain_handling: RetainHandling::TWO,
     ///   retain_as_publish: false,
     ///   no_local: false,
     ///   qos: QoS::AtLeastOnce,
