@@ -265,17 +265,8 @@ assert!(res.is_ok());
 ```
 
 ## FAQ
- - Why are there no implementations for TLS connections?
-   Many examples of creating TLS streams in rust exist with the crates [`async-rustls`](https://crates.io/crates/async-rustls) and [`tokio-rustls`](https://crates.io/crates/tokio-rustls). The focus of this crate is `MQTTv5` and providing a runtime free choice.  
-  
-- What are the advantages over [`rumqttc`](https://crates.io/crates/rumqttc)?
-  - Handling of messages by user before acknowledgement.
-  - Ping req depending on communication
-  - No `rumqttc` packet id collision errors (It is not possible with `MQRSTT`).
-  - Runtime agnositc and sync implementation
-  - Support for MQTT version 5 
+  - Not much gets frequently asked, so please do! :)
 
- - Please ask :)
 
 ## License
 Licensed under
