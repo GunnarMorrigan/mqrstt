@@ -42,6 +42,37 @@ impl MqttClient {
     /// Creates a subscribe packet that is then asynchronously tranfered to the Network stack for transmission
     ///
     /// Can be called with anything that can be converted into [`Subscription`]
+    /// 
+    /// # Examples
+    /// ```
+    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # smol::block_on(async {
+    /// 
+    /// use mqrstt::packets::QoS;
+    /// use mqrstt::packets::{SubscriptionOptions, RetainHandling};
+    /// 
+    /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
+    /// mqtt_client.subscribe("test/topic").await;
+    /// 
+    /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
+    /// mqtt_client.subscribe(("test/topic", QoS::ExactlyOnce)).await;
+    /// 
+    /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
+    /// mqtt_client.subscribe(vec).await;
+    /// 
+    /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
+    /// mqtt_client.subscribe(vec.as_slice()).await;
+    /// 
+    /// let sub_options = SubscriptionOptions{
+    ///   retain_handling: RetainHandling::ZERO,
+    ///   retain_as_publish: false,
+    ///   no_local: false,
+    ///   qos: QoS::AtLeastOnce,
+    /// };
+    /// mqtt_client.subscribe(("final/test/topic", sub_options)).await;
+    /// # });
+    /// ```
     pub async fn subscribe<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let subscription: Subscription = into_subscribtions.into();
@@ -56,7 +87,63 @@ impl MqttClient {
     /// The packet is then asynchronously tranfered to the Network stack for transmission.
     ///
     /// Can be called with anything that can be converted into [`Subscription`]
-    pub async fn subscribe_with_properties<S: Into<Subscription>>(&self, properties: SubscribeProperties, into_sub: S) -> Result<(), ClientError> {
+    /// 
+    /// # Examples
+    /// ```
+    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # smol::block_on(async {
+    /// 
+    /// use mqrstt::packets::QoS;
+    /// use mqrstt::packets::{SubscribeProperties, SubscriptionOptions, RetainHandling};
+    /// 
+    /// let sub_properties = SubscribeProperties{
+    ///   subscription_id: Some(1),
+    ///   user_properties: vec![],
+    /// };
+    /// 
+    /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
+    /// mqtt_client.subscribe_with_properties("test/topic", sub_properties).await;
+    /// 
+    /// # let sub_properties = SubscribeProperties{
+    /// #   subscription_id: Some(1),
+    /// #   user_properties: vec![],
+    /// # };
+    /// 
+    /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
+    /// mqtt_client.subscribe_with_properties(("test/topic", QoS::ExactlyOnce), sub_properties).await;
+    /// 
+    /// # let sub_properties = SubscribeProperties{
+    /// #   subscription_id: Some(1),
+    /// #   user_properties: vec![],
+    /// # };
+    /// 
+    /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
+    /// mqtt_client.subscribe_with_properties(vec, sub_properties).await;
+    /// 
+    /// # let sub_properties = SubscribeProperties{
+    /// #   subscription_id: Some(1),
+    /// #   user_properties: vec![],
+    /// # };
+    ///  
+    /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
+    /// mqtt_client.subscribe_with_properties(vec.as_slice(), sub_properties).await;
+    /// 
+    /// # let sub_properties = SubscribeProperties{
+    /// #   subscription_id: Some(1),
+    /// #   user_properties: vec![],
+    /// # };
+    ///  
+    /// let sub_options = SubscriptionOptions{
+    ///   retain_handling: RetainHandling::ZERO,
+    ///   retain_as_publish: false,
+    ///   no_local: false,
+    ///   qos: QoS::AtLeastOnce,
+    /// };
+    /// mqtt_client.subscribe_with_properties(("final/test/topic", sub_options), sub_properties).await;
+    /// # });
+    /// ```
+    pub async fn subscribe_with_properties<S: Into<Subscription>>(&self, into_sub: S, properties: SubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let sub = Subscribe {
             packet_identifier: pkid,
@@ -195,12 +282,12 @@ impl MqttClient {
     /// Can be called with anything that can be converted into [`Subscription`]
     ///
     /// This function blocks until the packet is queued for transmission
-    pub fn subscribe_with_properties_blocking<S: Into<Subscription>>(&self, properties: SubscribeProperties, into_sub: S) -> Result<(), ClientError> {
+    pub fn subscribe_with_properties_blocking<S: Into<Subscription>>(&self, into_subscribtions: S, properties: SubscribeProperties,) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
         let sub = Subscribe {
             packet_identifier: pkid,
             properties,
-            topics: into_sub.into().0,
+            topics: into_subscribtions.into().0,
         };
 
         sub.validate(self.max_packet_size)?;
