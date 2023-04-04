@@ -28,3 +28,10 @@ expression = "ISC"
 license-files = [
     { path = "LICENSE", hash = 0x001c7e6c },
 ]
+
+[[licenses.clarify]]
+name = "rustls-webpki"
+expression = ""
+license-files = [
+    { path = "LICENSE", hash = 0x001c7e6c }
+]
