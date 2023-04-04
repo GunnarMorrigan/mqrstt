@@ -51,9 +51,9 @@ tokio = { version = "1.26.0", features = ["rt-multi-thread", "rt", "macros", "sy
 pretty_assertions = "1.3.0"
 
 rustls = { version = "0.21.0" }
-rustls-pemfile = { version = "1.0.1" }
+rustls-pemfile = { version = "1.0.2" }
 webpki = { version = "0.22.0" }
 async-rustls = { version = "0.3.0" }
-tokio-rustls = "0.23.4"
+tokio-rustls = "0.24.0"
 rstest = "0.16.0"
 rand = "0.8.5"
