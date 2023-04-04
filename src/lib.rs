@@ -352,7 +352,7 @@ where
 
     (network, client)
 }
-
+#[cfg(feature = "sync")]
 pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
 where
     S: std::io::Read + std::io::Write + Sized + Unpin,
