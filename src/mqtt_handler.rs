@@ -17,7 +17,7 @@ use crate::state::State;
 
 use async_channel::Receiver;
 #[cfg(feature = "logs")]
-use tracing::{error, info, debug, warn};
+use tracing::{debug, error, info, warn};
 
 /// Eventloop with all the state of a connection
 pub struct MqttHandler {

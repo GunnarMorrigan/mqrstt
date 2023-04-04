@@ -83,7 +83,7 @@
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
-//! 
+//!
 //!     network.connect(stream, &mut pingpong).await.unwrap();
 //!
 //!     // This subscribe is only processed when we run the network
@@ -513,7 +513,6 @@ mod lib_test {
 
             client.subscribe("mqrstt").await.unwrap();
 
-
             let (n, _) = futures::join!(
                 async {
                     loop {
@@ -758,7 +757,7 @@ mod lib_test {
         let (mut network, client) = new_tokio(options);
 
         let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
-        
+
         let mut pingresp = PingResp::new(client.clone());
 
         network.connect(stream, &mut pingresp).await.unwrap();
@@ -807,7 +806,6 @@ mod lib_test {
             let mut pingresp = PingResp::new(client.clone());
 
             network.connect(stream, &mut pingresp).await.unwrap();
-
 
             let (n, _) = futures::join!(
                 async {

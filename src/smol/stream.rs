@@ -136,7 +136,7 @@ where
 
     pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         packet.write(&mut self.write_buffer)?;
-        
+
         #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
@@ -149,7 +149,7 @@ where
     pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
-            
+
             #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
 

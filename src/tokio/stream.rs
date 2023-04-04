@@ -4,7 +4,6 @@ use bytes::{Buf, BytesMut};
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-
 #[cfg(feature = "logs")]
 use tracing::trace;
 
@@ -48,7 +47,7 @@ impl<S> Stream<S> {
 
             let buf = self.read_buffer.split_to(header.remaining_length);
             let read_packet = Packet::read(header, buf.into())?;
-            
+
             #[cfg(feature = "logs")]
             trace!("Read packet from network {}", read_packet);
 
@@ -139,7 +138,6 @@ where
     pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         packet.write(&mut self.write_buffer)?;
 
-        
         #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
@@ -152,7 +150,7 @@ where
     pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
-            
+
             #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
 

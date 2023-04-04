@@ -2,7 +2,6 @@ use std::io::{self, Error, ErrorKind, Read, Write};
 
 use bytes::{Buf, BytesMut};
 
-
 #[cfg(feature = "logs")]
 use tracing::trace;
 
@@ -46,7 +45,7 @@ impl<S> Stream<S> {
 
             let buf = self.read_buffer.split_to(header.remaining_length);
             let read_packet = Packet::read(header, buf.into())?;
-            
+
             #[cfg(feature = "logs")]
             trace!("Read packet from network {}", read_packet);
             let packet_type = read_packet.packet_type();
@@ -163,7 +162,7 @@ where
 
     pub fn write_packet(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         packet.write(&mut self.write_buffer)?;
-    
+
         #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
@@ -177,8 +176,6 @@ where
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
 
-            
-            
             #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
 

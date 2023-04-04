@@ -1,6 +1,5 @@
 use async_channel::Receiver;
 
-
 #[cfg(feature = "logs")]
 use tracing::debug;
 
@@ -63,7 +62,10 @@ where
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> where H: AsyncEventHandler {
+    pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
+    where
+        H: AsyncEventHandler,
+    {
         let (network, connack) = Stream::connect(&self.options, stream).await?;
 
         self.network = Some(network);
