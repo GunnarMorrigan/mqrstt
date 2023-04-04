@@ -2,6 +2,8 @@ use std::io::{self, Error, ErrorKind, Read, Write};
 
 use bytes::{Buf, BytesMut};
 
+
+#[cfg(feature = "logs")]
 use tracing::trace;
 
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
@@ -44,7 +46,9 @@ impl<S> Stream<S> {
 
             let buf = self.read_buffer.split_to(header.remaining_length);
             let read_packet = Packet::read(header, buf.into())?;
-            tracing::trace!("Read packet from network {}", read_packet);
+            
+            #[cfg(feature = "logs")]
+            trace!("Read packet from network {}", read_packet);
             let packet_type = read_packet.packet_type();
             incoming_packet_buffer.push(read_packet);
 
@@ -138,6 +142,8 @@ where
 
     pub fn extend_write_buffer(&mut self, packet: &Packet) -> Result<bool, ConnectionError> {
         packet.write(&mut self.write_buffer)?;
+
+        #[cfg(feature = "logs")]
         trace!("Wrote packet {} to write buffer", packet);
 
         if self.write_buffer.len() >= 1000 {
@@ -157,6 +163,8 @@ where
 
     pub fn write_packet(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         packet.write(&mut self.write_buffer)?;
+    
+        #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
         self.stream.write_all(&self.write_buffer[..])?;
@@ -168,6 +176,10 @@ where
     pub fn write_all_packets(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
+
+            
+            
+            #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
 
             Ok::<(), ConnectionError>(())

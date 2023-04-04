@@ -18,6 +18,7 @@ default = ["tokio", "smol", "sync"]
 tokio = ["dep:tokio"]
 smol = ["dep:smol"]
 sync = []
+logs = ["dep:tracing"]
 # quic = ["dep:quinn"]
 
 [dependencies]
@@ -26,7 +27,7 @@ bytes = "1.4.0"
 
 # Errors
 thiserror = "1.0.40"
-tracing = "0.1.37"
+tracing = { version = "0.1.37", optional = true }
 
 async-channel = "1.8.0"
 #async-mutex = "1.4.0"

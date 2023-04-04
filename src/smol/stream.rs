@@ -4,6 +4,7 @@ use bytes::{Buf, BytesMut};
 
 use smol::io::{AsyncReadExt, AsyncWriteExt};
 
+#[cfg(feature = "logs")]
 use tracing::trace;
 
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
@@ -46,7 +47,9 @@ impl<S> Stream<S> {
 
             let buf = self.read_buffer.split_to(header.remaining_length);
             let read_packet = Packet::read(header, buf.into())?;
-            tracing::trace!("Read packet from network {}", read_packet);
+
+            #[cfg(feature = "logs")]
+            trace!("Read packet from network {}", read_packet);
             let packet_type = read_packet.packet_type();
             incoming_packet_buffer.push(read_packet);
 
@@ -133,6 +136,8 @@ where
 
     pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         packet.write(&mut self.write_buffer)?;
+        
+        #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
         self.stream.write_all(&self.write_buffer[..]).await?;
@@ -144,6 +149,8 @@ where
     pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
+            
+            #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
 
             Ok::<(), ConnectionError>(())

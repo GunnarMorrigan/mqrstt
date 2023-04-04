@@ -1,5 +1,7 @@
 use async_channel::{Receiver, Sender};
 use bytes::Bytes;
+
+#[cfg(feature = "logs")]
 use tracing::info;
 
 use crate::{
@@ -74,6 +76,7 @@ impl MqttClient {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
         };
+        #[cfg(feature = "logs")]
         info!("Published message with ID: {:?}", pkid);
         let publish = Publish {
             dup: false,
@@ -215,6 +218,7 @@ impl MqttClient {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
         };
+        #[cfg(feature = "logs")]
         info!("Published message with ID: {:?}", pkid);
         let publish = Publish {
             dup: false,

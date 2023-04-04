@@ -1,5 +1,7 @@
 use async_channel::Receiver;
 
+
+#[cfg(feature = "logs")]
 use tracing::debug;
 
 use std::time::{Duration, Instant};
@@ -131,7 +133,6 @@ where
         }
 
         if let Some(stream) = network {
-            debug!("Select!");
             tokio::select! {
                 _ = stream.read_bytes() => {
                     match stream.parse_messages(incoming_packet_buffer).await {

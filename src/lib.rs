@@ -299,9 +299,6 @@ pub enum NetworkStatus {
     NoPingResp,
 }
 
-// #[cfg(all(feature = "smol", feature = "tokio"))]
-// compile_error!("Both smol and tokio runtimes not supported at once.");
-
 /// Handlers are used to deal with packets before they are further processed (acked)
 /// This guarantees that the end user has handlded the packet.
 /// Trait for async mutable access to handler.

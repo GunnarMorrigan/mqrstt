@@ -16,10 +16,8 @@ use crate::packets::{PubAck, PubAckProperties};
 use crate::state::State;
 
 use async_channel::Receiver;
-use tracing::{error, info, warn};
-
-#[cfg(test)]
-use tracing::debug;
+#[cfg(feature = "logs")]
+use tracing::{error, info, debug, warn};
 
 /// Eventloop with all the state of a connection
 pub struct MqttHandler {
@@ -81,7 +79,8 @@ impl MqttHandler {
                 let pkid = publish.packet_identifier.ok_or(HandlerError::MissingPacketId)?;
 
                 if !self.state.add_incoming_pub(pkid) && !publish.dup {
-                    warn!("Received publish with an packet ID ({}) that is in use and the packet was not a duplicate", pkid,);
+                    #[cfg(feature = "logs")]
+                    error!("Received publish with an packet ID ({}) that is in use and the packet was not a duplicate", pkid,);
                     should_client_handle = false;
                 }
                 outgoing_packet_buffer.push(Packet::PubRec(PubRec::new(pkid)));
@@ -92,11 +91,12 @@ impl MqttHandler {
 
     fn handle_incoming_puback(&mut self, puback: &PubAck, _: &mut Vec<Packet>) -> Result<(), HandlerError> {
         if self.state.remove_outgoing_pub(puback.packet_identifier).is_some() {
-            #[cfg(test)]
+            #[cfg(feature = "logs")]
             debug!("Publish {:?} has been acknowledged", puback.packet_identifier);
             self.state.make_pkid_available(puback.packet_identifier)?;
             Ok(())
         } else {
+            #[cfg(feature = "logs")]
             error!("Publish {:?} was not found, while receiving a PubAck for it", puback.packet_identifier,);
             Err(HandlerError::Unsolicited(puback.packet_identifier, PacketType::PubAck))
         }
@@ -110,7 +110,7 @@ impl MqttHandler {
 
                     self.state.add_outgoing_rel(pubrec.packet_identifier);
 
-                    #[cfg(test)]
+                    #[cfg(feature = "logs")]
                     debug!("Publish {:?} has been PubReced", pubrec.packet_identifier);
 
                     outgoing_packet_buffer.push(Packet::PubRel(pubrel));
@@ -119,6 +119,7 @@ impl MqttHandler {
                 _ => Ok(()),
             },
             None => {
+                #[cfg(feature = "logs")]
                 error!("Publish {} was not found, while receiving a PubRec for it", pubrec.packet_identifier,);
                 Err(HandlerError::Unsolicited(pubrec.packet_identifier, PacketType::PubRec))
             }
@@ -140,6 +141,7 @@ impl MqttHandler {
             self.state.make_pkid_available(pubcomp.packet_identifier)?;
             Ok(())
         } else {
+            #[cfg(feature = "logs")]
             error!("PubRel {} was not found, while receiving a PubComp for it", pubcomp.packet_identifier,);
             Err(HandlerError::Unsolicited(pubcomp.packet_identifier, PacketType::PubComp))
         }
@@ -150,6 +152,7 @@ impl MqttHandler {
             self.state.make_pkid_available(suback.packet_identifier)?;
             Ok(())
         } else {
+            #[cfg(feature = "logs")]
             error!("Sub {} was not found, while receiving a SubAck for it", suback.packet_identifier,);
             Err(HandlerError::Unsolicited(suback.packet_identifier, PacketType::SubAck))
         }
@@ -160,6 +163,7 @@ impl MqttHandler {
             self.state.make_pkid_available(unsuback.packet_identifier)?;
             Ok(())
         } else {
+            #[cfg(feature = "logs")]
             error!("Unsub {} was not found, while receiving a unsuback for it", unsuback.packet_identifier,);
             Err(HandlerError::Unsolicited(unsuback.packet_identifier, PacketType::UnsubAck))
         }
@@ -179,6 +183,7 @@ impl MqttHandler {
     }
 
     pub fn handle_outgoing_packet(&mut self, packet: Packet) -> Result<(), HandlerError> {
+        #[cfg(feature = "logs")]
         info!("Handling outgoing packet {}", packet);
         match packet {
             Packet::Publish(publish) => self.handle_outgoing_publish(publish),
@@ -190,20 +195,23 @@ impl MqttHandler {
     }
 
     fn handle_outgoing_publish(&mut self, publish: Publish) -> Result<(), HandlerError> {
+        #[cfg(feature = "logs")]
         let id = publish.packet_identifier;
         match publish.qos {
             QoS::AtMostOnce => Ok(()),
             QoS::AtLeastOnce => match self.state.add_outgoing_pub(publish.packet_identifier.unwrap(), publish) {
                 Ok(_) => Ok(()),
                 Err(err) => {
-                    error!("Encountered a colliding packet ID ({:?}) in a publish QoS 1 packet", id,);
+                    #[cfg(feature = "logs")]
+                    error!("Encountered a colliding packet ID ({:?}) in a publish QoS 1 packet", id);
                     Err(err)
                 }
             },
             QoS::ExactlyOnce => match self.state.add_outgoing_pub(publish.packet_identifier.unwrap(), publish) {
                 Ok(_) => Ok(()),
                 Err(err) => {
-                    error!("Encountered a colliding packet ID ({:?}) in a publish QoS 2 packet", id,);
+                    #[cfg(feature = "logs")]
+                    error!("Encountered a colliding packet ID ({:?}) in a publish QoS 2 packet", id);
                     Err(err)
                 }
             },
@@ -211,8 +219,10 @@ impl MqttHandler {
     }
 
     fn handle_outgoing_subscribe(&mut self, sub: Subscribe) -> Result<(), HandlerError> {
+        #[cfg(feature = "logs")]
         info!("handling outgoing subscribe with ID: {}", sub.packet_identifier);
         if !self.state.add_outgoing_sub(sub.packet_identifier) {
+            #[cfg(feature = "logs")]
             error!("Encountered a colliding packet ID ({}) in a subscribe packet\n {:?}", sub.packet_identifier, sub,);
         }
         Ok(())
@@ -220,6 +230,7 @@ impl MqttHandler {
 
     fn handle_outgoing_unsubscribe(&mut self, unsub: Unsubscribe) -> Result<(), HandlerError> {
         if !self.state.add_outgoing_unsub(unsub.packet_identifier) {
+            #[cfg(feature = "logs")]
             error!("Encountered a colliding packet ID ({}) in a unsubscribe packet", unsub.packet_identifier,);
         }
         Ok(())
