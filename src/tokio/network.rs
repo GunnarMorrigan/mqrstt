@@ -1,8 +1,5 @@
 use async_channel::Receiver;
 
-#[cfg(feature = "logs")]
-use tracing::debug;
-
 use std::time::{Duration, Instant};
 
 use crate::connect_options::ConnectOptions;
