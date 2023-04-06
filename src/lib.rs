@@ -285,10 +285,12 @@ pub mod error;
 pub mod packets;
 pub mod state;
 
+use std::option;
+
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 pub use mqtt_handler::MqttHandler;
-use packets::{Connect, Packet};
+use packets::{Connect, Packet, ConnectProperties};
 
 #[cfg(test)]
 pub mod tests;
@@ -372,17 +374,29 @@ where
 }
 
 fn create_connect_from_options(options: &ConnectOptions) -> Packet {
-    let mut connect = Connect {
+
+    let connect_properties = ConnectProperties{
+        session_expiry_interval: options.session_expiry_interval,
+        receive_maximum: options.receive_maximum,
+        maximum_packet_size: options.maximum_packet_size,
+        topic_alias_maximum: options.topic_alias_maximum,
+        request_response_information: options.request_response_information,
+        request_problem_information: options.request_response_information,
+        user_properties: options.user_properties.clone(),
+        authentication_method: options.authentication_method.clone(),
+        authentication_data: options.authentication_data.clone(),
+    };
+
+    let connect = Connect {
         client_id: options.client_id.clone(),
         clean_start: options.clean_start,
         keep_alive: options.keep_alive_interval_s as u16,
         username: options.username.clone(),
         password: options.password.clone(),
-        ..Default::default()
+        connect_properties: connect_properties,
+        protocol_version: packets::ProtocolVersion::V5,
+        last_will: options.last_will.clone(),
     };
-
-    connect.connect_properties.request_problem_information = options.request_problem_information;
-    connect.connect_properties.request_response_information = options.request_response_information;
 
     Packet::Connect(connect)
 }
