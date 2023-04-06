@@ -5,6 +5,7 @@ use bytes::{Buf, BytesMut};
 #[cfg(feature = "logs")]
 use tracing::trace;
 
+use crate::packets::ConnAck;
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 use crate::{
     create_connect_from_options,
@@ -62,7 +63,7 @@ impl<S> Stream<S>
 where
     S: Read + Write + Sized + Unpin,
 {
-    pub fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, Packet), ConnectionError> {
+    pub fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
         let mut s = Self {
             stream,
             const_buffer: [0; 1000],
@@ -77,7 +78,7 @@ where
         let packet = s.read()?;
         if let Packet::ConnAck(con) = packet {
             if con.reason_code == ConnAckReasonCode::Success {
-                Ok((s, Packet::ConnAck(con)))
+                Ok((s, con))
             } else {
                 Err(ConnectionError::ConnectionRefused(con.reason_code))
             }
