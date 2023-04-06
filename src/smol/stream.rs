@@ -7,6 +7,7 @@ use smol::io::{AsyncReadExt, AsyncWriteExt};
 #[cfg(feature = "logs")]
 use tracing::trace;
 
+use crate::packets::ConnAck;
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 use crate::{
     create_connect_from_options,
@@ -64,7 +65,7 @@ impl<S> Stream<S>
 where
     S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin,
 {
-    pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, Packet), ConnectionError> {
+    pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
         let mut s = Self {
             stream,
             const_buffer: [0; 1000],
@@ -79,7 +80,7 @@ where
         let packet = s.read().await?;
         if let Packet::ConnAck(con) = packet {
             if con.reason_code == ConnAckReasonCode::Success {
-                Ok((s, Packet::ConnAck(con)))
+                Ok((s, con))
             } else {
                 Err(ConnectionError::ConnectionRefused(con.reason_code))
             }
@@ -136,7 +137,7 @@ where
 
     pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         packet.write(&mut self.write_buffer)?;
-        
+
         #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
@@ -149,7 +150,7 @@ where
     pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
         let writes = packets.drain(0..).map(|packet| {
             packet.write(&mut self.write_buffer)?;
-            
+
             #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
 

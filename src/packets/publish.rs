@@ -46,7 +46,7 @@ impl Publish {
         }
     }
 
-    pub fn payload_to_vec(&self) -> Vec<u8>{
+    pub fn payload_to_vec(&self) -> Vec<u8> {
         self.payload.to_vec()
     }
 }

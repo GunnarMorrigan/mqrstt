@@ -169,10 +169,10 @@ impl WireLength for SubscribeProperties {
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct SubscriptionOptions {
-    retain_handling: RetainHandling,
-    retain_as_publish: bool,
-    no_local: bool,
-    qos: QoS,
+    pub retain_handling: RetainHandling,
+    pub retain_as_publish: bool,
+    pub no_local: bool,
+    pub qos: QoS,
 }
 
 impl Default for SubscriptionOptions {
@@ -258,6 +258,12 @@ impl From<(&str, QoS)> for Subscription {
     }
 }
 
+impl From<Vec<(&str, QoS)>> for Subscription {
+    fn from(value: Vec<(&str, QoS)>) -> Self {
+        Self(value.into_iter().map(|f| (f.0.to_string(), SubscriptionOptions { qos: f.1, ..Default::default() })).collect())
+    }
+}
+
 impl From<Vec<(String, SubscriptionOptions)>> for Subscription {
     fn from(value: Vec<(String, SubscriptionOptions)>) -> Self {
         Self(value)
@@ -267,6 +273,18 @@ impl From<Vec<(String, SubscriptionOptions)>> for Subscription {
 impl From<(String, SubscriptionOptions)> for Subscription {
     fn from(value: (String, SubscriptionOptions)) -> Self {
         Self(vec![value])
+    }
+}
+
+impl From<Vec<(&str, SubscriptionOptions)>> for Subscription {
+    fn from(value: Vec<(&str, SubscriptionOptions)>) -> Self {
+        Self(value.into_iter().map(|s| (s.0.to_string(), s.1)).collect())
+    }
+}
+
+impl From<(&str, SubscriptionOptions)> for Subscription {
+    fn from(value: (&str, SubscriptionOptions)) -> Self {
+        Self(vec![(value.0.to_string(), value.1)])
     }
 }
 

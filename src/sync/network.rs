@@ -20,6 +20,7 @@ pub struct Network<S> {
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
+    keep_alive_interval_s: u64,
     options: ConnectOptions,
 
     last_network_action: Instant,
@@ -38,6 +39,7 @@ impl<S> Network<S> {
         Self {
             network: None,
 
+            keep_alive_interval_s: options.keep_alive_interval_s,
             options,
 
             last_network_action: Instant::now(),
@@ -58,17 +60,25 @@ where
     S: Read + Write + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
+    pub fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
+    where
+        H: EventHandler,
+    {
         let (network, connack) = Stream::connect(&self.options, stream)?;
 
         self.network = Some(network);
 
-        self.last_network_action = Instant::now();
-        if self.options.keep_alive_interval_s == 0 {
+        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive {
+            self.keep_alive_interval_s = keep_alive_interval as u64;
+        }
+        if self.keep_alive_interval_s == 0 {
             self.perform_keep_alive = false;
         }
 
-        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)?;
+        let packet = Packet::ConnAck(connack);
+
+        self.mqtt_handler.handle_incoming_packet(&packet, &mut self.outgoing_packet_buffer)?;
+        handler.handle(packet);
 
         Ok(())
     }
@@ -106,6 +116,7 @@ where
     {
         let Network {
             network,
+            keep_alive_interval_s,
             options: _,
             last_network_action,
             await_pingresp,
@@ -173,15 +184,9 @@ where
                 stream.flush_whole_buffer()?;
             }
 
-            // Keepalive process
-            // println!("Ping time {:?} < {:?}, {}",
-            //     (*last_network_action + Duration::from_secs(self.options.keep_alive_interval_s)),
-            //     Instant::now(),
-            //     *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) <= Instant::now()
-            // );
             if *perform_keep_alive {
                 if let Some(instant) = await_pingresp {
-                    if *instant + Duration::from_secs(self.options.keep_alive_interval_s) <= Instant::now() {
+                    if *instant + Duration::from_secs(*keep_alive_interval_s) <= Instant::now() {
                         let disconnect = Disconnect {
                             reason_code: DisconnectReasonCode::KeepAliveTimeout,
                             properties: Default::default(),
@@ -189,7 +194,7 @@ where
                         stream.write_packet(&Packet::Disconnect(disconnect))?;
                         return Ok(NetworkStatus::NoPingResp);
                     }
-                } else if *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) <= Instant::now() {
+                } else if *last_network_action + Duration::from_secs(*keep_alive_interval_s) <= Instant::now() {
                     stream.write_packet(&Packet::PingReq)?;
                     *last_network_action = Instant::now();
                     *await_pingresp = Some(Instant::now());

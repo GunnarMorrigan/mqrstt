@@ -21,6 +21,7 @@ pub struct Network<S> {
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
+    keep_alive_interval_s: u64,
     options: ConnectOptions,
 
     last_network_action: Instant,
@@ -39,6 +40,7 @@ impl<S> Network<S> {
         Self {
             network: None,
 
+            keep_alive_interval_s: options.keep_alive_interval_s,
             options,
 
             last_network_action: Instant::now(),
@@ -59,17 +61,26 @@ where
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect(&mut self, stream: S) -> Result<(), ConnectionError> {
+    pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
+    where
+        H: AsyncEventHandler,
+    {
         let (network, connack) = Stream::connect(&self.options, stream).await?;
+        self.last_network_action = Instant::now();
 
         self.network = Some(network);
 
-        self.last_network_action = Instant::now();
-        if self.options.keep_alive_interval_s == 0 {
+        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive {
+            self.keep_alive_interval_s = keep_alive_interval as u64;
+        }
+        if self.keep_alive_interval_s == 0 {
             self.perform_keep_alive = false;
         }
 
-        self.mqtt_handler.handle_incoming_packet(&connack, &mut self.outgoing_packet_buffer)?;
+        let packet = Packet::ConnAck(connack);
+
+        self.mqtt_handler.handle_incoming_packet(&packet, &mut self.outgoing_packet_buffer)?;
+        handler.handle(packet).await;
 
         Ok(())
     }
@@ -112,6 +123,7 @@ where
         let Network {
             network,
             options: _,
+            keep_alive_interval_s,
             last_network_action,
             await_pingresp,
             perform_keep_alive,
@@ -125,9 +137,9 @@ where
         if !(*perform_keep_alive) {
             sleep = Duration::new(3600, 0);
         } else if let Some(instant) = await_pingresp {
-            sleep = *instant + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+            sleep = *instant + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
         } else {
-            sleep = *last_network_action + Duration::from_secs(self.options.keep_alive_interval_s) - Instant::now();
+            sleep = *last_network_action + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
         }
 
         if let Some(stream) = network {

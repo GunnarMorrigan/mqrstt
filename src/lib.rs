@@ -83,7 +83,7 @@
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
-//! 
+//!
 //!     network.connect(stream, &mut pingpong).await.unwrap();
 //!
 //!     // This subscribe is only processed when we run the network
@@ -162,14 +162,15 @@
 //!     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
 //!         .unwrap();
-//!     
-//!     network.connect(stream).await.unwrap();
-//!     
-//!     client.subscribe("mqrstt").await.unwrap();
-//!     
+
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
+//!     
+//!     network.connect(stream, &mut pingpong).await.unwrap();
+//!     
+//!     client.subscribe("mqrstt").await.unwrap();
+//!     
 //!
 //!     let (n, _) = tokio::join!(
 //!         async {
@@ -244,11 +245,12 @@
 //! let stream = TcpStream::connect((address, port)).unwrap();
 //! stream.set_nonblocking(true).unwrap();
 //!
-//! network.connect(stream).unwrap();
-//!
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
+//!
+//! network.connect(stream, &mut pingpong).unwrap();
+//!
 //! let res_join_handle = std::thread::spawn(move ||
 //!     loop {
 //!         match network.poll(&mut pingpong) {
@@ -286,7 +288,7 @@ pub mod state;
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 pub use mqtt_handler::MqttHandler;
-use packets::{Connect, Packet};
+use packets::{Connect, ConnectProperties, Packet};
 
 #[cfg(test)]
 pub mod tests;
@@ -314,8 +316,14 @@ pub trait EventHandler {
     fn handle(&mut self, incoming_packet: Packet);
 }
 
-/// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
 #[cfg(feature = "smol")]
+/// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
+/// ```
+/// use mqrstt::ConnectOptions;
+///
+/// let options = ConnectOptions::new("ExampleClient".to_string());
+/// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
+/// ```
 pub fn new_smol<S>(options: ConnectOptions) -> (smol::Network<S>, MqttClient)
 where
     S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
@@ -335,6 +343,14 @@ where
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
 #[cfg(feature = "tokio")]
+/// # Example
+///
+/// ```
+/// use mqrstt::ConnectOptions;
+///
+/// let options = ConnectOptions::new("ExampleClient".to_string());
+/// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
+/// ```
 pub fn new_tokio<S>(options: ConnectOptions) -> (tokio::Network<S>, MqttClient)
 where
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
@@ -352,6 +368,18 @@ where
     (network, client)
 }
 #[cfg(feature = "sync")]
+/// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
+/// S should implement [`std::io::Read`] and [`std::io::Write`].
+/// Additionally, S should be made non_blocking otherwise it will not progress.
+///
+/// # Example
+///
+/// ```
+/// use mqrstt::ConnectOptions;
+///
+/// let options = ConnectOptions::new("ExampleClient".to_string());
+/// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
+/// ```
 pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
 where
     S: std::io::Read + std::io::Write + Sized + Unpin,
@@ -370,17 +398,28 @@ where
 }
 
 fn create_connect_from_options(options: &ConnectOptions) -> Packet {
-    let mut connect = Connect {
+    let connect_properties = ConnectProperties {
+        session_expiry_interval: options.session_expiry_interval,
+        receive_maximum: options.receive_maximum,
+        maximum_packet_size: options.maximum_packet_size,
+        topic_alias_maximum: options.topic_alias_maximum,
+        request_response_information: options.request_response_information,
+        request_problem_information: options.request_response_information,
+        user_properties: options.user_properties.clone(),
+        authentication_method: options.authentication_method.clone(),
+        authentication_data: options.authentication_data.clone(),
+    };
+
+    let connect = Connect {
         client_id: options.client_id.clone(),
         clean_start: options.clean_start,
         keep_alive: options.keep_alive_interval_s as u16,
         username: options.username.clone(),
         password: options.password.clone(),
-        ..Default::default()
+        connect_properties,
+        protocol_version: packets::ProtocolVersion::V5,
+        last_will: options.last_will.clone(),
     };
-
-    connect.connect_properties.request_problem_information = options.request_problem_information;
-    connect.connect_properties.request_response_information = options.request_response_information;
 
     Packet::Connect(connect)
 }
@@ -463,12 +502,12 @@ mod lib_test {
         stream.set_nonblocking(true).unwrap();
 
         let (mut network, client) = new_sync(options);
+        let mut pingpong = PingPong { client: client.clone() };
 
-        network.connect(stream).unwrap();
+        network.connect(stream, &mut pingpong).unwrap();
 
         client.subscribe_blocking("mqrstt").unwrap();
 
-        let mut pingpong = PingPong { client: client.clone() };
         let res_join_handle = thread::spawn(move || loop {
             return match network.poll(&mut pingpong) {
                 Ok(NetworkStatus::Active) => continue,
@@ -506,12 +545,11 @@ mod lib_test {
             let (mut network, client) = new_smol(options);
 
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
+            let mut pingpong = PingPong { client: client.clone() };
 
-            network.connect(stream).await.unwrap();
+            network.connect(stream, &mut pingpong).await.unwrap();
 
             client.subscribe("mqrstt").await.unwrap();
-
-            let mut pingpong = PingPong { client: client.clone() };
 
             let (n, _) = futures::join!(
                 async {
@@ -537,50 +575,6 @@ mod lib_test {
             assert!(n.is_ok());
         });
     }
-
-    // #[test]
-    // fn test_smol_tls() {
-    //     smol::block_on(async {
-    //         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-    //         client_id += "_SmolTlsPingPong";
-    //         let options = ConnectOptions::new(client_id);
-
-    //         let address = "broker.emqx.io";
-    //         let port = 8883;
-
-    //         let (mut network, client) = new_smol(options);
-
-    //         let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
-
-    //         let domain = ServerName::try_from(address).unwrap();
-    //         let connector = async_rustls::TlsConnector::from(arc_client_config);
-
-    //         let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
-    //         let connection = connector.connect(domain, stream).await.unwrap();
-
-    //         network.connect(connection).await.unwrap();
-
-    //         client.subscribe("mqrstt").await.unwrap();
-
-    //         let mut pingpong = PingPong { client: client.clone() };
-
-    //         let (n, _) = futures::join!(
-    //             async {
-    //                 loop {
-    //                     return match network.poll(&mut pingpong).await {
-    //                         Ok(NetworkStatus::Active) => continue,
-    //                         otherwise => otherwise,
-    //                     };
-    //                 }
-    //             },
-    //             async {
-    //                 smol::Timer::after(std::time::Duration::from_secs(30)).await;
-    //                 client.disconnect().await.unwrap();
-    //             }
-    //         );
-    //         assert!(n.is_ok());
-    //     });
-    // }
 
     #[cfg(feature = "tokio")]
     #[tokio::test]
@@ -625,53 +619,6 @@ mod lib_test {
 
         assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
     }
-
-    // #[cfg(feature = "tokio")]
-    // #[tokio::test]
-    // async fn test_tokio_tls() {
-    //     let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-    //     client_id += "_TokioTlsPingPong";
-    //     let options = ConnectOptions::new(client_id);
-
-    //     let address = "broker.emqx.io";
-    //     let port = 8883;
-
-    //     let (mut network, client) = new_tokio(options);
-
-    //     let arc_client_config = simple_rust_tls(crate::tests::resources::EMQX_CERT.to_vec(), None, None).unwrap();
-
-    //     let domain = ServerName::try_from(address).unwrap();
-    //     let connector = tokio_rustls::TlsConnector::from(arc_client_config);
-
-    //     let stream = tokio::net::TcpStream::connect((address, port)).await.unwrap();
-    //     let connection = connector.connect(domain, stream).await.unwrap();
-
-    //     network.connect(connection).await.unwrap();
-
-    //     client.subscribe("mqrstt").await.unwrap();
-
-    //     let mut pingpong = PingPong { client: client.clone() };
-
-    //     let (n, _) = tokio::join!(
-    //         async {
-    //             loop {
-    //                 return match network.poll(&mut pingpong).await {
-    //                     Ok(NetworkStatus::IncomingDisconnect) => Ok(NetworkStatus::IncomingDisconnect),
-    //                     Ok(NetworkStatus::OutgoingDisconnect) => Ok(NetworkStatus::OutgoingDisconnect),
-    //                     Ok(NetworkStatus::NoPingResp) => Ok(NetworkStatus::NoPingResp),
-    //                     Ok(NetworkStatus::Active) => continue,
-    //                     Err(a) => Err(a),
-    //                 };
-    //             }
-    //         },
-    //         async {
-    //             tokio::time::sleep(Duration::from_secs(30)).await;
-    //             client.disconnect().await.unwrap();
-    //         }
-    //     );
-    //     assert!(n.is_ok());
-    //     assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
-    // }
 
     pub struct PingResp {
         pub client: MqttClient,
@@ -720,9 +667,10 @@ mod lib_test {
         let stream = TcpStream::connect((address, port)).unwrap();
         stream.set_nonblocking(true).unwrap();
 
-        network.connect(stream).unwrap();
-
         let mut pingresp = PingResp::new(client.clone());
+
+        network.connect(stream, &mut pingresp).unwrap();
+
         let res_join_handle = thread::spawn(move || loop {
             loop {
                 match network.poll(&mut pingresp) {
@@ -756,7 +704,7 @@ mod lib_test {
         let (mut network, client) = new_tokio(options);
 
         let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
-        
+
         let mut pingresp = PingResp::new(client.clone());
 
         network.connect(stream, &mut pingresp).await.unwrap();
@@ -800,12 +748,11 @@ mod lib_test {
             let port = 1883;
 
             let (mut network, client) = new_smol(options);
-
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
 
-            network.connect(stream).await.unwrap();
-
             let mut pingresp = PingResp::new(client.clone());
+
+            network.connect(stream, &mut pingresp).await.unwrap();
 
             let (n, _) = futures::join!(
                 async {
