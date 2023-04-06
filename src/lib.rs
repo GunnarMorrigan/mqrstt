@@ -245,11 +245,12 @@
 //! let stream = TcpStream::connect((address, port)).unwrap();
 //! stream.set_nonblocking(true).unwrap();
 //!
-//! network.connect(stream).unwrap();
-//!
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
+//! 
+//! network.connect(stream, &mut pingpong).unwrap();
+//!
 //! let res_join_handle = std::thread::spawn(move ||
 //!     loop {
 //!         match network.poll(&mut pingpong) {
