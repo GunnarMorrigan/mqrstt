@@ -9,7 +9,6 @@ use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
 pub struct ConnectOptions {
     /// keep alive time to send pingreq to broker when the connection is idle
     pub keep_alive_interval_s: u64,
-    pub connection_timeout_s: u64,
     /// clean (or) persistent session
     pub clean_start: bool,
     /// client identifier
@@ -17,15 +16,6 @@ pub struct ConnectOptions {
     /// username and password
     pub username: Option<String>,
     pub password: Option<String>,
-    /// request (publish, subscribe) channel capacity
-    pub channel_capacity: usize,
-
-    /// Minimum delay time between consecutive outgoing packets
-    /// while retransmitting pending packets
-    // TODO! IMPLEMENT THIS!
-    pub pending_throttle_s: u64,
-
-    pub send_reason_messages: bool,
 
     // MQTT v5 Connect Properties:
     pub session_expiry_interval: Option<u32>,
@@ -46,14 +36,10 @@ impl ConnectOptions {
     pub fn new(client_id: String) -> Self {
         Self {
             keep_alive_interval_s: 60,
-            connection_timeout_s: 30,
             clean_start: false,
             client_id,
             username: None,
             password: None,
-            channel_capacity: 100,
-            pending_throttle_s: 30,
-            send_reason_messages: false,
 
             session_expiry_interval: None,
             receive_maximum: None,
