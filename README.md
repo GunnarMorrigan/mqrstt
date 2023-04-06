@@ -27,7 +27,6 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
     - QUIC via QUINN
     - Even More testing
     - More documentation
-    - Remove logging calls or move all to test flag
 
 ## Examples
   ### Notes:
