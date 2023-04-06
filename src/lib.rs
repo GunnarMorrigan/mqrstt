@@ -417,7 +417,7 @@ fn create_connect_from_options(options: &ConnectOptions) -> Packet {
         keep_alive: options.keep_alive_interval_s as u16,
         username: options.username.clone(),
         password: options.password.clone(),
-        connect_properties: connect_properties,
+        connect_properties,
         protocol_version: packets::ProtocolVersion::V5,
         last_will: options.last_will.clone(),
     };
