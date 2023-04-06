@@ -285,8 +285,6 @@ pub mod error;
 pub mod packets;
 pub mod state;
 
-use std::option;
-
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 pub use mqtt_handler::MqttHandler;
@@ -318,8 +316,14 @@ pub trait EventHandler {
     fn handle(&mut self, incoming_packet: Packet);
 }
 
-/// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
 #[cfg(feature = "smol")]
+/// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
+/// ```
+/// use mqrstt::ConnectOptions;
+/// 
+/// let options = ConnectOptions::new("ExampleClient".to_string());
+/// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
+/// ```
 pub fn new_smol<S>(options: ConnectOptions) -> (smol::Network<S>, MqttClient)
 where
     S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
@@ -339,6 +343,14 @@ where
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
 #[cfg(feature = "tokio")]
+/// # Example
+/// 
+/// ```
+/// use mqrstt::ConnectOptions;
+/// 
+/// let options = ConnectOptions::new("ExampleClient".to_string());
+/// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
+/// ```
 pub fn new_tokio<S>(options: ConnectOptions) -> (tokio::Network<S>, MqttClient)
 where
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
@@ -356,6 +368,18 @@ where
     (network, client)
 }
 #[cfg(feature = "sync")]
+/// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
+/// S should implement [`std::io::Read`] and [`std::io::Write`].
+/// Additionally, S should be made non_blocking otherwise it will not progress.
+/// 
+/// # Example
+/// 
+/// ```
+/// use mqrstt::ConnectOptions;
+/// 
+/// let options = ConnectOptions::new("ExampleClient".to_string());
+/// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
+/// ```
 pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
 where
     S: std::io::Read + std::io::Write + Sized + Unpin,
