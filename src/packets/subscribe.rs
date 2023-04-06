@@ -260,7 +260,7 @@ impl From<(&str, QoS)> for Subscription {
 
 impl From<Vec<(&str, QoS)>> for Subscription {
     fn from(value: Vec<(&str, QoS)>) -> Self {
-        Self(value.into_iter().map(|f| (f.0.to_string(), SubscriptionOptions { qos: f.1, ..Default::default() }) ).collect())
+        Self(value.into_iter().map(|f| (f.0.to_string(), SubscriptionOptions { qos: f.1, ..Default::default() })).collect())
     }
 }
 

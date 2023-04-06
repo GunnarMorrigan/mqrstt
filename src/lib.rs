@@ -248,7 +248,7 @@
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
-//! 
+//!
 //! network.connect(stream, &mut pingpong).unwrap();
 //!
 //! let res_join_handle = std::thread::spawn(move ||
@@ -288,7 +288,7 @@ pub mod state;
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 pub use mqtt_handler::MqttHandler;
-use packets::{Connect, Packet, ConnectProperties};
+use packets::{Connect, ConnectProperties, Packet};
 
 #[cfg(test)]
 pub mod tests;
@@ -320,7 +320,7 @@ pub trait EventHandler {
 /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
 /// ```
 /// use mqrstt::ConnectOptions;
-/// 
+///
 /// let options = ConnectOptions::new("ExampleClient".to_string());
 /// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
 /// ```
@@ -344,10 +344,10 @@ where
 /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
 #[cfg(feature = "tokio")]
 /// # Example
-/// 
+///
 /// ```
 /// use mqrstt::ConnectOptions;
-/// 
+///
 /// let options = ConnectOptions::new("ExampleClient".to_string());
 /// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
 /// ```
@@ -371,12 +371,12 @@ where
 /// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
 /// S should implement [`std::io::Read`] and [`std::io::Write`].
 /// Additionally, S should be made non_blocking otherwise it will not progress.
-/// 
+///
 /// # Example
-/// 
+///
 /// ```
 /// use mqrstt::ConnectOptions;
-/// 
+///
 /// let options = ConnectOptions::new("ExampleClient".to_string());
 /// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
 /// ```
@@ -398,8 +398,7 @@ where
 }
 
 fn create_connect_from_options(options: &ConnectOptions) -> Packet {
-
-    let connect_properties = ConnectProperties{
+    let connect_properties = ConnectProperties {
         session_expiry_interval: options.session_expiry_interval,
         receive_maximum: options.receive_maximum,
         maximum_packet_size: options.maximum_packet_size,

@@ -17,7 +17,6 @@ pub struct ConnectOptions {
     pub username: Option<String>,
     pub password: Option<String>,
 
-
     // MQTT v5 Connect Properties:
     pub session_expiry_interval: Option<u32>,
     pub receive_maximum: Option<u16>,
@@ -41,7 +40,6 @@ impl ConnectOptions {
             client_id,
             username: None,
             password: None,
-
 
             session_expiry_interval: None,
             receive_maximum: None,

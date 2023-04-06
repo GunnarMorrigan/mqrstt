@@ -73,9 +73,8 @@ where
 
         self.network = Some(network);
 
-        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive{
+        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive {
             self.keep_alive_interval_s = keep_alive_interval as u64;
-
         }
         if self.keep_alive_interval_s == 0 {
             self.perform_keep_alive = false;
