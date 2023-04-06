@@ -35,7 +35,7 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
   - Handlers only get incoming packets
 
   ### TLS:
-    TLS examples are too larger for a README due to the TLS configuration with but not limited too [tokio_rustls](https://docs.rs/tokio-rustls/latest/tokio_rustls), [async_rustls](https://docs.rs/async-rustls/latest/async_rustls) or [rustls](https://docs.rs/rustls/latest/rustls). 
+  TLS examples are too larger for a README due to the TLS configuration with but not limited too [tokio_rustls](https://docs.rs/tokio-rustls/latest/tokio_rustls), [async_rustls](https://docs.rs/async-rustls/latest/async_rustls) or [rustls](https://docs.rs/rustls/latest/rustls). 
 
 ### Smol example:
 ```rust
