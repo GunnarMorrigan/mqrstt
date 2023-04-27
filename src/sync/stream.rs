@@ -21,7 +21,7 @@ pub struct Stream<S> {
     pub stream: S,
 
     /// Input buffer
-    const_buffer: [u8; 1000],
+    const_buffer: [u8; 50000],
 
     /// Write buffer
     read_buffer: BytesMut,
