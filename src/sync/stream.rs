@@ -66,7 +66,7 @@ where
     pub fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
         let mut s = Self {
             stream,
-            const_buffer: [0; 1000],
+            const_buffer: [0; 50000],
             read_buffer: BytesMut::new(),
             write_buffer: BytesMut::new(),
         };
