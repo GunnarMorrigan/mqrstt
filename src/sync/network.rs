@@ -8,7 +8,8 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::{EventHandler, MqttHandler, NetworkStatus};
+use crate::sync::NetworkStatus;
+use crate::{EventHandler, MqttHandler};
 
 use super::stream::Stream;
 
@@ -98,7 +99,8 @@ where
         H: EventHandler,
     {
         match self.select(handler) {
-            Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
+            Ok(NetworkStatus::ActivePending) => Ok(NetworkStatus::ActivePending),
+            Ok(NetworkStatus::ActiveReady) => Ok(NetworkStatus::ActiveReady),
             otherwise => {
                 self.network = None;
                 self.await_pingresp = None;
@@ -128,12 +130,13 @@ where
         } = self;
 
         if let Some(stream) = network {
+            let mut ret_status = NetworkStatus::ActivePending;
             // Read segment of stream
             {
                 if stream.read_bytes()? > 0 {
                     match stream.parse_messages(incoming_packet_buffer) {
                         Err(ReadBytes::Err(err)) => return Err(err),
-                        Err(ReadBytes::InsufficientBytes(_)) => (),
+                        Err(ReadBytes::InsufficientBytes(_)) => ret_status = NetworkStatus::ActiveReady,
                         Ok(_) => (),
                     }
                 }
@@ -201,7 +204,7 @@ where
                 }
             }
 
-            Ok(NetworkStatus::Active)
+            Ok(ret_status)
         } else {
             Err(ConnectionError::NoNetwork)
         }

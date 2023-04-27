@@ -293,16 +293,6 @@ use packets::{Connect, ConnectProperties, Packet};
 #[cfg(test)]
 pub mod tests;
 
-/// [`NetworkStatus`] Represents status of the Network object.
-/// It is returned when the run handle returns from performing an operation.
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub enum NetworkStatus {
-    Active,
-    IncomingDisconnect,
-    OutgoingDisconnect,
-    NoPingResp,
-}
-
 /// Handlers are used to deal with packets before they are further processed (acked)
 /// This guarantees that the end user has handlded the packet.
 /// Trait for async mutable access to handler.
@@ -440,7 +430,7 @@ mod lib_test {
     use crate::{
         new_smol, new_sync,
         packets::{self, Packet},
-        AsyncEventHandler, ConnectOptions, EventHandler, MqttClient, NetworkStatus,
+        AsyncEventHandler, ConnectOptions, EventHandler, MqttClient,
     };
     use async_trait::async_trait;
     use bytes::Bytes;
@@ -510,7 +500,7 @@ mod lib_test {
 
         let res_join_handle = thread::spawn(move || loop {
             return match network.poll(&mut pingpong) {
-                Ok(NetworkStatus::Active) => continue,
+                Ok(crate::sync::NetworkStatus::ActivePending | crate::sync::NetworkStatus::ActiveReady) => continue,
                 otherwise => otherwise,
             };
         });
@@ -555,7 +545,7 @@ mod lib_test {
                 async {
                     loop {
                         return match network.poll(&mut pingpong).await {
-                            Ok(NetworkStatus::Active) => continue,
+                            Ok(crate::smol::NetworkStatus::Active) => continue,
                             otherwise => otherwise,
                         };
                     }
@@ -597,7 +587,7 @@ mod lib_test {
             async {
                 loop {
                     return match network.poll(&mut pingpong).await {
-                        Ok(NetworkStatus::Active) => continue,
+                        Ok(crate::tokio::NetworkStatus::Active) => continue,
                         otherwise => otherwise,
                     };
                 }
@@ -617,7 +607,7 @@ mod lib_test {
         let n = dbg!(n);
         assert!(n.is_ok());
 
-        assert_eq!(NetworkStatus::OutgoingDisconnect, n.unwrap());
+        assert_eq!(crate::tokio::NetworkStatus::OutgoingDisconnect, n.unwrap());
     }
 
     pub struct PingResp {
@@ -674,10 +664,10 @@ mod lib_test {
         let res_join_handle = thread::spawn(move || loop {
             loop {
                 match network.poll(&mut pingresp) {
-                    Ok(NetworkStatus::Active) => continue,
-                    Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
-                    Ok(NetworkStatus::NoPingResp) => panic!(),
-                    Ok(NetworkStatus::IncomingDisconnect) => panic!(),
+                    Ok(crate::sync::NetworkStatus::ActivePending | crate::sync::NetworkStatus::ActiveReady) => continue,
+                    Ok(crate::sync::NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                    Ok(crate::sync::NetworkStatus::NoPingResp) => panic!(),
+                    Ok(crate::sync::NetworkStatus::IncomingDisconnect) => panic!(),
                     Err(err) => return Err(err),
                 }
             }
@@ -714,10 +704,10 @@ mod lib_test {
                 async move {
                     loop {
                         match network.poll(&mut pingresp).await {
-                            Ok(NetworkStatus::Active) => continue,
-                            Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
-                            Ok(NetworkStatus::NoPingResp) => panic!(),
-                            Ok(NetworkStatus::IncomingDisconnect) => panic!(),
+                            Ok(crate::tokio::NetworkStatus::Active) => continue,
+                            Ok(crate::tokio::NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                            Ok(crate::tokio::NetworkStatus::NoPingResp) => panic!(),
+                            Ok(crate::tokio::NetworkStatus::IncomingDisconnect) => panic!(),
                             Err(err) => return Err(err),
                         }
                     }
@@ -758,10 +748,10 @@ mod lib_test {
                 async {
                     loop {
                         match network.poll(&mut pingresp).await {
-                            Ok(NetworkStatus::Active) => continue,
-                            Ok(NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
-                            Ok(NetworkStatus::NoPingResp) => panic!(),
-                            Ok(NetworkStatus::IncomingDisconnect) => panic!(),
+                            Ok(crate::smol::NetworkStatus::Active) => continue,
+                            Ok(crate::smol::NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                            Ok(crate::smol::NetworkStatus::NoPingResp) => panic!(),
+                            Ok(crate::smol::NetworkStatus::IncomingDisconnect) => panic!(),
                             Err(err) => return Err(err),
                         }
                     }

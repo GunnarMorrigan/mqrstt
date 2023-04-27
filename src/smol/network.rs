@@ -9,7 +9,8 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::{AsyncEventHandler, MqttHandler, NetworkStatus};
+use crate::smol::NetworkStatus;
+use crate::{AsyncEventHandler, MqttHandler};
 
 use super::stream::Stream;
 
