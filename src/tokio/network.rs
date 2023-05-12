@@ -143,7 +143,7 @@ where
 
         if let Some(stream) = network {
             tokio::select! {
-                _ = stream.read_bytes() => {
+                _ = stream.read_bytes()? => {
                     match stream.parse_messages(incoming_packet_buffer).await {
                         Err(ReadBytes::Err(err)) => return Err(err),
                         Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
