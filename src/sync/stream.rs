@@ -21,7 +21,7 @@ pub struct Stream<S> {
     pub stream: S,
 
     /// Input buffer
-    const_buffer: [u8; 8192],
+    const_buffer: [u8; 4096],
 
     /// Write buffer
     read_buffer: BytesMut,
@@ -66,7 +66,7 @@ where
     pub fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
         let mut s = Self {
             stream,
-            const_buffer: [0; 8192],
+            const_buffer: [0; 4096],
             read_buffer: BytesMut::new(),
             write_buffer: BytesMut::new(),
         };

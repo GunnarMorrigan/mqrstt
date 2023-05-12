@@ -1,6 +1,6 @@
 [package]
 name = "mqrstt"
-version = "0.2.0"
+version = "0.2.1"
 homepage = "https://github.com/GunnarMorrigan/mqrstt"
 repository = "https://github.com/GunnarMorrigan/mqrstt"
 documentation = "https://docs.rs/mqrstt"

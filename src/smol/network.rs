@@ -145,7 +145,8 @@ where
 
         if let Some(stream) = network {
             futures::select! {
-                _ = stream.read_bytes().fuse()? => {
+                res = stream.read_bytes().fuse() => {
+                    res?;
                     match stream.parse_messages(incoming_packet_buffer).await {
                         Err(ReadBytes::Err(err)) => return Err(err),
                         Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
