@@ -750,7 +750,7 @@ mod lib_test {
         use core::panic;
         use std::io::ErrorKind;
 
-        let address = ("127.0.0.1", 1883);
+        let address = ("127.0.0.1", 2000);
 
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTcpPingReqTest";
@@ -769,7 +769,7 @@ mod lib_test {
             async move {
                 let listener = smol::net::TcpListener::bind(address).await.unwrap();
                 let (stream, _) = listener.accept().await.unwrap();
-                tokio::time::sleep(Duration::new(5, 0)).await;
+                tokio::time::sleep(Duration::new(10, 0)).await;
                 stream.shutdown(std::net::Shutdown::Write).unwrap();
             }
         );
@@ -835,7 +835,7 @@ mod lib_test {
             let options = ConnectOptions::new(client_id);
 
             let address = "127.0.0.1";
-            let port = 1883;
+            let port = 2001;
 
             let (n, _) = futures::join!(
                 async {
@@ -847,7 +847,7 @@ mod lib_test {
                 async {
                     let listener = smol::net::TcpListener::bind((address, port)).await.unwrap();
                     let (stream, _) = listener.accept().await.unwrap();
-                    smol::Timer::after(std::time::Duration::from_secs(2)).await;
+                    smol::Timer::after(std::time::Duration::from_secs(10)).await;
                     stream.shutdown(std::net::Shutdown::Write).unwrap();
                 }
             );
