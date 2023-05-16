@@ -425,10 +425,15 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     use crate::new_tokio;
 
+    #[cfg(feature = "smol")]
+    use crate::new_smol;
+    
+    #[cfg(feature = "sync")]
+    use crate::new_sync;
+
     use rand::Rng;
 
     use crate::{
-        new_smol, new_sync,
         packets::{self, Packet},
         AsyncEventHandler, ConnectOptions, EventHandler, MqttClient,
     };
@@ -440,6 +445,7 @@ mod lib_test {
         pub client: MqttClient,
     }
 
+    #[cfg(any(feature = "smol", feature = "tokio"))]
     #[async_trait]
     impl AsyncEventHandler for PingPong {
         async fn handle(&mut self, event: packets::Packet) -> () {
@@ -460,6 +466,7 @@ mod lib_test {
         }
     }
 
+    #[cfg(feature = "sync")]
     impl EventHandler for PingPong {
         fn handle(&mut self, event: Packet) {
             match event {
@@ -478,6 +485,7 @@ mod lib_test {
         }
     }
 
+    #[cfg(feature = "sync")]
     #[test]
     fn test_sync_tcp() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
@@ -522,6 +530,7 @@ mod lib_test {
         assert!(res.is_ok());
     }
 
+    #[cfg(feature = "smol")]
     #[test]
     fn test_smol_tcp() {
         smol::block_on(async {
@@ -642,6 +651,7 @@ mod lib_test {
         }
     }
 
+    #[cfg(feature = "sync")]
     #[test]
     fn test_sync_ping_req() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
@@ -727,6 +737,7 @@ mod lib_test {
         assert_eq!(2, pingresp.ping_resp_received);
     }
 
+    #[cfg(feature = "smol")]
     #[test]
     fn test_smol_ping_req() {
         smol::block_on(async {

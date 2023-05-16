@@ -101,11 +101,11 @@ where
                 Err(ReadBytes::Err(err)) => return Err(Error::new(ErrorKind::InvalidData, err)),
             };
 
-            self.read_buffer.advance(header_length);
-
-            if header.remaining_length > self.read_buffer.len() {
+            if header_length + header.remaining_length > self.read_buffer.len() {
                 self.read_required_bytes(header.remaining_length - self.read_buffer.len()).await?;
             }
+            
+            self.read_buffer.advance(header_length);
 
             let buf = self.read_buffer.split_to(header.remaining_length);
 
