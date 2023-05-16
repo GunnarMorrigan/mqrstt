@@ -1,10 +1,10 @@
 //! A pure rust MQTT client which is easy to use, efficient and provides both sync and async options.
-//!
+//! 
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
 //! For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 //! For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
-//!
-//!
+//! 
+//! 
 //! Features:
 //! ----------------------------
 //!  - MQTT v5
@@ -14,7 +14,7 @@
 //!  - Lean
 //!  - Keep alive depends on actual communication
 //!  
-//!
+//! 
 //! To do
 //! ----------------------------
 //!  - Enforce size of outbound messages (e.g. Publish)
@@ -22,16 +22,16 @@
 //!  - Even More testing
 //!  - More documentation
 //!  - Remove logging calls or move all to test flag
-//!
-//!
+//! 
+//! 
 //! Notes:
 //! ----------------------------
 //! - Your handler should not wait too long
 //! - Create a new connection when an error or disconnect is encountered
 //! - Handlers only get incoming packets
 //! - Sync mode requires a non blocking stream
-//!
-//!
+//! 
+//! 
 //! Smol example:
 //! ----------------------------
 //! ```rust
@@ -40,7 +40,8 @@
 //!     ConnectOptions,
 //!     new_smol,
 //!     packets::{self, Packet},
-//!     AsyncEventHandler, NetworkStatus,
+//!     AsyncEventHandler,
+//!     smol::NetworkStatus,
 //! };
 //! use async_trait::async_trait;
 //! use bytes::Bytes;
@@ -83,12 +84,12 @@
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
-//!
+//! 
 //!     network.connect(stream, &mut pingpong).await.unwrap();
-//!
+//! 
 //!     // This subscribe is only processed when we run the network
 //!     client.subscribe("mqrstt").await.unwrap();
-//!
+//! 
 //!     let (n, t) = futures::join!(
 //!         async {
 //!             loop {
@@ -106,23 +107,23 @@
 //!     assert!(n.is_ok());
 //! });
 //! ```
-//!
-//!
+//! 
+//! 
 //!  Tokio example:
 //! ----------------------------
 //! ```rust
-//!
 //! use mqrstt::{
 //!     MqttClient,
 //!     ConnectOptions,
 //!     new_tokio,
 //!     packets::{self, Packet},
-//!     AsyncEventHandler, NetworkStatus,
+//!     AsyncEventHandler,
+//!     tokio::NetworkStatus,
 //! };
 //! use tokio::time::Duration;
 //! use async_trait::async_trait;
 //! use bytes::Bytes;
-//!
+//! 
 //! pub struct PingPong {
 //!     pub client: MqttClient,
 //! }
@@ -152,7 +153,7 @@
 //!         }
 //!     }
 //! }
-//!
+//! 
 //! #[tokio::main]
 //! async fn main() {
 //!     let options = ConnectOptions::new("TokioTcpPingPongExample".to_string());
@@ -162,7 +163,7 @@
 //!     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
 //!         .unwrap();
-
+//! 
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
@@ -171,7 +172,7 @@
 //!     
 //!     client.subscribe("mqrstt").await.unwrap();
 //!     
-//!
+//! 
 //!     let (n, _) = tokio::join!(
 //!         async {
 //!             loop {
@@ -188,9 +189,8 @@
 //!     );
 //!     assert!(n.is_ok());
 //! }
-//!
 //! ```
-//!
+//! 
 //! Sync example:
 //! ----------------------------
 //! ```rust
@@ -199,15 +199,16 @@
 //!     ConnectOptions,
 //!     new_sync,
 //!     packets::{self, Packet},
-//!     EventHandler, NetworkStatus,
+//!     EventHandler,
+//!     sync::NetworkStatus,
 //! };
 //! use std::net::TcpStream;
 //! use bytes::Bytes;
-//!
+//! 
 //! pub struct PingPong {
 //!     pub client: MqttClient,
 //! }
-//!
+//! 
 //! impl EventHandler for PingPong {
 //!     // Handlers only get INCOMING packets. This can change later.
 //!     fn handle(&mut self, event: packets::Packet) -> () {
@@ -231,35 +232,40 @@
 //!         }
 //!     }
 //! }
-//!
-//!
+//! 
+//! 
 //! let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
 //! let options = ConnectOptions::new(client_id);
-//!
+//! 
 //! let address = "broker.emqx.io";
 //! let port = 1883;
-//!
+//! 
 //! let (mut network, client) = new_sync(options);
-//!
+//! 
 //! // IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
 //! let stream = TcpStream::connect((address, port)).unwrap();
 //! stream.set_nonblocking(true).unwrap();
-//!
+//! 
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
-//!
+//! 
 //! network.connect(stream, &mut pingpong).unwrap();
-//!
+//! 
 //! let res_join_handle = std::thread::spawn(move ||
 //!     loop {
 //!         match network.poll(&mut pingpong) {
-//!             Ok(NetworkStatus::Active) => continue,
+//!             Ok(NetworkStatus::ActivePending) => {
+//!                 std::thread::sleep(std::time::Duration::from_millis(100));
+//!             },
+//!             Ok(NetworkStatus::ActiveReady) => {
+//!                 std::thread::sleep(std::time::Duration::from_millis(100));
+//!             },
 //!             otherwise => return otherwise,
 //!         }
 //!     }
 //! );
-//!
+//! 
 //! std::thread::sleep(std::time::Duration::from_secs(30));
 //! client.disconnect_blocking().unwrap();
 //! let join_res = res_join_handle.join();
