@@ -743,7 +743,7 @@ mod lib_test {
         assert_eq!(2, pingresp.ping_resp_received);
     }
 
-    #[cfg(feature = "tokio")]
+    #[cfg(all(feature = "tokio", target_family = "windows"))]
     #[tokio::test]
     async fn test_close_write_tcp_stream_tokio() {
         use crate::error::ConnectionError;
@@ -823,7 +823,7 @@ mod lib_test {
         });
     }
 
-    #[cfg(feature = "smol")]
+    #[cfg(all(feature = "smol", target_family = "windows"))]
     #[test]
     fn test_close_write_tcp_stream_smol() {
         use crate::error::ConnectionError;
