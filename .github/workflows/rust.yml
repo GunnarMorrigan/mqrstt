@@ -32,6 +32,7 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-22.04
+    container: ubuntu
     steps:
       - uses: actions/checkout@v3
       - run: cargo fetch
@@ -50,6 +51,7 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-latest
+    container: ubuntu
     permissions:
       issues: write
 
