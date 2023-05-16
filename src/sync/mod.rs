@@ -6,10 +6,8 @@ mod stream;
 /// It is returned when the run handle returns from performing an operation.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NetworkStatus {
-    #[cfg(feature = "sync")]
     /// Indicate that the network is active but there was no incoming packets
     ActivePending,
-    #[cfg(feature = "sync")]
     /// Indicate that the network is still active and currently in the reading state allowing you to poll more often
     ActiveReady,
     /// Indicate that there was an incoming disconnect and the socket has been closed.
