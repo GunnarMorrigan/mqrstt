@@ -18,24 +18,26 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
 ## Features
   - MQTT v5
   - Runtime agnostic (Smol, Tokio)
-  - Sync 
+  - Sync
   - TLS/TCP
   - Lean
   - Keep alive depends on actual communication
   
   ### To do
     - QUIC via QUINN
+    - no_std (Requires a lot of work to use no heap allocations and depend on stack)
     - Even More testing
     - More documentation
 
-## Examples
-  ### Notes:
-  - Your handler should not wait too long
-  - Create a new connection when an error or disconnect is encountered
-  - Handlers only get incoming packets
+## TCP & TLS Examples
 
-  ### TLS:
-  TLS examples are too larger for a README due to the TLS configuration with but not limited too [tokio_rustls](https://docs.rs/tokio-rustls/latest/tokio_rustls), [async_rustls](https://docs.rs/async-rustls/latest/async_rustls) or [rustls](https://docs.rs/rustls/latest/rustls). 
+### Notes:
+- Your handler should not wait too long
+- Create a new connection when an error or disconnect is encountered
+- Handlers only get incoming packets
+
+### TLS:
+TLS examples are too larger for a README. [TLS examples](https://github.com/GunnarMorrigan/mqrstt/tree/main/examples).
 
 ### Smol example:
 ```rust
@@ -277,11 +279,10 @@ assert!(res.is_ok());
 
 ## FAQ
   - Not much gets frequently asked, so please do! :)
-
+  - Open to feature requests
 
 ## License
 Licensed under
-
 * Mozilla Public License, Version 2.0, [(MPL-2.0)](https://choosealicense.com/licenses/mpl-2.0/)
 
 ## Contribution
