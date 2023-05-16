@@ -1,10 +1,10 @@
 //! A pure rust MQTT client which is easy to use, efficient and provides both sync and async options.
-//! 
+//!
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
 //! For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
 //! For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
-//! 
-//! 
+//!
+//!
 //! Features:
 //! ----------------------------
 //!  - MQTT v5
@@ -14,7 +14,7 @@
 //!  - Lean
 //!  - Keep alive depends on actual communication
 //!  
-//! 
+//!
 //! To do
 //! ----------------------------
 //!  - Enforce size of outbound messages (e.g. Publish)
@@ -22,16 +22,16 @@
 //!  - Even More testing
 //!  - More documentation
 //!  - Remove logging calls or move all to test flag
-//! 
-//! 
+//!
+//!
 //! Notes:
 //! ----------------------------
 //! - Your handler should not wait too long
 //! - Create a new connection when an error or disconnect is encountered
 //! - Handlers only get incoming packets
 //! - Sync mode requires a non blocking stream
-//! 
-//! 
+//!
+//!
 //! Smol example:
 //! ----------------------------
 //! ```rust
@@ -84,12 +84,12 @@
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
-//! 
+//!
 //!     network.connect(stream, &mut pingpong).await.unwrap();
-//! 
+//!
 //!     // This subscribe is only processed when we run the network
 //!     client.subscribe("mqrstt").await.unwrap();
-//! 
+//!
 //!     let (n, t) = futures::join!(
 //!         async {
 //!             loop {
@@ -107,8 +107,8 @@
 //!     assert!(n.is_ok());
 //! });
 //! ```
-//! 
-//! 
+//!
+//!
 //!  Tokio example:
 //! ----------------------------
 //! ```rust
@@ -123,7 +123,7 @@
 //! use tokio::time::Duration;
 //! use async_trait::async_trait;
 //! use bytes::Bytes;
-//! 
+//!
 //! pub struct PingPong {
 //!     pub client: MqttClient,
 //! }
@@ -153,7 +153,7 @@
 //!         }
 //!     }
 //! }
-//! 
+//!
 //! #[tokio::main]
 //! async fn main() {
 //!     let options = ConnectOptions::new("TokioTcpPingPongExample".to_string());
@@ -163,7 +163,7 @@
 //!     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
 //!         .unwrap();
-//! 
+//!
 //!     let mut pingpong = PingPong {
 //!         client: client.clone(),
 //!     };
@@ -172,7 +172,7 @@
 //!     
 //!     client.subscribe("mqrstt").await.unwrap();
 //!     
-//! 
+//!
 //!     let (n, _) = tokio::join!(
 //!         async {
 //!             loop {
@@ -190,7 +190,7 @@
 //!     assert!(n.is_ok());
 //! }
 //! ```
-//! 
+//!
 //! Sync example:
 //! ----------------------------
 //! ```rust
@@ -204,11 +204,11 @@
 //! };
 //! use std::net::TcpStream;
 //! use bytes::Bytes;
-//! 
+//!
 //! pub struct PingPong {
 //!     pub client: MqttClient,
 //! }
-//! 
+//!
 //! impl EventHandler for PingPong {
 //!     // Handlers only get INCOMING packets. This can change later.
 //!     fn handle(&mut self, event: packets::Packet) -> () {
@@ -232,26 +232,26 @@
 //!         }
 //!     }
 //! }
-//! 
-//! 
+//!
+//!
 //! let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
 //! let options = ConnectOptions::new(client_id);
-//! 
+//!
 //! let address = "broker.emqx.io";
 //! let port = 1883;
-//! 
+//!
 //! let (mut network, client) = new_sync(options);
-//! 
+//!
 //! // IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
 //! let stream = TcpStream::connect((address, port)).unwrap();
 //! stream.set_nonblocking(true).unwrap();
-//! 
+//!
 //! let mut pingpong = PingPong {
 //!     client: client.clone(),
 //! };
-//! 
+//!
 //! network.connect(stream, &mut pingpong).unwrap();
-//! 
+//!
 //! let res_join_handle = std::thread::spawn(move ||
 //!     loop {
 //!         match network.poll(&mut pingpong) {
@@ -265,7 +265,7 @@
 //!         }
 //!     }
 //! );
-//! 
+//!
 //! std::thread::sleep(std::time::Duration::from_secs(30));
 //! client.disconnect_blocking().unwrap();
 //! let join_res = res_join_handle.join();
@@ -433,7 +433,7 @@ mod lib_test {
 
     #[cfg(feature = "smol")]
     use crate::new_smol;
-    
+
     #[cfg(feature = "sync")]
     use crate::new_sync;
 
@@ -746,9 +746,9 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_close_write_tcp_stream_tokio() {
+        use crate::error::ConnectionError;
         use core::panic;
         use std::io::ErrorKind;
-        use crate::{error::ConnectionError};
 
         let address = ("127.0.0.1", 1883);
 
@@ -761,9 +761,9 @@ mod lib_test {
                 let (mut network, client) = new_tokio(options);
 
                 let stream = tokio::net::TcpStream::connect(address).await.unwrap();
-        
+
                 let mut pingresp = PingResp::new(client.clone());
-        
+
                 network.connect(stream, &mut pingresp).await
             },
             async move {
@@ -777,8 +777,7 @@ mod lib_test {
         if let ConnectionError::Io(err) = n.unwrap_err() {
             assert_eq!(ErrorKind::ConnectionReset, err.kind());
             assert_eq!("Connection reset by peer".to_string(), err.to_string());
-        }   
-        else{
+        } else {
             panic!();
         }
     }
@@ -824,13 +823,11 @@ mod lib_test {
         });
     }
 
-
-
     #[cfg(feature = "smol")]
     #[test]
     fn test_close_write_tcp_stream_smol() {
+        use crate::error::ConnectionError;
         use std::io::ErrorKind;
-        use crate::{error::ConnectionError};
 
         smol::block_on(async {
             let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
@@ -840,9 +837,8 @@ mod lib_test {
             let address = "127.0.0.1";
             let port = 1883;
 
-
             let (n, _) = futures::join!(
-                async {     
+                async {
                     let (mut network, client) = new_smol(options);
                     let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
                     let mut pingresp = PingResp::new(client.clone());
@@ -858,8 +854,7 @@ mod lib_test {
             if let ConnectionError::Io(err) = n.unwrap_err() {
                 assert_eq!(ErrorKind::ConnectionReset, err.kind());
                 assert_eq!("Connection reset by peer".to_string(), err.to_string());
-            }   
-            else{
+            } else {
                 panic!();
             }
         });

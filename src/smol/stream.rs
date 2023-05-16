@@ -103,7 +103,7 @@ where
             if header_length + header.remaining_length > self.read_buffer.len() {
                 self.read_required_bytes(header.remaining_length - self.read_buffer.len()).await?;
             }
-            
+
             self.read_buffer.advance(header_length);
 
             let buf = self.read_buffer.split_to(header.remaining_length);

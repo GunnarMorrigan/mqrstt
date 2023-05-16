@@ -1,7 +1,7 @@
 use async_channel::{Receiver, Sender, TrySendError};
 
 #[cfg(feature = "logs")]
-use tracing::{error, debug};
+use tracing::{debug, error};
 
 use crate::error::HandlerError;
 

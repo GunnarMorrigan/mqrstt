@@ -918,7 +918,6 @@ mod tests {
         (client, client_to_handler_r, to_network_r)
     }
 
-    
     #[tokio::test]
     async fn publish_with_just_right_topic_len() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
@@ -928,7 +927,6 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    
     #[tokio::test]
     async fn publish_with_too_long_topic() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
@@ -939,7 +937,6 @@ mod tests {
         assert_eq!(res.unwrap_err(), ClientError::ValidationError(PacketValidationError::TopicSize(65538)));
     }
 
-    
     #[tokio::test]
     async fn subscribe_with_too_long_topic() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
@@ -952,7 +949,6 @@ mod tests {
         assert_eq!(res.unwrap_err(), ClientError::ValidationError(PacketValidationError::TopicSize(150000)));
     }
 
-    
     #[tokio::test]
     async fn subscribe_with_just_right_topic_len() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
@@ -964,7 +960,6 @@ mod tests {
         assert!(res.is_ok());
     }
 
-    
     #[tokio::test]
     async fn publish_with_too_large_mqtt_packet() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
@@ -975,7 +970,6 @@ mod tests {
         assert_eq!(ClientError::ValidationError(PacketValidationError::MaxPacketSize(500005)), res.unwrap_err())
     }
 
-    
     #[tokio::test]
     async fn unsubscribe_with_properties_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
@@ -999,7 +993,6 @@ mod tests {
         }
     }
 
-    
     #[tokio::test]
     async fn disconnect_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
@@ -1016,7 +1009,6 @@ mod tests {
         }
     }
 
-    
     #[tokio::test]
     async fn disconnect_with_properties_test() {
         let (client, client_to_handler_r, _) = create_new_test_client();
@@ -1033,7 +1025,6 @@ mod tests {
         }
     }
 
-    
     #[tokio::test]
     async fn disconnect_with_properties_test2() {
         let (client, client_to_handler_r, _) = create_new_test_client();

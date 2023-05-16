@@ -9,8 +9,8 @@ use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 use crate::{AsyncEventHandler, MqttHandler};
 
-use super::NetworkStatus;
 use super::stream::Stream;
+use super::NetworkStatus;
 
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
