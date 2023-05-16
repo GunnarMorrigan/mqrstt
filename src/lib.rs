@@ -746,6 +746,7 @@ mod lib_test {
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_close_write_tcp_stream_tokio() {
+        use core::panic;
         use std::io::ErrorKind;
         use crate::{error::ConnectionError};
 
@@ -763,7 +764,7 @@ mod lib_test {
         
                 let mut pingresp = PingResp::new(client.clone());
         
-                return network.connect(stream, &mut pingresp).await;
+                network.connect(stream, &mut pingresp).await
             },
             async move {
                 let listener = smol::net::TcpListener::bind(address).await.unwrap();
@@ -778,7 +779,7 @@ mod lib_test {
             assert_eq!("Connection reset by peer".to_string(), err.to_string());
         }   
         else{
-            assert!(false);
+            panic!();
         }
     }
 
@@ -845,7 +846,7 @@ mod lib_test {
                     let (mut network, client) = new_smol(options);
                     let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
                     let mut pingresp = PingResp::new(client.clone());
-                    return network.connect(stream, &mut pingresp).await;
+                    network.connect(stream, &mut pingresp).await
                 },
                 async {
                     let listener = smol::net::TcpListener::bind((address, port)).await.unwrap();
@@ -859,7 +860,7 @@ mod lib_test {
                 assert_eq!("Connection reset by peer".to_string(), err.to_string());
             }   
             else{
-                assert!(false);
+                panic!();
             }
         });
     }
