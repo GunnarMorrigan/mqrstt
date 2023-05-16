@@ -44,7 +44,8 @@ use mqrstt::{
     ConnectOptions,
     new_smol,
     packets::{self, Packet},
-    AsyncEventHandler, NetworkStatus,
+    AsyncEventHandler,
+    smol::NetworkStatus,
 };
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -61,9 +62,9 @@ impl AsyncEventHandler for PingPong {
                     if payload.to_lowercase().contains("ping") {
                         self.client
                             .publish(
+                                p.topic.clone(),
                                 p.qos,
                                 p.retain,
-                                p.topic.clone(),
                                 Bytes::from_static(b"pong"),
                             )
                             .await
@@ -83,14 +84,16 @@ smol::block_on(async {
     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
         .await
         .unwrap();
-    network.connect(stream).await.unwrap();
+    
+    let mut pingpong = PingPong {
+        client: client.clone(),
+    };
+
+    network.connect(stream, &mut pingpong).await.unwrap();
 
     // This subscribe is only processed when we run the network
     client.subscribe("mqrstt").await.unwrap();
 
-    let mut pingpong = PingPong {
-        client: client.clone(),
-    };
     let (n, t) = futures::join!(
         async {
             loop {
@@ -111,13 +114,13 @@ smol::block_on(async {
 
 ### Tokio example:
 ```rust
-
 use mqrstt::{
     MqttClient,
     ConnectOptions,
     new_tokio,
     packets::{self, Packet},
-    AsyncEventHandler, NetworkStatus,
+    AsyncEventHandler,
+    tokio::NetworkStatus,
 };
 use tokio::time::Duration;
 use async_trait::async_trait;
@@ -136,9 +139,9 @@ impl AsyncEventHandler for PingPong {
                     if payload.to_lowercase().contains("ping") {
                         self.client
                             .publish(
+                                p.topic.clone(),
                                 p.qos,
                                 p.retain,
-                                p.topic.clone(),
                                 Bytes::from_static(b"pong"),
                             )
                             .await
@@ -162,14 +165,15 @@ async fn main() {
     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
         .await
         .unwrap();
-    
-    network.connect(stream).await.unwrap();
-    
-    client.subscribe("mqrstt").await.unwrap();
-    
+
     let mut pingpong = PingPong {
         client: client.clone(),
     };
+    
+    network.connect(stream, &mut pingpong).await.unwrap();
+    
+    client.subscribe("mqrstt").await.unwrap();
+    
 
     let (n, _) = tokio::join!(
         async {
@@ -185,8 +189,8 @@ async fn main() {
             client.disconnect().await.unwrap();
         }
     );
+    assert!(n.is_ok());
 }
-
 ```
 
 ### Sync example:
@@ -196,7 +200,8 @@ use mqrstt::{
     ConnectOptions,
     new_sync,
     packets::{self, Packet},
-    EventHandler, NetworkStatus,
+    EventHandler,
+    sync::NetworkStatus,
 };
 use std::net::TcpStream;
 use bytes::Bytes;
@@ -214,9 +219,9 @@ impl EventHandler for PingPong {
                     if payload.to_lowercase().contains("ping") {
                         self.client
                             .publish_blocking(
+                                p.topic.clone(),
                                 p.qos,
                                 p.retain,
-                                p.topic.clone(),
                                 Bytes::from_static(b"pong"),
                             ).unwrap();
                         println!("Received Ping, Send pong!");
@@ -228,6 +233,7 @@ impl EventHandler for PingPong {
         }
     }
 }
+
 
 let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
 let options = ConnectOptions::new(client_id);
@@ -241,15 +247,21 @@ let (mut network, client) = new_sync(options);
 let stream = TcpStream::connect((address, port)).unwrap();
 stream.set_nonblocking(true).unwrap();
 
-network.connect(stream).unwrap();
-
 let mut pingpong = PingPong {
     client: client.clone(),
 };
-let res_join_handle = std::thread::spawn(move || 
+
+network.connect(stream, &mut pingpong).unwrap();
+
+let res_join_handle = std::thread::spawn(move ||
     loop {
         match network.poll(&mut pingpong) {
-            Ok(NetworkStatus::Active) => continue,
+            Ok(NetworkStatus::ActivePending) => {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            },
+            Ok(NetworkStatus::ActiveReady) => {
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            },
             otherwise => return otherwise,
         }
     }
