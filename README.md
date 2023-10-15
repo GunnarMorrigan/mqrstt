@@ -24,10 +24,10 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
   - Keep alive depends on actual communication
   
   ### To do
-    - QUIC via QUINN
-    - no_std (Requires a lot of work to use no heap allocations and depend on stack)
-    - Even More testing
-    - More documentation
+  - QUIC via QUINN
+  - no_std (Requires a lot of work to use no heap allocations and depend on stack)
+  - Even More testing
+  - More documentation
 
 ## TCP & TLS Examples
 

@@ -1,5 +1,7 @@
 use bytes::Bytes;
 
+use std::time::Duration;
+
 use crate::packets::LastWill;
 #[cfg(any(feature = "smol-rustls", feature = "tokio-rustls"))]
 use crate::stream::transport::TlsConfig;
@@ -8,7 +10,7 @@ use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
     /// keep alive time to send pingreq to broker when the connection is idle
-    pub keep_alive_interval_s: u64,
+    pub keep_alive_interval: Duration,
     /// clean (or) persistent session
     pub clean_start: bool,
     /// client identifier
@@ -35,7 +37,7 @@ pub struct ConnectOptions {
 impl ConnectOptions {
     pub fn new(client_id: String) -> Self {
         Self {
-            keep_alive_interval_s: 60,
+            keep_alive_interval: Duration::from_secs(60),
             clean_start: false,
             client_id,
             username: None,

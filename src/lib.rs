@@ -198,6 +198,7 @@ pub mod tokio;
 pub mod error;
 pub mod packets;
 pub mod state;
+mod new_network;
 
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
@@ -334,7 +335,7 @@ fn create_connect_from_options(options: &ConnectOptions) -> Packet {
     let connect = Connect {
         client_id: options.client_id.clone(),
         clean_start: options.clean_start,
-        keep_alive: options.keep_alive_interval_s as u16,
+        keep_alive: options.keep_alive_interval.as_secs() as u16,
         username: options.username.clone(),
         password: options.password.clone(),
         connect_properties,

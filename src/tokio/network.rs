@@ -20,7 +20,7 @@ pub struct Network<S> {
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
-    keep_alive_interval_s: u64,
+    keep_alive_interval: Duration,
     options: ConnectOptions,
 
     last_network_action: Instant,
@@ -39,7 +39,7 @@ impl<S> Network<S> {
         Self {
             network: None,
 
-            keep_alive_interval_s: options.keep_alive_interval_s,
+            keep_alive_interval: options.keep_alive_interval,
             options,
 
             last_network_action: Instant::now(),
@@ -123,7 +123,7 @@ where
     {
         let Network {
             network,
-            keep_alive_interval_s,
+            keep_alive_interval,
             options: _,
             last_network_action,
             await_pingresp,
@@ -136,7 +136,7 @@ where
 
         let sleep;
         if let Some(instant) = await_pingresp {
-            sleep = *instant + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
+            sleep = *instant + keep_alive_interval - Instant::now();
         } else {
             sleep = *last_network_action + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
         }
