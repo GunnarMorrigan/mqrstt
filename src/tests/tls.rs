@@ -25,7 +25,7 @@ pub mod tests {
                 None
             }
         });
-        root_cert_store.add_server_trust_anchors(trust_anchors);
+        root_cert_store.add_trust_anchors(trust_anchors);
 
         assert!(!root_cert_store.is_empty());
 
