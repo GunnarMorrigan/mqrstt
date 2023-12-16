@@ -10,7 +10,7 @@ use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
     /// keep alive time to send pingreq to broker when the connection is idle
-    pub keep_alive_interval: Duration,
+    pub keep_alive_interval: Option<Duration>,
     /// clean (or) persistent session
     pub clean_start: bool,
     /// client identifier
@@ -37,7 +37,7 @@ pub struct ConnectOptions {
 impl ConnectOptions {
     pub fn new(client_id: String) -> Self {
         Self {
-            keep_alive_interval: Duration::from_secs(60),
+            keep_alive_interval: Some(Duration::from_secs(60)),
             clean_start: false,
             client_id,
             username: None,

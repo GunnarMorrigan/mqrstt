@@ -20,7 +20,7 @@ pub struct Network<S> {
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
-    keep_alive_interval: Duration,
+    keep_alive_interval: Option<Duration>,
     options: ConnectOptions,
 
     last_network_action: Instant,
@@ -71,10 +71,10 @@ where
 
         self.network = Some(network);
 
-        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive {
-            self.keep_alive_interval_s = keep_alive_interval as u64;
+        if let Some(server_keep_alive_interval) = connack.connack_properties.server_keep_alive {
+            self.keep_alive_interval = Some(Duration::from_secs(server_keep_alive_interval as u64));
         }
-        if self.keep_alive_interval_s == 0 {
+        if self.keep_alive_interval.is_none() {
             self.perform_keep_alive = false;
         }
 
@@ -134,12 +134,11 @@ where
             to_network_r,
         } = self;
 
-        let sleep;
-        if let Some(instant) = await_pingresp {
-            sleep = *instant + keep_alive_interval - Instant::now();
-        } else {
-            sleep = *last_network_action + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
-        }
+        let sleep = match (keep_alive_interval.as_ref(), await_pingresp.as_ref()) {
+            (None, _) => Duration::MAX,
+            (Some(&keep_alive_interval), None) => *last_network_action + keep_alive_interval - Instant::now(),
+            (Some(&keep_alive_interval), Some(&instant)) => instant + keep_alive_interval - Instant::now(),
+        };
 
         if let Some(stream) = network {
             tokio::select! {
@@ -195,14 +194,14 @@ where
                         Ok(NetworkStatus::Active)
                     }
                 },
-                _ = tokio::time::sleep(sleep), if await_pingresp.is_none() && *perform_keep_alive => {
+                _ = tokio::time::sleep(sleep), if await_pingresp.is_none() && keep_alive_interval.is_some() => {
                     let packet = Packet::PingReq;
                     stream.write(&packet).await?;
                     *last_network_action = Instant::now();
                     *await_pingresp = Some(Instant::now());
                     Ok(NetworkStatus::Active)
                 },
-                _ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
+                _ = tokio::time::sleep(sleep), if await_pingresp.is_some() && keep_alive_interval.is_some() => {
                     let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
                     stream.write(&Packet::Disconnect(disconnect)).await?;
                     Ok(NetworkStatus::NoPingResp)
