@@ -1,9 +1,7 @@
 use std::{io::{BufReader, Cursor}, sync::Arc, time::Duration};
 
-use async_trait::async_trait;
 use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, NetworkStatus, new_tokio};
 use tokio_rustls::rustls::{ClientConfig, RootCertStore, OwnedTrustAnchor, Certificate, ServerName};
-
 
 pub const EMQX_CERT: &[u8] = include_bytes!("broker.emqx.io-ca.crt");
 
@@ -12,7 +10,6 @@ pub struct PingPong {
     pub client: MqttClient,
 }
 
-#[async_trait]
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
     async fn handle(&mut self, event: packets::Packet) -> () {

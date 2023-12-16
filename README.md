@@ -49,12 +49,10 @@ use mqrstt::{
     AsyncEventHandler,
     smol::NetworkStatus,
 };
-use async_trait::async_trait;
 use bytes::Bytes;
 pub struct PingPong {
     pub client: MqttClient,
 }
-#[async_trait]
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
     async fn handle(&mut self, event: packets::Packet) -> () {
@@ -125,13 +123,11 @@ use mqrstt::{
     tokio::NetworkStatus,
 };
 use tokio::time::Duration;
-use async_trait::async_trait;
 use bytes::Bytes;
 
 pub struct PingPong {
     pub client: MqttClient,
 }
-#[async_trait]
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
     async fn handle(&mut self, event: packets::Packet) -> () {

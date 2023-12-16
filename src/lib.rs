@@ -40,7 +40,6 @@
 //!     AsyncEventHandler,
 //!     smol::NetworkStatus,
 //! };
-//! use async_trait::async_trait;
 //! 
 //! smol::block_on(async {
 //!     let options = ConnectOptions::new("mqrsttSmolExample".to_string());
@@ -91,7 +90,6 @@
 //!     tokio::NetworkStatus,
 //! };
 //! use tokio::time::Duration;
-//! use async_trait::async_trait;
 //! 
 //! #[tokio::main]
 //! async fn main() {
@@ -201,6 +199,7 @@ pub mod state;
 
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
+use futures::Future;
 pub use mqtt_handler::MqttHandler;
 use packets::{Connect, ConnectProperties, Packet};
 
@@ -211,9 +210,8 @@ pub mod tests;
 /// This guarantees that the end user has handlded the packet.
 /// Trait for async mutable access to handler.
 /// Usefull when you have a single handler
-#[async_trait::async_trait]
 pub trait AsyncEventHandler {
-    async fn handle(&mut self, incoming_packet: Packet);
+    fn handle(&mut self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
 }
 
 pub trait EventHandler {
@@ -224,7 +222,6 @@ pub trait EventHandler {
 /// This handler performs no operations on incoming messages.
 pub struct NOP{}
 
-#[async_trait::async_trait]
 impl AsyncEventHandler for NOP{
     async fn handle(&mut self, _: Packet){
 
@@ -368,7 +365,6 @@ mod lib_test {
         packets::{self, Packet},
         AsyncEventHandler, ConnectOptions, EventHandler, MqttClient,
     };
-    use async_trait::async_trait;
     use bytes::Bytes;
     use packets::QoS;
 
@@ -377,7 +373,6 @@ mod lib_test {
     }
 
     #[cfg(any(feature = "smol", feature = "tokio"))]
-    #[async_trait]
     impl AsyncEventHandler for PingPong {
         async fn handle(&mut self, event: packets::Packet) -> () {
             match event {
@@ -561,7 +556,6 @@ mod lib_test {
         }
     }
 
-    #[async_trait]
     impl AsyncEventHandler for PingResp {
         async fn handle(&mut self, event: packets::Packet) -> () {
             use Packet::*;

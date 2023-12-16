@@ -255,7 +255,7 @@ mod handler_tests {
     };
 
     pub struct Nop {}
-    #[async_trait::async_trait]
+    
     impl AsyncEventHandler for Nop {
         async fn handle(&mut self, _event: Packet) {}
     }

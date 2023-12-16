@@ -44,7 +44,7 @@ pub mod tests {
                 let client_certs = rustls_pemfile::certs(&mut BufReader::new(Cursor::new(client_cert_info))).unwrap();
                 let client_cert_chain = client_certs.into_iter().map(Certificate).collect();
 
-                config.with_single_cert(client_cert_chain, rustls::PrivateKey(key))?
+                config.with_client_auth_cert(client_cert_chain, rustls::PrivateKey(key))?
             }
             None => config.with_no_client_auth(),
         };

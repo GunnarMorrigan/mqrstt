@@ -1,6 +1,5 @@
 use std::{io::{BufReader, Cursor}, sync::Arc};
 
-use async_trait::async_trait;
 use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, new_smol, NetworkStatus};
 use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate, ServerName};
 
@@ -12,7 +11,6 @@ pub struct PingPong {
     pub client: MqttClient,
 }
 
-#[async_trait]
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
     async fn handle(&mut self, event: packets::Packet) -> () {
