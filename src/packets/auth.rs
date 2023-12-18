@@ -56,52 +56,95 @@ pub struct AuthProperties {
     pub user_properties: Vec<(String, String)>,
 }
 
-impl MqttRead for AuthProperties {
-    fn read(buf: &mut Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = read_variable_integer(buf)?;
+impl MqttRead for AuthProperties{
+    async fn read<S: crate::mqtt_async_traits::AsyncMqttRead>(stream: &mut S) -> Result<Self, DeserializeError> {
+        let (len, _) = read_variable_integer(stream).await?;
 
         let mut properties = AuthProperties::default();
 
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len {
-            return Err(DeserializeError::MalformedPacket);
         }
 
-        let mut property_data = buf.split_to(len);
+//         loop {
+//             match PropertyType::read(&mut property_data)? {
+//                 PropertyType::ReasonString => {
+//                     if properties.reason_string.is_some() {
+//                         return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
+//                     }
+//                     properties.reason_string = Some(String::read(&mut property_data)?);
+//                 }
+//                 PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+//                 PropertyType::AuthenticationMethod => {
+//                     if properties.authentication_method.is_some() {
+//                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
+//                     }
+//                     properties.authentication_method = Some(String::read(&mut property_data)?);
+//                 }
+//                 PropertyType::AuthenticationData => {
+//                     if properties.authentication_data.is_empty() {
+//                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
+//                     }
+//                     properties.authentication_data = Bytes::read(&mut property_data)?;
+//                 }
+//                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Auth)),
+//             }
 
-        loop {
-            match PropertyType::read(&mut property_data)? {
-                PropertyType::ReasonString => {
-                    if properties.reason_string.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
-                    }
-                    properties.reason_string = Some(String::read(&mut property_data)?);
-                }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
-                PropertyType::AuthenticationMethod => {
-                    if properties.authentication_method.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
-                    }
-                    properties.authentication_method = Some(String::read(&mut property_data)?);
-                }
-                PropertyType::AuthenticationData => {
-                    if properties.authentication_data.is_empty() {
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
-                    }
-                    properties.authentication_data = Bytes::read(&mut property_data)?;
-                }
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Auth)),
-            }
+//             if property_data.is_empty() {
+//                 break;
+//             }
+//         }
 
-            if property_data.is_empty() {
-                break;
-            }
-        }
-
-        Ok(properties)
+//         Ok(properties)
     }
 }
+
+// impl MqttRead for AuthProperties {
+//     fn read(buf: &mut Bytes) -> Result<Self, super::error::DeserializeError> {
+//         let (len, _) = read_variable_integer(buf)?;
+
+//         let mut properties = AuthProperties::default();
+
+//         if len == 0 {
+//             return Ok(properties);
+//         } else if buf.len() < len {
+//             return Err(DeserializeError::MalformedPacket);
+//         }
+
+//         let mut property_data = buf.split_to(len);
+
+//         loop {
+//             match PropertyType::read(&mut property_data)? {
+//                 PropertyType::ReasonString => {
+//                     if properties.reason_string.is_some() {
+//                         return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
+//                     }
+//                     properties.reason_string = Some(String::read(&mut property_data)?);
+//                 }
+//                 PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+//                 PropertyType::AuthenticationMethod => {
+//                     if properties.authentication_method.is_some() {
+//                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
+//                     }
+//                     properties.authentication_method = Some(String::read(&mut property_data)?);
+//                 }
+//                 PropertyType::AuthenticationData => {
+//                     if properties.authentication_data.is_empty() {
+//                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
+//                     }
+//                     properties.authentication_data = Bytes::read(&mut property_data)?;
+//                 }
+//                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Auth)),
+//             }
+
+//             if property_data.is_empty() {
+//                 break;
+//             }
+//         }
+
+//         Ok(properties)
+//     }
+// }
 
 impl MqttWrite for AuthProperties {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {

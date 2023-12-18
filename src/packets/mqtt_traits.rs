@@ -1,5 +1,7 @@
 use bytes::{Bytes, BytesMut};
 
+use crate::mqtt_async_traits::AsyncMqttRead;
+
 use super::error::{DeserializeError, SerializeError};
 
 pub trait VariableHeaderRead: Sized {
@@ -15,7 +17,7 @@ pub trait WireLength {
 }
 
 pub trait MqttRead: Sized {
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError>;
+    async fn read<S: AsyncMqttRead>(stream: &mut S) -> Result<Self, DeserializeError>;
 }
 
 pub trait MqttWrite: Sized {

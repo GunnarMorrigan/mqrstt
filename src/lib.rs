@@ -188,6 +188,8 @@ mod connect_options;
 mod mqtt_handler;
 mod util;
 
+mod mqtt_async_traits;
+
 #[cfg(feature = "smol")]
 pub mod smol;
 #[cfg(feature = "sync")]

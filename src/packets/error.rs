@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use super::{PacketType, PropertyType};
 
-#[derive(Error, Clone, Debug)]
+#[derive(Error, Debug)]
 pub enum DeserializeError {
     #[error("Malformed packet: {0}")]
     MalformedPacketWithInfo(String),
@@ -44,6 +44,9 @@ pub enum DeserializeError {
 
     #[error("Encountered an error when reading in a UTF-8 string. {0}")]
     Utf8Error(FromUtf8Error),
+
+    #[error("IO error")]
+    IoError(#[from] std::io::Error)
 }
 
 impl From<String> for DeserializeError {

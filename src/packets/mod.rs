@@ -34,6 +34,8 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::slice::Iter;
 use std::fmt::Display;
 
+use crate::mqtt_async_traits::AsyncMqttRead;
+
 use self::error::{DeserializeError, ReadBytes, SerializeError};
 use self::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
 
@@ -262,7 +264,33 @@ pub fn read_fixed_header_rem_len(mut buf: Iter<u8>) -> Result<(usize, usize), Re
     Err(ReadBytes::Err(DeserializeError::MalformedPacket))
 }
 
-pub fn read_variable_integer(buf: &mut Bytes) -> Result<(usize, usize), DeserializeError> {
+pub async fn read_variable_integer<S: AsyncMqttRead>(stream: &mut S) -> Result<(usize, usize), DeserializeError> {
+    let mut integer = 0;
+    let mut length = 0;
+    
+    let mut byte: u8 = 0;
+
+    for i in 0..4 {
+        // if buf.is_empty() {
+        //     return Err(DeserializeError::MalformedPacket);
+        // }
+
+        stream.read_exact(std::slice::from_mut(&mut byte)).await?;
+
+        length += 1;
+        
+
+        integer += (byte as usize & 0x7f) << (7 * i);
+
+        if (byte & 0b1000_0000) == 0 {
+            return Ok((integer, length));
+        }
+    }
+    Err(DeserializeError::MalformedPacket)
+}
+
+
+pub fn read_variable_integer_old(buf: &mut Bytes) -> Result<(usize, usize), DeserializeError> {
     let mut integer = 0;
     let mut length = 0;
 
