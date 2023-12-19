@@ -69,12 +69,10 @@ where
     /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
     where
-        H: AsyncEventHandler + Clone + Send + Sync + 'static
+        H: AsyncEventHandler
     {
-        let (network, conn_ack) = Stream::connect(&self.options, stream).await?;
+        let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
-
-        self.network = Some(network);
 
         if let Some(keep_alive_interval) = conn_ack.connack_properties.server_keep_alive {
             self.keep_alive_interval_s = keep_alive_interval as u64;
@@ -86,6 +84,12 @@ where
         if let Some(mut retransmit_packets) = self.state_handler.handle_incoming_connack(&conn_ack)? {
             self.outgoing_packet_buffer.append(&mut retransmit_packets)
         }
+        handler.handle(Packet::ConnAck(conn_ack)).await;
+
+        network.write_all(&mut self.outgoing_packet_buffer).await?;
+        self.last_network_action = Instant::now();
+
+        self.network = Some(network);
 
         Ok(())
     }
