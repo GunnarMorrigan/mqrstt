@@ -37,6 +37,9 @@ pub enum ConnectionError {
 
     #[error("Handler Error: {0:?}")]
     HandlerError(#[from] HandlerError),
+
+    #[error("Join error")]
+    JoinError(#[from] tokio::task::JoinError)
 }
 
 /// Errors that the [`mqrstt::MqttHandler`] can emit
@@ -62,6 +65,9 @@ pub enum HandlerError {
 
     #[error("Received unsolicited ack pkid: {0}")]
     Unsolicited(u16, PacketType),
+
+    #[error("Received an unexpected packet: {0}")]
+    UnexpectedPacket(PacketType)
 }
 
 /// Errors producable by the [`mqrstt::AsyncClient`]

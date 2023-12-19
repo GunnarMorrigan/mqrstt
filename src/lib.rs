@@ -140,7 +140,7 @@
 //! };
 //! use std::net::TcpStream;
 //! 
-//! let mut client_id: String = "SyncTcpPingReqTestExample".to_string();
+//! let mut client_id: String = "SyncTcppingrespTestExample".to_string();
 //! let options = ConnectOptions::new(client_id);
 //! 
 //! let address = "broker.emqx.io";
@@ -197,10 +197,12 @@ pub mod error;
 pub mod packets;
 pub mod state;
 
+use std::sync::Arc;
+
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 use futures::Future;
-pub use mqtt_handler::MqttHandler;
+pub use mqtt_handler::StateHandler;
 use packets::{Connect, ConnectProperties, Packet};
 
 #[cfg(test)]
@@ -211,7 +213,13 @@ pub mod tests;
 /// Trait for async mutable access to handler.
 /// Usefull when you have a single handler
 pub trait AsyncEventHandler {
-    fn handle(&mut self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
+    fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
+}
+
+impl<T> AsyncEventHandler for Arc<T> where T: AsyncEventHandler{
+    fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync {
+        T::handle(&self, incoming_packet)
+    }
 }
 
 pub trait EventHandler {
@@ -223,7 +231,7 @@ pub trait EventHandler {
 pub struct NOP{}
 
 impl AsyncEventHandler for NOP{
-    async fn handle(&mut self, _: Packet){
+    async fn handle(&self, _: Packet){
 
     }
 }
@@ -248,7 +256,7 @@ where
 {
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (handler, packet_ids) = MqttHandler::new(&options);
+    let (handler, packet_ids) = StateHandler::new(&options);
 
     let max_packet_size = options.maximum_packet_size;
 
@@ -275,7 +283,7 @@ where
 {
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (mqtt_handler, apkid) = MqttHandler::new(&options);
+    let (mqtt_handler, apkid) = StateHandler::new(&options);
 
     let max_packet_size = options.maximum_packet_size;
 
@@ -304,7 +312,7 @@ where
 {
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (mqtt_handler, apkid) = MqttHandler::new(&options);
+    let (mqtt_handler, apkid) = StateHandler::new(&options);
 
     let max_packet_size = options.maximum_packet_size;
 
@@ -348,6 +356,7 @@ mod lib_test {
         net::TcpStream,
         thread::{self},
         time::Duration,
+        sync::{Arc, atomic::AtomicU16},
     };
 
     #[cfg(feature = "tokio")]
@@ -374,7 +383,7 @@ mod lib_test {
 
     #[cfg(any(feature = "smol", feature = "tokio"))]
     impl AsyncEventHandler for PingPong {
-        async fn handle(&mut self, event: packets::Packet) -> () {
+        async fn handle(&self, event: packets::Packet) -> () {
             match event {
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
@@ -512,7 +521,7 @@ mod lib_test {
 
         let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
-        let mut pingpong = PingPong { client: client.clone() };
+        let mut pingpong = Arc::new(PingPong {client: client.clone()});
 
         network.connect(stream, &mut pingpong).await.unwrap();
 
@@ -547,20 +556,20 @@ mod lib_test {
 
     pub struct PingResp {
         pub client: MqttClient,
-        pub ping_resp_received: u64,
+        pub ping_resp_received: AtomicU16,
     }
 
     impl PingResp {
         pub fn new(client: MqttClient) -> Self {
-            Self { client, ping_resp_received: 0 }
+            Self { client, ping_resp_received: AtomicU16::new(0) }
         }
     }
 
     impl AsyncEventHandler for PingResp {
-        async fn handle(&mut self, event: packets::Packet) -> () {
+        async fn handle(&self, event: packets::Packet) -> () {
             use Packet::*;
             if event == PingResp {
-                self.ping_resp_received += 1;
+                self.ping_resp_received.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
             println!("Received packet: {}", event);
         }
@@ -570,7 +579,7 @@ mod lib_test {
         fn handle(&mut self, event: Packet) {
             use Packet::*;
             if event == PingResp {
-                self.ping_resp_received += 1;
+                self.ping_resp_received.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             }
             println!("Received packet: {}", event);
         }
@@ -580,7 +589,7 @@ mod lib_test {
     #[test]
     fn test_sync_ping_req() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-        client_id += "_SyncTcpPingReqTest";
+        client_id += "_SyncTcppingrespTest";
         let options = ConnectOptions::new(client_id);
 
         let address = "broker.emqx.io";
@@ -615,26 +624,29 @@ mod lib_test {
 
         let res = join_res.unwrap();
         assert!(res.is_ok());
-        let pingreq = res.unwrap();
-        assert_eq!(2, pingreq.ping_resp_received);
+        let pingresp = res.unwrap();
+        assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
     }
 
     #[cfg(feature = "tokio")]
     #[tokio::test]
     async fn test_tokio_ping_req() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-        client_id += "_TokioTcpPingReqTest";
-        let options = ConnectOptions::new(client_id);
+        client_id += "_TokioTcppingrespTest";
+        let mut options = ConnectOptions::new(client_id);
+        options.keep_alive_interval_s = 5;
+
+        let wait_duration = options.keep_alive_interval_s * 2 + options.keep_alive_interval_s / 2;
 
         let (mut network, client) = new_tokio(options);
 
         let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
-        let mut pingresp = PingResp::new(client.clone());
+        let mut pingresp = Arc::new(PingResp::new(client.clone()));
 
         network.connect(stream, &mut pingresp).await.unwrap();
 
-        let futs = tokio::task::spawn(async {
+        let futs = tokio::task::spawn(async move {
             tokio::join!(
                 async move {
                     loop {
@@ -648,18 +660,18 @@ mod lib_test {
                     }
                 },
                 async move {
-                    tokio::time::sleep(Duration::new(150, 0)).await;
+                    tokio::time::sleep(Duration::new(wait_duration, 0)).await;
                     client.disconnect().await.unwrap();
                 }
             )
         });
 
-        tokio::time::sleep(Duration::new(150, 0)).await;
+        tokio::time::sleep(Duration::new(wait_duration + 1, 0)).await;
 
         let (n, _) = futs.await.unwrap();
         assert!(n.is_ok());
         let pingresp = n.unwrap();
-        assert_eq!(2, pingresp.ping_resp_received);
+        assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
     }
 
     #[cfg(all(feature = "tokio", target_family = "windows"))]
@@ -672,7 +684,7 @@ mod lib_test {
         let address = ("127.0.0.1", 2000);
 
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-        client_id += "_TokioTcpPingReqTest";
+        client_id += "_TokioTcppingrespTest";
         let options = ConnectOptions::new(client_id);
 
         let (n, _) = tokio::join!(
@@ -681,7 +693,7 @@ mod lib_test {
 
                 let stream = tokio::net::TcpStream::connect(address).await.unwrap();
 
-                let mut pingresp = PingResp::new(client.clone());
+                let mut pingresp = Arc::new(PingResp::new(client.clone()));
 
                 network.connect(stream, &mut pingresp).await
             },
@@ -706,7 +718,7 @@ mod lib_test {
     fn test_smol_ping_req() {
         smol::block_on(async {
             let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-            client_id += "_SmolTcpPingReqTest";
+            client_id += "_SmolTcppingrespTest";
             let options = ConnectOptions::new(client_id);
 
             let address = "broker.emqx.io";
@@ -737,8 +749,8 @@ mod lib_test {
                 }
             );
             assert!(n.is_ok());
-            let pingreq = n.unwrap();
-            assert_eq!(2, pingreq.ping_resp_received);
+            let pingresp = n.unwrap();
+            assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
         });
     }
 
@@ -750,7 +762,7 @@ mod lib_test {
 
         smol::block_on(async {
             let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-            client_id += "_SmolTcpPingReqTest";
+            client_id += "_SmolTcppingrespTest";
             let options = ConnectOptions::new(client_id);
 
             let address = "127.0.0.1";

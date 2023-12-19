@@ -1,4 +1,5 @@
 use async_channel::Receiver;
+use tokio::task::JoinSet;
 
 use std::time::{Duration, Instant};
 
@@ -7,7 +8,7 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::{AsyncEventHandler, MqttHandler};
+use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
 use super::NetworkStatus;
@@ -27,15 +28,17 @@ pub struct Network<S> {
     await_pingresp: Option<Instant>,
     perform_keep_alive: bool,
 
-    mqtt_handler: MqttHandler,
+    state_handler: StateHandler,
     outgoing_packet_buffer: Vec<Packet>,
     incoming_packet_buffer: Vec<Packet>,
+
+    join_set: JoinSet<Option<Packet>>,
 
     to_network_r: Receiver<Packet>,
 }
 
 impl<S> Network<S> {
-    pub fn new(options: ConnectOptions, mqtt_handler: MqttHandler, to_network_r: Receiver<Packet>) -> Self {
+    pub fn new(options: ConnectOptions, state_handler: StateHandler, to_network_r: Receiver<Packet>) -> Self {
         Self {
             network: None,
 
@@ -46,9 +49,11 @@ impl<S> Network<S> {
             await_pingresp: None,
             perform_keep_alive: true,
 
-            mqtt_handler,
+            state_handler,
             outgoing_packet_buffer: Vec::new(),
             incoming_packet_buffer: Vec::new(),
+
+            join_set: JoinSet::new(),
 
             to_network_r,
         }
@@ -64,24 +69,23 @@ where
     /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
     where
-        H: AsyncEventHandler,
+        H: AsyncEventHandler + Clone + Send + Sync + 'static
     {
-        let (network, connack) = Stream::connect(&self.options, stream).await?;
+        let (network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
         self.network = Some(network);
 
-        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive {
+        if let Some(keep_alive_interval) = conn_ack.connack_properties.server_keep_alive {
             self.keep_alive_interval_s = keep_alive_interval as u64;
         }
         if self.keep_alive_interval_s == 0 {
             self.perform_keep_alive = false;
         }
 
-        let packet = Packet::ConnAck(connack);
-
-        self.mqtt_handler.handle_incoming_packet(&packet, &mut self.outgoing_packet_buffer)?;
-        handler.handle(packet).await;
+        if let Some(mut retransmit_packets) = self.state_handler.handle_incoming_connack(&conn_ack)? {
+            self.outgoing_packet_buffer.append(&mut retransmit_packets)
+        }
 
         Ok(())
     }
@@ -98,7 +102,7 @@ where
     /// The stream will be dropped and the internal buffers will be cleared.
     pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
-        H: AsyncEventHandler,
+        H: AsyncEventHandler + Clone + Send + Sync + 'static
     {
         if self.network.is_none() {
             return Err(ConnectionError::NoNetwork);
@@ -111,6 +115,7 @@ where
                 self.await_pingresp = None;
                 self.outgoing_packet_buffer.clear();
                 self.incoming_packet_buffer.clear();
+                self.join_set.abort_all();
 
                 otherwise
             }
@@ -119,7 +124,7 @@ where
 
     async fn tokio_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
-        H: AsyncEventHandler,
+        H: AsyncEventHandler + Clone + Send + Sync + 'static
     {
         let Network {
             network,
@@ -128,9 +133,10 @@ where
             last_network_action,
             await_pingresp,
             perform_keep_alive,
-            mqtt_handler,
+            state_handler: mqtt_handler,
             outgoing_packet_buffer,
             incoming_packet_buffer,
+            join_set,
             to_network_r,
         } = self;
 
@@ -140,7 +146,7 @@ where
         } else {
             sleep = *last_network_action + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
         }
-
+        
         if let Some(stream) = network {
             tokio::select! {
                 res = stream.read_bytes() => {
@@ -163,9 +169,25 @@ where
                                 handler.handle(packet).await;
                                 return Ok(NetworkStatus::IncomingDisconnect);
                             }
+                            Packet::ConnAck(conn_ack) => {
+                                if let Some(mut retransmit_packets) = mqtt_handler.handle_incoming_connack(&conn_ack)? {
+                                    outgoing_packet_buffer.append(&mut retransmit_packets)
+                                }
+                                handler.handle(Packet::ConnAck(conn_ack)).await;
+                            }
                             packet => {
-                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
-                                    handler.handle(packet).await;
+                                match mqtt_handler.handle_incoming_packet(&packet)? {
+                                    (reply_packet, true) => {
+                                        let handler_clone = handler.clone();
+                                        join_set.spawn(async move {
+                                            handler_clone.handle(packet).await;
+                                            reply_packet
+                                        });
+                                    },
+                                    (Some(reply_packet), false) => {
+                                        outgoing_packet_buffer.push(reply_packet);
+                                    },
+                                    (None, false) => (),
                                 }
                             }
                         }
@@ -194,6 +216,23 @@ where
                         Ok(NetworkStatus::OutgoingDisconnect)
                     }
                     else{
+                        Ok(NetworkStatus::Active)
+                    }
+                },
+                joined_res = join_set.join_next(), if !join_set.is_empty() => {
+                    if let Some(res) = joined_res {
+                        if let Some(packet) = res? {
+                            outgoing_packet_buffer.push(packet);
+                            
+                            stream.write_all(outgoing_packet_buffer).await?;
+                            *last_network_action = Instant::now();
+        
+                            Ok(NetworkStatus::Active)
+
+                        } else {
+                            Ok(NetworkStatus::Active)
+                        }
+                    } else {
                         Ok(NetworkStatus::Active)
                     }
                 },

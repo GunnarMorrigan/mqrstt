@@ -10,7 +10,7 @@ use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 use crate::smol::NetworkStatus;
-use crate::{AsyncEventHandler, MqttHandler};
+use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
 
@@ -29,7 +29,7 @@ pub struct Network<S> {
     await_pingresp: Option<Instant>,
     perform_keep_alive: bool,
 
-    mqtt_handler: MqttHandler,
+    mqtt_handler: StateHandler,
     outgoing_packet_buffer: Vec<Packet>,
     incoming_packet_buffer: Vec<Packet>,
 
@@ -37,7 +37,7 @@ pub struct Network<S> {
 }
 
 impl<S> Network<S> {
-    pub fn new(options: ConnectOptions, mqtt_handler: MqttHandler, to_network_r: Receiver<Packet>) -> Self {
+    pub fn new(options: ConnectOptions, mqtt_handler: StateHandler, to_network_r: Receiver<Packet>) -> Self {
         Self {
             network: None,
 
@@ -80,8 +80,8 @@ where
 
         let packet = Packet::ConnAck(connack);
 
-        self.mqtt_handler.handle_incoming_packet(&packet, &mut self.outgoing_packet_buffer)?;
-        handler.handle(packet).await;
+        // self.mqtt_handler.handle_incoming_packet(&packet, &mut self.outgoing_packet_buffer)?;
+        // handler.handle(packet).await;
 
         Ok(())
     }
@@ -165,9 +165,9 @@ where
                                 return Ok(NetworkStatus::IncomingDisconnect);
                             }
                             packet => {
-                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
-                                    handler.handle(packet).await;
-                                }
+                                // if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
+                                //    handler.handle(packet).await;
+                                // }
                             }
                         }
                     }
