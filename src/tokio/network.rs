@@ -110,6 +110,7 @@ where
 
         match self.tokio_select(handler).await {
             Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
+            Err(ConnectionError::JoinError(err)) => Err(ConnectionError::JoinError(err)),
             otherwise => {
                 self.network = None;
                 self.await_pingresp = None;
@@ -223,7 +224,7 @@ where
                     if let Some(res) = joined_res {
                         if let Some(packet) = res? {
                             outgoing_packet_buffer.push(packet);
-                            
+
                             stream.write_all(outgoing_packet_buffer).await?;
                             *last_network_action = Instant::now();
         
