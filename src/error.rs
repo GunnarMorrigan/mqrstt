@@ -35,7 +35,7 @@ pub enum ConnectionError {
     #[error("Expected ConnAck packet, received: {0:?}")]
     NotConnAck(Packet),
 
-    #[error("The handler encountered an error")]
+    #[error("Handler Error: {0:?}")]
     HandlerError(#[from] HandlerError),
 }
 
