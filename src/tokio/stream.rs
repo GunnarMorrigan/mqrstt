@@ -33,32 +33,22 @@ pub struct Stream<S> {
 }
 
 impl<S> Stream<S> {
-    pub async fn parse_messages(&mut self, incoming_packet_buffer: &mut Vec<Packet>) -> Result<(), ReadBytes<ConnectionError>> {
-        loop {
-            if self.read_buffer.is_empty() {
-                return Ok(());
-            }
-            let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
+    pub async fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
+        let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
 
-            if header.remaining_length + header_length > self.read_buffer.len() {
-                return Err(ReadBytes::InsufficientBytes(header.remaining_length - self.read_buffer.len()));
-            }
-
-            self.read_buffer.advance(header_length);
-
-            let buf = self.read_buffer.split_to(header.remaining_length);
-            let read_packet = Packet::read(header, buf.into())?;
-
-            #[cfg(feature = "logs")]
-            trace!("Read packet from network {}", read_packet);
-
-            let packet_type = read_packet.packet_type();
-            incoming_packet_buffer.push(read_packet);
-
-            if packet_type == PacketType::Disconnect {
-                return Ok(());
-            }
+        if header.remaining_length + header_length > self.read_buffer.len() {
+            return Err(ReadBytes::InsufficientBytes(header.remaining_length - self.read_buffer.len()));
         }
+
+        self.read_buffer.advance(header_length);
+
+        let buf = self.read_buffer.split_to(header.remaining_length);
+        let read_packet = Packet::read(header, buf.into())?;
+
+        #[cfg(feature = "logs")]
+        trace!("Read packet from network {}", read_packet);
+
+        Ok(read_packet)
     }
 }
 

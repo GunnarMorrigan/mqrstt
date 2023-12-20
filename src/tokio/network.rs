@@ -145,27 +145,24 @@ where
             tokio::select! {
                 res = stream.read_bytes() => {
                     res?;
-                    match stream.parse_messages(incoming_packet_buffer).await {
+                    let packet = match stream.parse_message().await {
                         Err(ReadBytes::Err(err)) => return Err(err),
                         Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
-                        Ok(_) => (),
-                    }
+                        Ok(packet) => packet,
+                    };
 
-                    for packet in incoming_packet_buffer.drain(0..){
-                        use Packet::*;
-                        match packet{
-                            PingResp => {
+                    match packet{
+                        Packet::PingResp => {
+                            handler.handle(packet).await;
+                            *await_pingresp = None;
+                        },
+                        Packet::Disconnect(_) => {
+                            handler.handle(packet).await;
+                            return Ok(NetworkStatus::IncomingDisconnect);
+                        }
+                        packet => {
+                            if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
                                 handler.handle(packet).await;
-                                *await_pingresp = None;
-                            },
-                            Disconnect(_) => {
-                                handler.handle(packet).await;
-                                return Ok(NetworkStatus::IncomingDisconnect);
-                            }
-                            packet => {
-                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
-                                    handler.handle(packet).await;
-                                }
                             }
                         }
                     }
