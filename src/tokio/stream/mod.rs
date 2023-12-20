@@ -1,3 +1,6 @@
+pub mod read_half;
+pub mod write_half;
+
 use std::io::{self, Error, ErrorKind};
 
 use bytes::{Buf, BytesMut};
@@ -17,6 +20,9 @@ use crate::{
         {FixedHeader, Packet, PacketType},
     },
 };
+
+use self::read_half::ReadStream;
+use self::write_half::WriteStream;
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -56,6 +62,23 @@ impl<S> Stream<S>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Sized + Unpin,
 {
+
+    pub fn split(self) -> (ReadStream<S>, WriteStream<S>) {
+        let Self {
+            stream,
+            const_buffer,
+            read_buffer,
+            write_buffer,
+        } = self;
+
+        let (read_stream, write_stream) = tokio::io::split(stream);
+
+        (
+            ReadStream::new(read_stream, const_buffer, read_buffer),
+            WriteStream::new(write_stream, write_buffer)
+        )
+    }
+
     pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
         let mut s = Self {
             stream,

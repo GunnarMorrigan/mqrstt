@@ -12,13 +12,15 @@ use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
 use super::NetworkStatus;
+use super::stream::read_half::ReadStream;
+use super::stream::write_half::WriteStream;
 
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
 pub struct Network<S> {
-    network: Option<Stream<S>>,
+    network: Option<(ReadStream<S>, WriteStream<S>)>,
 
     /// Options of the current mqtt connection
     keep_alive_interval_s: u64,
@@ -89,7 +91,7 @@ where
         network.write_all(&mut self.outgoing_packet_buffer).await?;
         self.last_network_action = Instant::now();
 
-        self.network = Some(network);
+        self.network = Some(network.split());
 
         Ok(())
     }
@@ -104,7 +106,7 @@ where
     ///
     /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.
-    pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    pub async fn poll<H>(self, handler: &mut H) -> Result<Self, ConnectionError>
     where
         H: AsyncEventHandler + Clone + Send + Sync + 'static
     {
@@ -113,21 +115,22 @@ where
         }
 
         match self.tokio_select(handler).await {
-            Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
-            Err(ConnectionError::JoinError(err)) => Err(ConnectionError::JoinError(err)),
-            otherwise => {
-                self.network = None;
-                self.await_pingresp = None;
-                self.outgoing_packet_buffer.clear();
-                self.incoming_packet_buffer.clear();
-                self.join_set.abort_all();
+            _ => todo!()
+            // Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
+            // Err(ConnectionError::JoinError(err)) => Err(ConnectionError::JoinError(err)),
+            // otherwise => {
+            //     self.network = None;
+            //     self.await_pingresp = None;
+            //     self.outgoing_packet_buffer.clear();
+            //     self.incoming_packet_buffer.clear();
+            //     self.join_set.abort_all();
 
-                otherwise
-            }
+            //     otherwise
+            // }
         }
     }
 
-    async fn tokio_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    async fn tokio_select<H>(self, handler: &mut H) -> Result<Self, ConnectionError>
     where
         H: AsyncEventHandler + Clone + Send + Sync + 'static
     {
@@ -153,6 +156,9 @@ where
         }
         
         if let Some(stream) = network {
+
+            let stream = stream.split
+
             tokio::select! {
                 res = stream.read_bytes() => {
                     res?;
