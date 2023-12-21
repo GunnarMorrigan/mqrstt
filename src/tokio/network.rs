@@ -130,7 +130,7 @@ where
         }
     }
 
-    async fn tokio_select<H>(self, handler: &mut H) -> Result<Self, ConnectionError>
+    async fn tokio_select<H>(&mut self, handler: &mut H) -> Result<Self, ConnectionError>
     where
         H: AsyncEventHandler + Clone + Send + Sync + 'static
     {
@@ -155,12 +155,10 @@ where
             sleep = *last_network_action + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
         }
         
-        if let Some(stream) = network {
-
-            let stream = stream.split
+        if let Some((read_stream, write_stream)) = network {
 
             tokio::select! {
-                res = stream.read_bytes() => {
+                res = read_stream.read_bytes() => {
                     res?;
                     loop {
                         let packet = match stream.parse_message().await {
