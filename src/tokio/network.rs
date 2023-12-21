@@ -145,27 +145,32 @@ where
             tokio::select! {
                 res = stream.read_bytes() => {
                     res?;
-                    let packet = match stream.parse_message().await {
-                        Err(ReadBytes::Err(err)) => return Err(err),
-                        Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
-                        Ok(packet) => packet,
-                    };
+                    loop {
+                        let packet = match stream.parse_message().await {
+                            Err(ReadBytes::Err(err)) => return Err(err),
+                            Err(ReadBytes::InsufficientBytes(_)) => {
+                                break;
+                            },
+                            Ok(packet) => packet,
+                        };
 
-                    match packet{
-                        Packet::PingResp => {
-                            handler.handle(packet).await;
-                            *await_pingresp = None;
-                        },
-                        Packet::Disconnect(_) => {
-                            handler.handle(packet).await;
-                            return Ok(NetworkStatus::IncomingDisconnect);
-                        }
-                        packet => {
-                            if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
+                        match packet{
+                            Packet::PingResp => {
                                 handler.handle(packet).await;
+                                *await_pingresp = None;
+                            },
+                            Packet::Disconnect(_) => {
+                                handler.handle(packet).await;
+                                return Ok(NetworkStatus::IncomingDisconnect);
+                            }
+                            packet => {
+                                if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
+                                    handler.handle(packet).await;
+                                }
                             }
                         }
                     }
+
 
                     stream.write_all(outgoing_packet_buffer).await?;
                     *last_network_action = Instant::now();
