@@ -127,13 +127,14 @@ impl MqttHandler {
     }
 
     fn handle_incoming_pubrel(&mut self, pubrel: &PubRel, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<(), HandlerError> {
-        if self.state.remove_incoming_pub(pubrel.packet_identifier) {
+        let pubcomp = PubComp::new(pubrel.packet_identifier);
+        outgoing_packet_buffer.push(Packet::PubComp(pubcomp));
+        if !self.state.remove_incoming_pub(pubrel.packet_identifier) {
+            #[cfg(feature = "logs")]
+            warn!("Received an unexpected / unsolicited PubRel packet with id {}", pubrel.packet_identifier);
             let pubcomp = PubComp::new(pubrel.packet_identifier);
-            outgoing_packet_buffer.push(Packet::PubComp(pubcomp));
-            Ok(())
-        } else {
-            Err(HandlerError::Unsolicited(pubrel.packet_identifier, PacketType::PubRel))
         }
+        Ok(())
     }
 
     fn handle_incoming_pubcomp(&mut self, pubcomp: &PubComp, _: &mut Vec<Packet>) -> Result<(), HandlerError> {
