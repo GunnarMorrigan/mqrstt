@@ -1,5 +1,7 @@
 use bytes::BytesMut;
-use tokio::io::WriteHalf;
+use tokio::io::{WriteHalf, AsyncWriteExt};
+
+use crate::{packets::Packet, error::ConnectionError};
 
 #[derive(Debug)]
 pub struct WriteStream<S> {
@@ -15,5 +17,42 @@ impl<S> WriteStream<S> {
             stream,
             write_buffer,
         }
+    }
+}
+
+impl<S> WriteStream<S> where S: tokio::io::AsyncWrite + Sized + Unpin {
+    pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
+        packet.write(&mut self.write_buffer)?;
+
+        #[cfg(feature = "logs")]
+        trace!("Sending packet {}", packet);
+
+        self.stream.write_all(&self.write_buffer[..]).await?;
+        self.stream.flush().await?;
+        self.write_buffer.clear();
+        Ok(())
+    }
+
+    pub async fn write_all<I>(&mut self, packets: &mut I) -> Result<(), ConnectionError> 
+    where 
+        I: Iterator<Item = Packet> 
+    {
+        let writes = packets.map(|packet| {
+            packet.write(&mut self.write_buffer)?;
+
+            #[cfg(feature = "logs")]
+            trace!("Sending packet {}", packet);
+
+            Ok::<(), ConnectionError>(())
+        });
+
+        for write in writes {
+            write?;
+        }
+
+        self.stream.write_all(&self.write_buffer[..]).await?;
+        self.stream.flush().await?;
+        self.write_buffer.clear();
+        Ok(())
     }
 }

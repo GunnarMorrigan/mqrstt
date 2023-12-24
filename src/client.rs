@@ -17,7 +17,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct MqttClient {
     /// Provides this client with an available packet id or waits on it.
-    available_packet_ids: Receiver<u16>,
+    available_packet_ids_r: Receiver<u16>,
 
     /// Sends Publish, Subscribe, Unsubscribe to the event handler to handle later.
     to_network_s: Sender<Packet>,
@@ -27,11 +27,11 @@ pub struct MqttClient {
 }
 
 impl MqttClient {
-    pub fn new(available_packet_ids: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: Option<u32>) -> Self {
+    pub fn new(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
         Self {
-            available_packet_ids,
+            available_packet_ids_r,
             to_network_s,
-            max_packet_size: max_packet_size.unwrap_or(DEFAULT_MAX_PACKET_SIZE) as usize,
+            max_packet_size
         }
     }
 }
@@ -74,7 +74,7 @@ impl MqttClient {
     /// # });
     /// ```
     pub async fn subscribe<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let subscription: Subscription = into_subscribtions.into();
         let sub = Subscribe::new(pkid, subscription.0);
 
@@ -144,7 +144,7 @@ impl MqttClient {
     /// # });
     /// ```
     pub async fn subscribe_with_properties<S: Into<Subscription>>(&self, into_sub: S, properties: SubscribeProperties) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let sub = Subscribe {
             packet_identifier: pkid,
             properties,
@@ -190,7 +190,7 @@ impl MqttClient {
     pub async fn publish<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
-            _ => Some(self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
+            _ => Some(self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
         };
         #[cfg(feature = "logs")]
         info!("Published message with ID: {:?}", pkid);
@@ -276,7 +276,7 @@ impl MqttClient {
     pub async fn publish_with_properties<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
-            _ => Some(self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
+            _ => Some(self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
         };
         let publish = Publish {
             dup: false,
@@ -327,7 +327,7 @@ impl MqttClient {
     /// # });
     /// ```
     pub async fn unsubscribe<T: Into<UnsubscribeTopics>>(&self, into_topics: T) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let unsub = Unsubscribe {
             packet_identifier: pkid,
             properties: UnsubscribeProperties::default(),
@@ -396,7 +396,7 @@ impl MqttClient {
     /// # });
     /// ```
     pub async fn unsubscribe_with_properties<T: Into<UnsubscribeTopics>>(&self, into_topics: T, properties: UnsubscribeProperties) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let unsub = Unsubscribe {
             packet_identifier: pkid,
             properties,
@@ -509,7 +509,7 @@ impl MqttClient {
     /// # });
     /// ```
     pub fn subscribe_blocking<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
         let subscription: Subscription = into_subscribtions.into();
         let sub = Subscribe::new(pkid, subscription.0);
 
@@ -578,7 +578,7 @@ impl MqttClient {
     /// mqtt_client.subscribe_with_properties_blocking(("final/test/topic", sub_options), sub_properties);
     /// ```
     pub fn subscribe_with_properties_blocking<S: Into<Subscription>>(&self, into_subscribtions: S, properties: SubscribeProperties) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
         let sub = Subscribe {
             packet_identifier: pkid,
             properties,
@@ -624,7 +624,7 @@ impl MqttClient {
     pub fn publish_blocking<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
-            _ => Some(self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
+            _ => Some(self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
         };
         #[cfg(feature = "logs")]
         info!("Published message with ID: {:?}", pkid);
@@ -710,7 +710,7 @@ impl MqttClient {
     pub fn publish_with_properties_blocking<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
-            _ => Some(self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
+            _ => Some(self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
         };
         let publish = Publish {
             dup: false,
@@ -760,7 +760,7 @@ impl MqttClient {
     ///
     /// ```
     pub fn unsubscribe_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
         let unsub = Unsubscribe {
             packet_identifier: pkid,
             properties: UnsubscribeProperties::default(),
@@ -827,7 +827,7 @@ impl MqttClient {
     /// mqtt_client.unsubscribe_with_properties_blocking(topics.as_slice(), properties);
     /// ```
     pub fn unsubscribe_with_properties_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T, properties: UnsubscribeProperties) -> Result<(), ClientError> {
-        let pkid = self.available_packet_ids.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
+        let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
         let unsub = Unsubscribe {
             packet_identifier: pkid,
             properties,
@@ -913,7 +913,7 @@ mod tests {
         let (client_to_handler_s, client_to_handler_r) = async_channel::bounded(100);
         let (_, to_network_r) = async_channel::bounded(100);
 
-        let client = MqttClient::new(r, client_to_handler_s, Some(500000));
+        let client = MqttClient::new(r, client_to_handler_s, 500000);
 
         (client, client_to_handler_r, to_network_r)
     }

@@ -1,3 +1,8 @@
+use std::borrow::Borrow;
+use std::cell::{Ref, OnceCell};
+use std::sync::atomic::AtomicBool;
+
+use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::HandlerError;
 use crate::packets::reason_codes::{ConnAckReasonCode, PubAckReasonCode, PubRecReasonCode};
@@ -28,15 +33,12 @@ pub struct StateHandler {
 /// [`MqttHandler`] is used to properly handle incoming and outgoing packets according to the MQTT specifications.
 /// Only the incoming messages are shown to the user via the user provided handler.
 impl StateHandler {
-    pub(crate) fn new(options: &ConnectOptions) -> (Self, Receiver<u16>) {
-        let (state, packet_id_channel) = State::new(options.receive_maximum());
-
-        let handler = StateHandler {
-            state,
+    pub(crate) fn new(options: &ConnectOptions, apkids: AvailablePacketIds) -> Self {
+        StateHandler {
+            state: State::new(options.receive_maximum(), apkids),
 
             clean_start: options.clean_start,
-        };
-        (handler, packet_id_channel)
+        }
     }
 
     /// This function handles the incoming packet `packet` depending on the packet type.
@@ -47,7 +49,7 @@ impl StateHandler {
     /// In some cases (retransmitted Publish packets) the users handler should not be called to avoid duplicate delivery.
     /// true is returned if the users handler should be called
     /// false otherwise
-    pub fn handle_incoming_packet(&mut self, packet: &Packet) -> Result<(Option<Packet>, bool), HandlerError> {
+    pub fn handle_incoming_packet(&self, packet: &Packet) -> Result<(Option<Packet>, bool), HandlerError> {
         Ok(
             match packet {
             Packet::Publish(publish) => self.handle_incoming_publish(publish),
@@ -62,7 +64,7 @@ impl StateHandler {
         )
     }
 
-    fn handle_incoming_publish(&mut self, publish: &Publish) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_publish(&self, publish: &Publish) -> Result<(Option<Packet>, bool), HandlerError> {
         match publish.qos {
             QoS::AtMostOnce => Ok((None, true)),
             QoS::AtLeastOnce => {
@@ -87,7 +89,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_incoming_puback(&mut self, puback: &PubAck) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_puback(&self, puback: &PubAck) -> Result<(Option<Packet>, bool), HandlerError> {
         if self.state.remove_outgoing_pub(puback.packet_identifier).is_some() {
             #[cfg(feature = "logs")]
             debug!("Publish {:?} has been acknowledged", puback.packet_identifier);
@@ -100,7 +102,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_incoming_pubrec(&mut self, pubrec: &PubRec) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_pubrec(&self, pubrec: &PubRec) -> Result<(Option<Packet>, bool), HandlerError> {
         match self.state.remove_outgoing_pub(pubrec.packet_identifier) {
             Some(_) => match pubrec.reason_code {
                 PubRecReasonCode::Success | PubRecReasonCode::NoMatchingSubscribers => {
@@ -123,18 +125,17 @@ impl StateHandler {
         }
     }
 
-    fn handle_incoming_pubrel(&mut self, pubrel: &PubRel, outgoing_packet_buffer: &mut Vec<Packet>) -> Result<(), HandlerError> {
+    fn handle_incoming_pubrel(&self, pubrel: &PubRel) -> Result<(Option<Packet>, bool), HandlerError> {
         let pubcomp = PubComp::new(pubrel.packet_identifier);
-        outgoing_packet_buffer.push(Packet::PubComp(pubcomp));
         if !self.state.remove_incoming_pub(pubrel.packet_identifier) {
             #[cfg(feature = "logs")]
             warn!("Received an unexpected / unsolicited PubRel packet with id {}", pubrel.packet_identifier);
             let pubcomp = PubComp::new(pubrel.packet_identifier);
         }
-        Ok(())
+        Ok((Some(Packet::PubComp(pubcomp)), false))
     }
 
-    fn handle_incoming_pubcomp(&mut self, pubcomp: &PubComp) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_pubcomp(&self, pubcomp: &PubComp) -> Result<(Option<Packet>, bool), HandlerError> {
         if self.state.remove_outgoing_rel(&pubcomp.packet_identifier) {
             self.state.make_pkid_available(pubcomp.packet_identifier)?;
             Ok((None, false))
@@ -145,7 +146,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_incoming_suback(&mut self, suback: &SubAck) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_suback(&self, suback: &SubAck) -> Result<(Option<Packet>, bool), HandlerError> {
         if self.state.remove_outgoing_sub(suback.packet_identifier) {
             self.state.make_pkid_available(suback.packet_identifier)?;
             Ok((None, false))
@@ -156,7 +157,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_incoming_unsuback(&mut self, unsuback: &UnsubAck,) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_unsuback(&self, unsuback: &UnsubAck,) -> Result<(Option<Packet>, bool), HandlerError> {
         if self.state.remove_outgoing_unsub(unsuback.packet_identifier) {
             self.state.make_pkid_available(unsuback.packet_identifier)?;
             Ok((None, false))
@@ -167,7 +168,7 @@ impl StateHandler {
         }
     }
 
-    pub fn handle_incoming_connack(&mut self, conn_ack: &ConnAck) -> Result<Option<Vec<Packet>>, HandlerError> {
+    pub fn handle_incoming_connack(&self, conn_ack: &ConnAck) -> Result<Option<Vec<Packet>>, HandlerError> {
         if conn_ack.reason_code == ConnAckReasonCode::Success {
             let retransmission = conn_ack.connack_flags.session_present && !self.clean_start;
             let (freeable_ids, republish) = self.state.reset(retransmission);
@@ -182,7 +183,7 @@ impl StateHandler {
         }
     }
 
-    pub fn handle_outgoing_packet(&mut self, packet: Packet) -> Result<(), HandlerError> {
+    pub fn handle_outgoing_packet(&self, packet: Packet) -> Result<(), HandlerError> {
         #[cfg(feature = "logs")]
         info!("Handling outgoing packet {}", packet);
         match packet {
@@ -194,7 +195,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_outgoing_publish(&mut self, publish: Publish) -> Result<(), HandlerError> {
+    fn handle_outgoing_publish(&self, publish: Publish) -> Result<(), HandlerError> {
         #[cfg(feature = "logs")]
         let id = publish.packet_identifier;
         match publish.qos {
@@ -218,7 +219,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_outgoing_subscribe(&mut self, sub: Subscribe) -> Result<(), HandlerError> {
+    fn handle_outgoing_subscribe(&self, sub: Subscribe) -> Result<(), HandlerError> {
         #[cfg(feature = "logs")]
         info!("handling outgoing subscribe with ID: {}", sub.packet_identifier);
         if !self.state.add_outgoing_sub(sub.packet_identifier) {
@@ -228,7 +229,7 @@ impl StateHandler {
         Ok(())
     }
 
-    fn handle_outgoing_unsubscribe(&mut self, unsub: Unsubscribe) -> Result<(), HandlerError> {
+    fn handle_outgoing_unsubscribe(&self, unsub: Unsubscribe) -> Result<(), HandlerError> {
         if !self.state.add_outgoing_unsub(unsub.packet_identifier) {
             #[cfg(feature = "logs")]
             error!("Encountered a colliding packet ID ({}) in a unsubscribe packet", unsub.packet_identifier,);
@@ -236,7 +237,7 @@ impl StateHandler {
         Ok(())
     }
 
-    fn handle_outgoing_disconnect(&mut self, _: Disconnect) -> Result<(), HandlerError> {
+    fn handle_outgoing_disconnect(&self, _: Disconnect) -> Result<(), HandlerError> {
         Ok(())
     }
 }
@@ -251,7 +252,7 @@ mod handler_tests {
             Packet, QoS, UnsubAck, UnsubAckProperties, {PubComp, PubCompProperties}, {PubRec, PubRecProperties}, {PubRel, PubRelProperties}, {SubAck, SubAckProperties},
         },
         tests::test_packets::{create_connack_packet, create_puback_packet, create_publish_packet, create_subscribe_packet, create_unsubscribe_packet},
-        AsyncEventHandler, ConnectOptions, StateHandler,
+        AsyncEventHandler, ConnectOptions, StateHandler, available_packet_ids::AvailablePacketIds,
     };
 
     pub struct Nop {}
@@ -261,11 +262,12 @@ mod handler_tests {
     }
 
     fn handler(clean_start: bool) -> (StateHandler, Receiver<u16>) {
-        let mut opt = ConnectOptions::new("test123123".to_string());
-        opt.receive_maximum = Some(100);
-        opt.clean_start = clean_start;
+        let (apkids, apkids_r) = AvailablePacketIds::new(100);
 
-        StateHandler::new(&opt)
+        let mut opt = ConnectOptions::new("test123123".to_string(), clean_start);
+        opt.set_receive_maximum(100);
+
+        (StateHandler::new(&opt, apkids), apkids_r)
     }
 
     #[tokio::test]

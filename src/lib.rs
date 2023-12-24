@@ -141,7 +141,7 @@
 //! use std::net::TcpStream;
 //! 
 //! let mut client_id: String = "SyncTcppingrespTestExample".to_string();
-//! let options = ConnectOptions::new(client_id);
+//! let options = ConnectOptions::new(client_id, true);
 //! 
 //! let address = "broker.emqx.io";
 //! let port = 1883;
@@ -242,30 +242,30 @@ impl EventHandler for NOP{
     }
 }
 
-#[cfg(feature = "smol")]
-/// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
-/// ```
-/// use mqrstt::ConnectOptions;
-///
-/// let options = ConnectOptions::new("ExampleClient".to_string());
-/// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
-/// ```
-pub fn new_smol<S>(options: ConnectOptions) -> (smol::Network<S>, MqttClient)
-where
-    S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
-{
-    let (to_network_s, to_network_r) = async_channel::bounded(100);
+// #[cfg(feature = "smol")]
+// /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
+// /// ```
+// /// use mqrstt::ConnectOptions;
+// ///
+// /// let options = ConnectOptions::new("ExampleClient".to_string());
+// /// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
+// /// ```
+// pub fn new_smol<S>(options: ConnectOptions) -> (smol::Network<S>, MqttClient)
+// where
+//     S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
+// {
+//     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (handler, packet_ids) = StateHandler::new(&options);
+//     let (handler, packet_ids) = StateHandler::new(&options);
 
-    let max_packet_size = options.maximum_packet_size;
+//     let max_packet_size = options.maximum_packet_size;
 
-    let network = smol::Network::<S>::new(options, handler, to_network_r);
+//     let network = smol::Network::<S>::new(options, handler, to_network_r);
 
-    let client = MqttClient::new(packet_ids, to_network_s, max_packet_size);
+//     let client = MqttClient::new(packet_ids, to_network_s, max_packet_size);
 
-    (network, client)
-}
+//     (network, client)
+// }
 
 /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
 #[cfg(feature = "tokio")]
@@ -281,74 +281,49 @@ pub fn new_tokio<S>(options: ConnectOptions) -> (tokio::Network<S>, MqttClient)
 where
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
 {
+    use available_packet_ids::AvailablePacketIds;
+
     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (mqtt_handler, apkid) = StateHandler::new(&options);
+    let (apkids, apkids_r) = AvailablePacketIds::new(options.send_maximum());
 
-    let max_packet_size = options.maximum_packet_size;
+    let max_packet_size = options.maximum_packet_size();
 
-    let network = tokio::Network::new(options, mqtt_handler, to_network_r);
+    let network = tokio::Network::new(options, to_network_r, apkids);
 
-    let client = MqttClient::new(apkid, to_network_s, max_packet_size);
+    let client = MqttClient::new(apkids_r, to_network_s, max_packet_size);
 
     (network, client)
 }
-#[cfg(feature = "sync")]
-/// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
-/// S should implement [`std::io::Read`] and [`std::io::Write`].
-/// Additionally, S should be made non_blocking otherwise it will not progress.
-///
-/// # Example
-///
-/// ```
-/// use mqrstt::ConnectOptions;
-///
-/// let options = ConnectOptions::new("ExampleClient".to_string());
-/// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-/// ```
-pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
-where
-    S: std::io::Read + std::io::Write + Sized + Unpin,
-{
-    let (to_network_s, to_network_r) = async_channel::bounded(100);
+// #[cfg(feature = "sync")]
+// /// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
+// /// S should implement [`std::io::Read`] and [`std::io::Write`].
+// /// Additionally, S should be made non_blocking otherwise it will not progress.
+// ///
+// /// # Example
+// ///
+// /// ```
+// /// use mqrstt::ConnectOptions;
+// ///
+// /// let options = ConnectOptions::new("ExampleClient".to_string());
+// /// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
+// /// ```
+// pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
+// where
+//     S: std::io::Read + std::io::Write + Sized + Unpin,
+// {
+//     let (to_network_s, to_network_r) = async_channel::bounded(100);
 
-    let (mqtt_handler, apkid) = StateHandler::new(&options);
+//     let (mqtt_handler, apkid) = StateHandler::new(&options);
 
-    let max_packet_size = options.maximum_packet_size;
+//     let max_packet_size = options.maximum_packet_size;
 
-    let network = sync::Network::new(options, mqtt_handler, to_network_r);
+//     let network = sync::Network::new(options, mqtt_handler, to_network_r);
 
-    let client = MqttClient::new(apkid, to_network_s, max_packet_size);
+//     let client = MqttClient::new(apkid, to_network_s, max_packet_size);
 
-    (network, client)
-}
-
-fn create_connect_from_options(options: &ConnectOptions) -> Packet {
-    let connect_properties = ConnectProperties {
-        session_expiry_interval: options.session_expiry_interval,
-        receive_maximum: options.receive_maximum,
-        maximum_packet_size: options.maximum_packet_size,
-        topic_alias_maximum: options.topic_alias_maximum,
-        request_response_information: options.request_response_information,
-        request_problem_information: options.request_response_information,
-        user_properties: options.user_properties.clone(),
-        authentication_method: options.authentication_method.clone(),
-        authentication_data: options.authentication_data.clone(),
-    };
-
-    let connect = Connect {
-        client_id: options.client_id.clone(),
-        clean_start: options.clean_start,
-        keep_alive: options.keep_alive_interval_s as u16,
-        username: options.username.clone(),
-        password: options.password.clone(),
-        connect_properties,
-        protocol_version: packets::ProtocolVersion::V5,
-        last_will: options.last_will.clone(),
-    };
-
-    Packet::Connect(connect)
-}
+//     (network, client)
+// }
 
 #[cfg(test)]
 mod lib_test {
@@ -425,7 +400,7 @@ mod lib_test {
     fn test_sync_tcp() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_SyncTcpPingPong";
-        let options = ConnectOptions::new(client_id);
+        let options = ConnectOptions::new(client_id, true);
 
         let address = "broker.emqx.io";
         let port = 1883;
@@ -471,7 +446,7 @@ mod lib_test {
         smol::block_on(async {
             let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
             client_id += "_SmolTcpPingPong";
-            let options = ConnectOptions::new(client_id);
+            let options = ConnectOptions::new(client_id, true);
 
             let address = "broker.emqx.io";
             let port = 1883;
@@ -515,7 +490,7 @@ mod lib_test {
     async fn test_tokio_tcp() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTcpPingPong";
-        let options = ConnectOptions::new(client_id);
+        let options = ConnectOptions::new(client_id, true);
 
         let (mut network, client) = new_tokio(options);
 
@@ -590,7 +565,7 @@ mod lib_test {
     fn test_sync_ping_req() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_SyncTcppingrespTest";
-        let options = ConnectOptions::new(client_id);
+        let options = ConnectOptions::new(client_id, true);
 
         let address = "broker.emqx.io";
         let port = 1883;
@@ -633,10 +608,11 @@ mod lib_test {
     async fn test_tokio_ping_req() {
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTcppingrespTest";
-        let mut options = ConnectOptions::new(client_id);
-        options.keep_alive_interval_s = 5;
+        let mut options = ConnectOptions::new(client_id, true);
+        let mut keep_alive_interval = 5;
+        options.set_keep_alive_interval(Duration::from_secs(keep_alive_interval));
 
-        let wait_duration = options.keep_alive_interval_s * 2 + options.keep_alive_interval_s / 2;
+        let wait_duration = options.get_keep_alive_interval() * 2 + options.get_keep_alive_interval() / 2;
 
         let (mut network, client) = new_tokio(options);
 
@@ -660,13 +636,13 @@ mod lib_test {
                     }
                 },
                 async move {
-                    tokio::time::sleep(Duration::new(wait_duration, 0)).await;
+                    tokio::time::sleep(wait_duration).await;
                     client.disconnect().await.unwrap();
                 }
             )
         });
 
-        tokio::time::sleep(Duration::new(wait_duration + 1, 0)).await;
+        tokio::time::sleep(wait_duration + Duration::from_secs(1)).await;
 
         let (n, _) = futs.await.unwrap();
         assert!(n.is_ok());
@@ -685,7 +661,7 @@ mod lib_test {
 
         let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
         client_id += "_TokioTcppingrespTest";
-        let options = ConnectOptions::new(client_id);
+        let options = ConnectOptions::new(client_id, true);
 
         let (n, _) = tokio::join!(
             async move {
@@ -719,7 +695,7 @@ mod lib_test {
         smol::block_on(async {
             let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
             client_id += "_SmolTcppingrespTest";
-            let options = ConnectOptions::new(client_id);
+            let options = ConnectOptions::new(client_id, true);
 
             let address = "broker.emqx.io";
             let port = 1883;
@@ -763,7 +739,7 @@ mod lib_test {
         smol::block_on(async {
             let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
             client_id += "_SmolTcppingrespTest";
-            let options = ConnectOptions::new(client_id);
+            let options = ConnectOptions::new(client_id, true);
 
             let address = "127.0.0.1";
             let port = 2001;
