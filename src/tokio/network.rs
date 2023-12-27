@@ -1,7 +1,9 @@
 use async_channel::{Receiver, Sender};
+use tokio::join;
 use tokio::task::JoinSet;
 
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
 use std::time::{Duration, Instant};
 
 use crate::available_packet_ids::AvailablePacketIds;
@@ -18,51 +20,43 @@ use super::NetworkStatus;
 use super::stream::read_half::ReadStream;
 use super::stream::write_half::WriteStream;
 
+// type StreamType = tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static;
+
 /// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
-pub struct Network<S> {
+pub struct Network<H, S> {
+    handler: Option<H>,
+
     network: Option<(ReadStream<S>, WriteStream<S>)>,
 
     /// Options of the current mqtt connection
     options: ConnectOptions,
 
     last_network_action: Instant,
-    await_pingresp: Option<Instant>,
+
+    await_pingresp_atomic: Arc<AtomicBool>,
     perform_keep_alive: bool,
 
     state_handler: Arc<StateHandler>,
-    // outgoing_packet_buffer: Vec<Packet>,
-    // incoming_packet_buffer: Vec<Packet>,
-
-    join_set: JoinSet<()>,
-
-    to_writer_s: Sender<Packet>,
-    to_writer_r: Receiver<Packet>,
 
     to_network_r: Receiver<Packet>,
 }
 
-impl<S> Network<S> {
+impl<H, S> Network<H, S> {
     pub fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
-        let (to_writer_s, to_writer_r) = async_channel::bounded(100);
-
         Self {
+            handler: None,
             network: None,
             
             last_network_action: Instant::now(),
-            await_pingresp: None,
+            await_pingresp_atomic: Arc::new(AtomicBool::new(false)),
             perform_keep_alive: true,
             
             state_handler: Arc::new(StateHandler::new(&options, apkids)),
             
             options,
-
-            join_set: JoinSet::new(),
-
-            to_writer_s,
-            to_writer_r,
 
             to_network_r,
         }
@@ -71,15 +65,13 @@ impl<S> Network<S> {
 
 /// Tokio impl
 #[cfg(feature = "tokio")]
-impl<S> Network<S>
+impl<H, S> Network<H, S>
 where
-    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
+    H: AsyncEventHandler + Clone + Send + Sync + 'static,
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
-    where
-        H: AsyncEventHandler
-    {
+    pub async fn connect(&mut self, stream: S, handler: H) -> Result<(), ConnectionError> {
         let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
@@ -100,6 +92,7 @@ where
         self.last_network_action = Instant::now();
 
         self.network = Some(network.split());
+        self.handler = Some(handler);
 
         Ok(())
     }
@@ -114,149 +107,66 @@ where
     ///
     /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.
-    pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
-    where
-        H: AsyncEventHandler + Clone + Send + Sync + 'static
-    {
+    pub async fn run(&mut self) -> Result<NetworkStatus, ConnectionError> {
         if self.network.is_none() {
             return Err(ConnectionError::NoNetwork);
         }
 
-        match self.tokio_select(handler).await {
-            Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
-            Err(ConnectionError::JoinError(err)) => Err(ConnectionError::JoinError(err)),
-            otherwise => {
-                self.network = None;
-                self.await_pingresp = None;
-                self.join_set.abort_all();
-                self.clear_write_channl();
-                
-                
-
-                otherwise
-            }
-        }
+        self.tokio_select().await
     }
 
-    fn clear_write_channl(&mut self) {
-        loop {
-            match self.to_writer_r.try_recv() {
-                Ok(_) => (),
-                Err(_) => return,
-            }
-        }
-    }
+    async fn tokio_select(&mut self) -> Result<NetworkStatus, ConnectionError> {
+        match self.network.take() {
+            Some((read_stream, write_stream)) => {
+                let run_signal = Arc::new(AtomicBool::new(true));
+                let (to_writer_s, to_writer_r) = async_channel::bounded(100);
 
-    async fn tokio_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
-    where
-        H: AsyncEventHandler + Clone + Send + Sync + 'static
-    {
-        let Network {
-            network,
-            options: options,
-            last_network_action,
-            await_pingresp,
-            perform_keep_alive,
-            state_handler: state_handler,
-            // outgoing_packet_buffer,
-            join_set,
-            to_writer_s,
-            to_writer_r,
-            to_network_r,
-        } = self;
+                let mut read_network = NetworkReader{
+                    run_signal: run_signal.clone(),
+                    handler: self.handler.as_ref().unwrap().clone(),
+                    read_stream: read_stream,
+                    await_pingresp_atomic: self.await_pingresp_atomic.clone(),
+                    state_handler: self.state_handler.clone(),
+                    to_writer_s,
+                };
+    
+                let mut write_network = NetworkWriter {
+                    run_signal: run_signal.clone(),
+                    write_stream,
+                    keep_alive_interval: self.options.keep_alive_interval,
+                    last_network_action: self.last_network_action,
+                    await_pingresp_bool: self.await_pingresp_atomic.clone(),
+                    await_pingresp_time: None,
+                    perform_keep_alive: self.perform_keep_alive,
+                    state_handler: self.state_handler.clone(),
+                    to_writer_r: to_writer_r,
+                    to_network_r: self.to_network_r.clone(),
+                };
+                
+                let read_task = tokio::spawn(async move {
+                    let ret = read_network.read().await;
+                    read_network.run_signal.store(false, std::sync::atomic::Ordering::Release);
+                    ret
+                });
+                
+                let write_task = tokio::spawn(async move {
+                    let ret = write_network.write().await;
+                    write_network.run_signal.store(false, std::sync::atomic::Ordering::Release);
+                    ret
+                });
 
-        let sleep;
-        if let Some(instant) = await_pingresp {
-            sleep = *instant + options.keep_alive_interval - Instant::now();
-        } else {
-            sleep = *last_network_action + options.keep_alive_interval - Instant::now();
-        }
-        
-        if let Some((read_stream, write_stream)) = network {
-            tokio::select! {
-                // res = read_stream.read_bytes() => {
-                //     res?;
-                //     loop {
-                //         let packet = match read_stream.parse_message().await {
-                //             Err(ReadBytes::Err(err)) => return Err(err),
-                //             Err(ReadBytes::InsufficientBytes(_)) => {
-                //                 break;
-                //             },
-                //             Ok(packet) => packet,
-                //         };
-
-                //         match packet{
-                //             Packet::PingResp => {
-                //                 handler.handle(packet).await;
-                //                 *await_pingresp = None;
-                //             },
-                //             Packet::Disconnect(_) => {
-                //                 handler.handle(packet).await;
-                //                 return Ok(NetworkStatus::IncomingDisconnect);
-                //             }
-                //             Packet::ConnAck(conn_ack) => {
-                //                 if let Some(retransmit_packets) = mqtt_handler.handle_incoming_connack(&conn_ack)? {
-                //                     retransmit_packets.into_iter().map(|p| to_network_s.send(p));
-                //                     // outgoing_packet_buffer.append(&mut retransmit_packets)
-                //                 }
-                //                 handler.handle(Packet::ConnAck(conn_ack)).await;
-                //             }
-                //             packet => {
-                //                 match mqtt_handler.handle_incoming_packet(&packet)? {
-                //                     (maybe_reply_packet, true) => {
-                //                         let handler_clone = handler.clone();
-                //                         let sender_clone = to_network_s.clone();
-                //                         join_set.spawn(async move {
-                //                             handler_clone.handle(packet).await;
-                //                             if let Some(reply_packet) = maybe_reply_packet {
-                //                                 sender_clone.send(reply_packet).await;
-                //                             }
-                //                         });
-                //                     },
-                //                     (Some(reply_packet), false) => {
-                //                         to_network_s.send(reply_packet);
-                //                     },
-                //                     (None, false) => (),
-                //                 }
-                //             }
-                //         }
-                //     }
-                //     Ok(NetworkStatus::Active)
-                // },
-                // outgoing = to_network_r.recv() => {
-                //     let packet = outgoing?;
-                //     write_stream.write(&packet).await?;
-                //     let mut disconnect = false;
-
-                //     if packet.packet_type() == PacketType::Disconnect{
-                //         disconnect = true;
-                //     }
-
-                //     mqtt_handler.handle_outgoing_packet(packet)?;
-                //     *last_network_action = Instant::now();
-
-                //     if disconnect{
-                //         Ok(NetworkStatus::OutgoingDisconnect)
-                //     }
-                //     else{
-                //         Ok(NetworkStatus::Active)
-                //     }
-                // },
-                _ = tokio::time::sleep(sleep), if await_pingresp.is_none() && *perform_keep_alive => {
-                    let packet = Packet::PingReq;
-                    write_stream.write(&packet).await?;
-                    *last_network_action = Instant::now();
-                    *await_pingresp = Some(Instant::now());
-                    Ok(NetworkStatus::Active)
-                },
-                _ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
-                    let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
-                    write_stream.write(&Packet::Disconnect(disconnect)).await?;
-                    Ok(NetworkStatus::NoPingResp)
+                let (a,b) = join!(read_task, write_task);
+                let a = a?;
+                let b = b?;
+                match (a, b) {
+                    (Ok(a), _) => Ok(a),
+                    (_, Ok(b)) => Ok(b),
+                    (Err(err), Err(_)) => Err(err),
                 }
             }
-        } else {
-            Err(ConnectionError::NoNetwork)
+            None => {
+                Err(ConnectionError::NoNetwork)
+            },
         }
     }
 
@@ -264,35 +174,27 @@ where
 }
 
 
-pub struct NetworkReader<S> {
+pub struct NetworkReader<H, S> {
+    run_signal: Arc<AtomicBool>,
+
+    handler: H,
     read_stream: ReadStream<S>,
-
-    // last_network_action: Instant,
-    // await_pingresp: Option<Instant>,
-    // perform_keep_alive: bool,
-
+    await_pingresp_atomic:Arc<AtomicBool>,
     state_handler: Arc<StateHandler>,
-    // outgoing_packet_buffer: Vec<Packet>,
-    // incoming_packet_buffer: Vec<Packet>,
-
-    join_set: JoinSet<()>,
-
     to_writer_s: Sender<Packet>,
 }
 
 #[cfg(feature = "tokio")]
-impl<S> NetworkReader<S>
+impl<H, S> NetworkReader<H, S>
 where
-    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
+    H: AsyncEventHandler + Clone + Send + Sync + 'static,
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
 {
-    async fn read<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError> 
-    where
-        H: AsyncEventHandler + Clone + Send + Sync + 'static
-    {
-        loop {
+    async fn read(&mut self) -> Result<NetworkStatus, ConnectionError>{
+        while self.run_signal.load(std::sync::atomic::Ordering::Acquire) {
             let _ = self.read_stream.read_bytes().await?;
             loop {
-                let packet = match self.read_stream.parse_message().await {
+                let packet = match self.read_stream.parse_message() {
                     Err(ReadBytes::Err(err)) => return Err(err),
                     Err(ReadBytes::InsufficientBytes(_)) => {
                         break;
@@ -302,33 +204,36 @@ where
 
                 match packet{
                     Packet::PingResp => {
-                        handler.handle(packet).await;
-                        // *await_pingresp = None;
+                        self.handler.handle(packet).await;
+                        #[cfg(feature = "logs")]
+                        if !self.await_pingresp_atomic.fetch_and(false, std::sync::atomic::Ordering::SeqCst) {
+                            tracing::warn!("Received PingResp but did not expect it");
+                        }
+                        #[cfg(not(feature = "logs"))]
+                        self.await_pingresp_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
+                        println!("Turned await_pingresp atomic to false");
                     },
                     Packet::Disconnect(_) => {
-                        handler.handle(packet).await;
+                        self.handler.handle(packet).await;
                         return Ok(NetworkStatus::IncomingDisconnect);
                     }
                     Packet::ConnAck(conn_ack) => {
                         if let Some(retransmit_packets) = self.state_handler.handle_incoming_connack(&conn_ack)? {
-                            retransmit_packets.into_iter().map(|p| self.to_writer_s.send(p));
+                            for packet in retransmit_packets.into_iter(){
+                                self.to_writer_s.send(packet).await?;
+                            }
                         }
-                        handler.handle(Packet::ConnAck(conn_ack)).await;
+                        self.handler.handle(Packet::ConnAck(conn_ack)).await;
                     }
                     packet => {
                         match self.state_handler.handle_incoming_packet(&packet)? {
                             (maybe_reply_packet, true) => {
-                                let handler_clone = handler.clone();
-                                let sender_clone = self.to_writer_s.clone();
-                                self.join_set.spawn(async move {
-                                    handler_clone.handle(packet).await;
-                                    if let Some(reply_packet) = maybe_reply_packet {
-                                        sender_clone.send(reply_packet).await;
-                                    }
-                                });
+                                if let Some(reply_packet) = maybe_reply_packet {
+                                    let _ = self.to_writer_s.send(reply_packet).await?;
+                                }
                             },
                             (Some(reply_packet), false) => {
-                                self.to_writer_s.send(reply_packet);
+                                self.to_writer_s.send(reply_packet).await?;
                             },
                             (None, false) => (),
                         }
@@ -338,15 +243,19 @@ where
         }
         Ok(NetworkStatus::Active)
     }
-
 }
 
 pub struct NetworkWriter<S> {
+    run_signal: Arc<AtomicBool>,
+
     write_stream: WriteStream<S>,
 
-    // last_network_action: Instant,
-    // await_pingresp: Option<Instant>,
-    // perform_keep_alive: bool,
+    keep_alive_interval: Duration,
+
+    last_network_action: Instant,
+    await_pingresp_bool: Arc<AtomicBool>,
+    await_pingresp_time: Option<Instant>,
+    perform_keep_alive: bool,
 
     state_handler: Arc<StateHandler>,
 
@@ -359,11 +268,21 @@ impl<S> NetworkWriter<S>
 where
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,
 {
-    async fn write<H>(&mut self) -> Result<NetworkStatus, ConnectionError> 
-    where
-        H: AsyncEventHandler + Clone + Send + Sync + 'static
-    {   
-        loop {
+    async fn write(&mut self) -> Result<NetworkStatus, ConnectionError> {
+        while self.run_signal.load(std::sync::atomic::Ordering::Acquire) {
+            
+            if self.await_pingresp_time.is_some() && !self.await_pingresp_bool.load(std::sync::atomic::Ordering::Acquire) {
+                self.await_pingresp_time = None;
+            }
+
+            let sleep;
+            if let Some(instant) = &self.await_pingresp_time {
+                sleep = *instant + self.keep_alive_interval - Instant::now();
+            } else {
+                sleep = self.last_network_action + self.keep_alive_interval - Instant::now();
+            }
+
+
             tokio::select!{
                 outgoing = self.to_network_r.recv() => {
                     let packet = outgoing?;
@@ -372,13 +291,35 @@ where
                     let disconnect = if packet.packet_type() == PacketType::Disconnect { true } else { false };
                     
                     self.state_handler.handle_outgoing_packet(packet)?;
-                    // *last_network_action = Instant::now();
+                    self.last_network_action = Instant::now();
                     
                     if disconnect{
                         return Ok(NetworkStatus::OutgoingDisconnect)
                     }
+                },
+                from_reader = self.to_writer_r.recv() => {
+                    let packet = from_reader?;
+                    self.write_stream.write(&packet).await?;
+                    self.state_handler.handle_outgoing_packet(packet)?;
+                    self.last_network_action = Instant::now();
+                },
+                _ = tokio::time::sleep(sleep), if self.await_pingresp_time.is_none() && self.perform_keep_alive => {
+                    let packet = Packet::PingReq;
+                    self.write_stream.write(&packet).await?;
+                    self.await_pingresp_bool.store(true, std::sync::atomic::Ordering::SeqCst);
+                    self.last_network_action = Instant::now();
+                    self.await_pingresp_time = Some(Instant::now());
+                },
+                _ = tokio::time::sleep(sleep), if self.await_pingresp_time.is_some() => {
+                    self.await_pingresp_time = None;
+                    if self.await_pingresp_bool.load(std::sync::atomic::Ordering::SeqCst){
+                        let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
+                        self.write_stream.write(&Packet::Disconnect(disconnect)).await?;
+                        return Ok(NetworkStatus::KeepAliveTimeout)
+                    }
                 }
             }
         }
+        Ok(NetworkStatus::Active)
     }
 }

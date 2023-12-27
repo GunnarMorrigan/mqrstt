@@ -1,4 +1,4 @@
-use std::{cell::OnceCell, time::Duration};
+use std::time::Duration;
 
 use bytes::Bytes;
 
@@ -41,11 +41,11 @@ pub struct ConnectOptions {
 }
 
 impl ConnectOptions {
-    pub fn new(client_id: String, clean_start: bool) -> Self {
+    pub fn new<S: AsRef<str>>(client_id: S, clean_start: bool) -> Self {
         Self {
             keep_alive_interval: Duration::from_secs(60),
             clean_start: clean_start,
-            client_id,
+            client_id: client_id.as_ref().to_string(),
             username: None,
             password: None,
 

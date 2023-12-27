@@ -13,5 +13,5 @@ pub enum NetworkStatus {
     /// Indicate that an outgoing disconnect has been transmited and the socket is closed
     OutgoingDisconnect,
     /// The server did not respond to the ping request and the socket has been closed
-    NoPingResp,
+    KeepAliveTimeout,
 }

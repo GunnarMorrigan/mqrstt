@@ -17,7 +17,7 @@ pub struct ReadStream<S> {
 }
 
 impl<S> ReadStream<S> where S: tokio::io::AsyncRead + Sized + Unpin {
-    pub fn new(stream: ReadHalf<S>, const_buffer: [u8; 4096], read_buffer: BytesMut) -> Self{   
+    pub fn new(stream: ReadHalf<S>, const_buffer: [u8; 4096], read_buffer: BytesMut) -> Self{
         Self{
             stream,
             const_buffer,
@@ -25,7 +25,7 @@ impl<S> ReadStream<S> where S: tokio::io::AsyncRead + Sized + Unpin {
         }
     }
 
-    pub async fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
+    pub fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {
         let (header, header_length) = FixedHeader::read_fixed_header(self.read_buffer.iter())?;
 
         if header.remaining_length + header_length > self.read_buffer.len() {
