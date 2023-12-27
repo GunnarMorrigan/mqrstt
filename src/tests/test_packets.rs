@@ -12,7 +12,7 @@ fn publish_packet_1() -> Packet {
         dup: false,
         qos: QoS::ExactlyOnce,
         retain: true,
-        topic: "test/123/test/blabla".to_string(),
+        topic: "test/123/test/blabla".into(),
         packet_identifier: Some(13779),
         publish_properties: PublishProperties {
             payload_format_indicator: Some(1),
@@ -32,7 +32,7 @@ fn publish_packet_2() -> Packet {
         dup: true,
         qos: QoS::ExactlyOnce,
         retain: false,
-        topic: "test/#".to_string(),
+        topic: "test/#".into(),
         packet_identifier: Some(4566),
         publish_properties: PublishProperties {
             payload_format_indicator: None,
@@ -52,16 +52,16 @@ fn publish_packet_3() -> Packet {
         dup: true,
         qos: QoS::AtLeastOnce,
         retain: false,
-        topic: "test/#".to_string(),
+        topic: "test/#".into(),
         packet_identifier: Some(4566),
         publish_properties: PublishProperties {
             payload_format_indicator: None,
             message_expiry_interval: Some(3600),
             topic_alias: None,
-            response_topic: Some("Please respond here thank you".to_string()),
+            response_topic: Some("Please respond here thank you".into()),
             correlation_data: Some(Bytes::from_static(b"5420874")),
             subscription_identifier: vec![],
-            user_properties: vec![("blabla".to_string(), "another blabla".to_string())],
+            user_properties: vec![("blabla".into(), "another blabla".into())],
             content_type: None,
         },
         payload: Bytes::from_static(b""),
@@ -72,7 +72,7 @@ fn publish_packet_4() -> Packet {
         dup: true,
         qos: QoS::AtLeastOnce,
         retain: false,
-        topic: "test/#".to_string(),
+        topic: "test/#".into(),
         packet_identifier: Some(4566),
         publish_properties: PublishProperties {
             payload_format_indicator: None,
@@ -82,7 +82,7 @@ fn publish_packet_4() -> Packet {
             correlation_data: Some(Bytes::from_static(b"1212")),
             subscription_identifier: vec![1],
             user_properties: vec![],
-            content_type: Some("Garbage".to_string()),
+            content_type: Some("Garbage".into()),
         },
         payload: Bytes::from_static(b""),
         // payload: Bytes::from_iter(b"abcdefg".repeat(500)),
@@ -96,7 +96,7 @@ pub fn create_subscribe_packet(packet_identifier: u16) -> Packet {
 }
 
 pub fn create_unsubscribe_packet(packet_identifier: u16) -> Packet {
-    let sub = Unsubscribe::new(packet_identifier, vec!["test/topic".to_string()]);
+    let sub = Unsubscribe::new(packet_identifier, vec!["test/topic".into()]);
     Packet::Unsubscribe(sub)
 }
 
@@ -105,7 +105,7 @@ pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifie
         dup,
         qos,
         retain,
-        topic: "test/#".to_string(),
+        topic: "test/#".into(),
         packet_identifier,
         publish_properties: PublishProperties {
             payload_format_indicator: None,
@@ -115,7 +115,7 @@ pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifie
             correlation_data: Some(Bytes::from_static(b"1212")),
             subscription_identifier: vec![1],
             user_properties: vec![],
-            content_type: Some("Garbage".to_string()),
+            content_type: Some("Garbage".into()),
         },
         payload: Bytes::from_iter(b"testabcbba==asdasdasdasdasd".repeat(500)),
     })

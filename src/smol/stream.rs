@@ -10,7 +10,6 @@ use tracing::trace;
 use crate::packets::ConnAck;
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 use crate::{
-    create_connect_from_options,
     packets::{
         error::ReadBytes,
         reason_codes::ConnAckReasonCode,
@@ -73,7 +72,7 @@ where
             write_buffer: BytesMut::new(),
         };
 
-        let connect = create_connect_from_options(options);
+        let connect = options.create_connect_from_options();
 
         s.write(&connect).await?;
 

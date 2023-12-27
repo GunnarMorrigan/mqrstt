@@ -62,9 +62,9 @@ impl WireLength for Disconnect {
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DisconnectProperties {
     pub session_expiry_interval: Option<u32>,
-    pub reason_string: Option<String>,
-    pub user_properties: Vec<(String, String)>,
-    pub server_reference: Option<String>,
+    pub reason_string: Option<Box::<str>>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub server_reference: Option<Box::<str>>,
 }
 
 impl MqttRead for DisconnectProperties {
@@ -92,15 +92,15 @@ impl MqttRead for DisconnectProperties {
                     if properties.reason_string.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
                     }
-                    properties.reason_string = Some(String::read(&mut property_data)?);
+                    properties.reason_string = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::ServerReference => {
                     if properties.server_reference.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ServerReference));
                     }
-                    properties.server_reference = Some(String::read(&mut property_data)?);
+                    properties.server_reference = Some(Box::<str>::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(&mut property_data)?, Box::<str>::read(&mut property_data)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Disconnect)),
             }
 

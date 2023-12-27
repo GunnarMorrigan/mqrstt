@@ -117,6 +117,31 @@ impl MqttWrite for QoS {
     }
 }
 
+impl MqttRead for Box<str> {
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
+        let content = Bytes::read(buf)?;
+
+        match String::from_utf8(content.to_vec()) {
+            Ok(s) => Ok(s.into()),
+            Err(e) => Err(DeserializeError::Utf8Error(e)),
+        }
+    }
+}
+
+impl MqttWrite for Box<str> {
+    #[inline(always)]
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        self.as_ref().write(buf)
+    }
+}
+
+impl WireLength for Box<str> {
+    #[inline(always)]
+    fn wire_len(&self) -> usize {
+        self.as_ref().wire_len()
+    }
+}
+
 impl MqttWrite for &str {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.len() as u16);
@@ -890,7 +915,7 @@ mod tests {
             dup: false,
             qos: QoS::ExactlyOnce,
             retain: true,
-            topic: "test/123/test/blabla".to_string(),
+            topic: "test/123/test/blabla".into(),
             packet_identifier: Some(13779),
             publish_properties: PublishProperties {
                 payload_format_indicator: Some(1),

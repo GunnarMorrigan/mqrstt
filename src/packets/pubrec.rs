@@ -81,8 +81,8 @@ impl WireLength for PubRec {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
 pub struct PubRecProperties {
-    pub reason_string: Option<String>,
-    pub user_properties: Vec<(String, String)>,
+    pub reason_string: Option<Box::<str>>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
 }
 
 impl PubRecProperties {
@@ -110,9 +110,9 @@ impl MqttRead for PubRecProperties {
                     if properties.reason_string.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
                     }
-                    properties.reason_string = Some(String::read(buf)?);
+                    properties.reason_string = Some(Box::<str>::read(buf)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(buf)?, String::read(buf)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(buf)?, Box::<str>::read(buf)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubRec)),
             }
             if buf.is_empty() {

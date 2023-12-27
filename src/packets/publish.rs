@@ -20,7 +20,7 @@ pub struct Publish {
 
     /// 3.3.2.1 Topic Name
     /// The Topic Name identifies the information channel to which Payload data is published.
-    pub topic: String,
+    pub topic: Box<str>,
 
     /// 3.3.2.2 Packet Identifier
     /// The Packet Identifier field is only present in PUBLISH packets where the QoS level is 1 or 2. Section 2.2.1 provides more information about Packet Identifiers.
@@ -34,12 +34,12 @@ pub struct Publish {
 }
 
 impl Publish {
-    pub fn new(qos: QoS, retain: bool, topic: String, packet_identifier: Option<u16>, publish_properties: PublishProperties, payload: Bytes) -> Self {
+    pub fn new<S: AsRef<str>>(qos: QoS, retain: bool, topic: S, packet_identifier: Option<u16>, publish_properties: PublishProperties, payload: Bytes) -> Self {
         Self {
             dup: false,
             qos,
             retain,
-            topic,
+            topic: topic.as_ref().into(),
             packet_identifier,
             publish_properties,
             payload,
@@ -57,7 +57,7 @@ impl VariableHeaderRead for Publish {
         let qos = QoS::from_u8((flags & 0b110) >> 1)?;
         let retain = flags & 0b1 != 0;
 
-        let topic = String::read(&mut buf)?;
+        let topic = Box::<str>::read(&mut buf)?;
         let mut packet_identifier = None;
         if qos != QoS::AtMostOnce {
             packet_identifier = Some(u16::read(&mut buf)?);
@@ -138,7 +138,7 @@ pub struct PublishProperties {
 
     /// 3.3.2.3.5 Response Topic
     /// 8 (0x08) Byte, Identifier of the Response Topic.
-    pub response_topic: Option<String>,
+    pub response_topic: Option<Box<str>>,
 
     /// 3.3.2.3.6 Correlation Data
     /// 9 (0x09) Byte, Identifier of the Correlation Data.
@@ -150,11 +150,11 @@ pub struct PublishProperties {
 
     /// 3.3.2.3.7 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
 
     /// 3.3.2.3.9 Content Type
     /// 3 (0x03) Identifier of the Content Type
-    pub content_type: Option<String>,
+    pub content_type: Option<Box<str>>,
 }
 
 impl MqttRead for PublishProperties {
@@ -195,7 +195,7 @@ impl MqttRead for PublishProperties {
                     if properties.response_topic.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic));
                     }
-                    properties.response_topic = Some(String::read(&mut property_data)?);
+                    properties.response_topic = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::CorrelationData => {
                     if properties.correlation_data.is_some() {
@@ -206,12 +206,12 @@ impl MqttRead for PublishProperties {
                 PropertyType::SubscriptionIdentifier => {
                     properties.subscription_identifier.push(read_variable_integer(&mut property_data)?.0);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(&mut property_data)?, Box::<str>::read(&mut property_data)?)),
                 PropertyType::ContentType => {
                     if properties.content_type.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ContentType));
                     }
-                    properties.content_type = Some(String::read(&mut property_data)?);
+                    properties.content_type = Some(Box::<str>::read(&mut property_data)?);
                 }
                 t => return Err(DeserializeError::UnexpectedProperty(t, PacketType::Publish)),
             }
@@ -242,7 +242,7 @@ impl MqttWrite for PublishProperties {
         }
         if let Some(response_topic) = &self.response_topic {
             buf.put_u8(PropertyType::ResponseTopic.to_u8());
-            response_topic.write(buf)?;
+            response_topic.as_ref().write(buf)?;
         }
         if let Some(correlation_data) = &self.correlation_data {
             buf.put_u8(PropertyType::CorrelationData.to_u8());

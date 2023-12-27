@@ -41,7 +41,7 @@ impl WireLength for Auth {
 pub struct AuthProperties {
     /// 3.15.2.2.2 Authentication Method
     /// 21 (0x15) Byte, Identifier of the Authentication Method.
-    pub authentication_method: Option<String>,
+    pub authentication_method: Option<Box<str>>,
 
     /// 3.15.2.2.3 Authentication Data
     /// 22 (0x16) Byte, Identifier of the Authentication Data
@@ -49,11 +49,11 @@ pub struct AuthProperties {
 
     /// 3.15.2.2.4 Reason String
     /// 31 (0x1F) Byte, Identifier of the Reason String
-    pub reason_string: Option<String>,
+    pub reason_string: Option<Box<str>>,
 
     /// 3.15.2.2.5 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
 }
 
 impl MqttRead for AuthProperties {
@@ -76,14 +76,14 @@ impl MqttRead for AuthProperties {
                     if properties.reason_string.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));
                     }
-                    properties.reason_string = Some(String::read(&mut property_data)?);
+                    properties.reason_string = Some(Box::<str>::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(&mut property_data)?, Box::<str>::read(&mut property_data)?)),
                 PropertyType::AuthenticationMethod => {
                     if properties.authentication_method.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
                     }
-                    properties.authentication_method = Some(String::read(&mut property_data)?);
+                    properties.authentication_method = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::AuthenticationData => {
                     if properties.authentication_data.is_empty() {

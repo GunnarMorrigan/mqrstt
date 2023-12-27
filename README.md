@@ -81,7 +81,7 @@ impl AsyncEventHandler for PingPong {
     }
 }
 smol::block_on(async {
-    let options = ConnectOptions::new("mqrsttSmolExample".to_string());
+    let options = ConnectOptions::new("mqrsttSmolExample");
     let (mut network, client) = new_smol(options);
     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
         .await
@@ -158,7 +158,7 @@ impl AsyncEventHandler for PingPong {
 
 #[tokio::main]
 async fn main() {
-    let options = ConnectOptions::new("TokioTcpPingPongExample".to_string());
+    let options = ConnectOptions::new("TokioTcpPingPongExample");
     
     let (mut network, client) = new_tokio(options);
     

@@ -11,7 +11,6 @@ use crate::{
         reason_codes::DisconnectReasonCode,
         Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, Subscription}, {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
     },
-    util::constants::DEFAULT_MAX_PACKET_SIZE,
 };
 
 #[derive(Debug, Clone)]
@@ -45,7 +44,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -90,7 +89,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -161,7 +160,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -187,7 +186,7 @@ impl MqttClient {
     ///
     /// # });
     /// ```
-    pub async fn publish<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
+    pub async fn publish<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
@@ -198,7 +197,7 @@ impl MqttClient {
             dup: false,
             qos,
             retain,
-            topic: topic.into(),
+            topic: topic.as_ref().into(),
             packet_identifier: pkid,
             publish_properties: PublishProperties::default(),
             payload: payload.into(),
@@ -216,7 +215,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -225,7 +224,7 @@ impl MqttClient {
     /// use bytes::Bytes;
     ///
     /// let properties = PublishProperties{
-    ///     response_topic: Some("response/topic".to_string()),
+    ///     response_topic: Some("response/topic".into()),
     ///     correlation_data: Some("correlation_data".into()),
     ///     ..Default::default()
     /// };
@@ -234,7 +233,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties).await;
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -243,7 +242,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties).await;
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -252,7 +251,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties).await;
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -262,7 +261,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtLeastOnce, true, payload, properties).await;
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -273,7 +272,7 @@ impl MqttClient {
     ///
     /// # });
     /// ```
-    pub async fn publish_with_properties<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
+    pub async fn publish_with_properties<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
@@ -282,7 +281,7 @@ impl MqttClient {
             dup: false,
             qos,
             retain,
-            topic: topic.into(),
+            topic: topic.as_ref().into(),
             packet_identifier: pkid,
             publish_properties: properties,
             payload: payload.into(),
@@ -300,7 +299,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -347,7 +346,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -417,7 +416,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -443,7 +442,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -451,7 +450,7 @@ impl MqttClient {
     /// use mqrstt::packets::reason_codes::DisconnectReasonCode;
     ///
     /// let properties = DisconnectProperties {
-    ///     reason_string: Some("Reason here".to_string()),
+    ///     reason_string: Some("Reason here".into()),
     ///     ..Default::default()
     /// };
     ///
@@ -480,7 +479,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -526,7 +525,7 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::QoS;
@@ -597,7 +596,7 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::QoS;
@@ -621,7 +620,7 @@ impl MqttClient {
     /// mqtt_client.publish("test/topic", QoS::AtMostOnce, true, payload);
     ///
     /// ```
-    pub fn publish_blocking<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
+    pub fn publish_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
@@ -632,7 +631,7 @@ impl MqttClient {
             dup: false,
             qos,
             retain,
-            topic: topic.into(),
+            topic: topic.as_ref().into(),
             packet_identifier: pkid,
             publish_properties: PublishProperties::default(),
             payload: payload.into(),
@@ -652,7 +651,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::QoS;
@@ -660,7 +659,7 @@ impl MqttClient {
     /// use bytes::Bytes;
     ///
     /// let properties = PublishProperties{
-    ///     response_topic: Some("response/topic".to_string()),
+    ///     response_topic: Some("response/topic".into()),
     ///     correlation_data: Some("correlation_data".into()),
     ///     ..Default::default()
     /// };
@@ -669,7 +668,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties);
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -678,7 +677,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties);
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -687,7 +686,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties);
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -697,7 +696,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, true, payload, properties);
     ///
     /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".to_string()),
+    /// #     response_topic: Some("response/topic".into()),
     /// #     correlation_data: Some("correlation_data".into()),
     /// #     ..Default::default()
     /// # };
@@ -707,7 +706,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, true, payload, properties);
     ///
     /// ```
-    pub fn publish_with_properties_blocking<T: Into<String>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
+    pub fn publish_with_properties_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
@@ -716,7 +715,7 @@ impl MqttClient {
             dup: false,
             qos,
             retain,
-            topic: topic.into(),
+            topic: topic.as_ref().into(),
             packet_identifier: pkid,
             publish_properties: properties,
             payload: payload.into(),
@@ -735,7 +734,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// // Unsubscribe from a single topic specified as a string:
@@ -781,7 +780,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::UnsubscribeProperties;
@@ -789,41 +788,34 @@ impl MqttClient {
     /// let properties = UnsubscribeProperties{
     ///     user_properties: vec![("property".to_string(), "value".to_string())],
     /// };
+    /// # let properties_clone = properties.clone();
     ///
     /// // Unsubscribe from a single topic specified as a string:
     /// let topic = "test/topic";
     /// mqtt_client.unsubscribe_with_properties_blocking(topic, properties);
     ///
-    /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // Unsubscribe from multiple topics specified as an array of string slices:
-    /// let topics = &["test/topic1", "test/topic2"];
+    /// let topics = ["test/topic1", "test/topic2"];
     /// mqtt_client.unsubscribe_with_properties_blocking(topics.as_slice(), properties);
     ///
-    /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///  
     /// // Unsubscribe from a single topic specified as a String:
     /// let topic = String::from("test/topic");
     /// mqtt_client.unsubscribe_with_properties_blocking(topic, properties);
     ///
-    /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///  
     /// // Unsubscribe from multiple topics specified as a Vec<String>:
     /// let topics = vec![String::from("test/topic1"), String::from("test/topic2")];
     /// mqtt_client.unsubscribe_with_properties_blocking(topics, properties);
     ///
-    /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///  
     /// // Unsubscribe from multiple topics specified as an array of String:
-    /// let topics = &[String::from("test/topic1"), String::from("test/topic2")];
+    /// let topics = ["test/topic1","test/topic2"];
     /// mqtt_client.unsubscribe_with_properties_blocking(topics.as_slice(), properties);
     /// ```
     pub fn unsubscribe_with_properties_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T, properties: UnsubscribeProperties) -> Result<(), ClientError> {
@@ -846,7 +838,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// mqtt_client.disconnect_blocking().unwrap();
@@ -870,14 +862,14 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example".to_string());
+        /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::DisconnectProperties;
     /// use mqrstt::packets::reason_codes::DisconnectReasonCode;
     ///
     /// let properties = DisconnectProperties {
-    ///     reason_string: Some("Reason here".to_string()),
+    ///     reason_string: Some("Reason here".into()),
     ///     ..Default::default()
     /// };
     ///
@@ -985,7 +977,7 @@ mod tests {
 
         if let Packet::Unsubscribe(unsub) = unsubscribe {
             assert_eq!(1, unsub.packet_identifier);
-            assert_eq!(vec!["Topic"], unsub.topics);
+            assert_eq!(vec![Box::from("Topic")], unsub.topics);
             assert_eq!(prop, unsub.properties);
         } else {
             // To make sure we did the if branch
@@ -1029,7 +1021,7 @@ mod tests {
     async fn disconnect_with_properties_test2() {
         let (client, client_to_handler_r, _) = create_new_test_client();
         let properties = DisconnectProperties {
-            reason_string: Some("TestString".to_string()),
+            reason_string: Some("TestString".into()),
             ..Default::default()
         };
 

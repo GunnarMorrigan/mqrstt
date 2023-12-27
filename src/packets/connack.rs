@@ -62,7 +62,7 @@ pub struct ConnAckProperties {
 
     /// 3.2.2.3.7 Assigned Client Identifier
     /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier.
-    pub assigned_client_id: Option<String>,
+    pub assigned_client_id: Option<Box::<str>>,
 
     /// 3.2.2.3.8 Topic Alias Maximum
     /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum.
@@ -70,11 +70,11 @@ pub struct ConnAckProperties {
 
     /// 3.2.2.3.9 Reason String
     /// 31 (0x1F) Byte Identifier of the Reason String.
-    pub reason_string: Option<String>,
+    pub reason_string: Option<Box::<str>>,
 
     /// 3.2.2.3.10 User Property
     /// 38 (0x26) Byte, Identifier of User Property.
-    pub user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
 
     /// 3.2.2.3.11 Wildcard Subscription Available
     /// 40 (0x28) Byte, Identifier of Wildcard Subscription Available.
@@ -94,15 +94,15 @@ pub struct ConnAckProperties {
 
     /// 3.2.2.3.15 Response Information
     /// 26 (0x1A) Byte, Identifier of the Response Information.
-    pub response_info: Option<String>,
+    pub response_info: Option<Box::<str>>,
 
     /// 3.2.2.3.16 Server Reference
     /// 28 (0x1C) Byte, Identifier of the Server Reference
-    pub server_reference: Option<String>,
+    pub server_reference: Option<Box::<str>>,
 
     /// 3.2.2.3.17 Authentication Method
     /// 21 (0x15) Byte, Identifier of the Authentication Method
-    pub authentication_method: Option<String>,
+    pub authentication_method: Option<Box::<str>>,
 
     /// 3.2.2.3.18 Authentication Data
     /// 22 (0x16) Byte, Identifier of the Authentication Data
@@ -159,7 +159,7 @@ impl MqttRead for ConnAckProperties {
                     if properties.assigned_client_id.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::AssignedClientIdentifier));
                     }
-                    properties.assigned_client_id = Some(String::read(&mut property_data)?);
+                    properties.assigned_client_id = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::TopicAliasMaximum => {
                     if properties.topic_alias_maximum.is_some() {
@@ -171,9 +171,9 @@ impl MqttRead for ConnAckProperties {
                     if properties.reason_string.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
                     }
-                    properties.reason_string = Some(String::read(&mut property_data)?);
+                    properties.reason_string = Some(Box::<str>::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(&mut property_data)?, Box::<str>::read(&mut property_data)?)),
                 PropertyType::WildcardSubscriptionAvailable => {
                     if properties.wildcards_available.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::WildcardSubscriptionAvailable));
@@ -202,19 +202,19 @@ impl MqttRead for ConnAckProperties {
                     if properties.response_info.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseInformation));
                     }
-                    properties.response_info = Some(String::read(&mut property_data)?);
+                    properties.response_info = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::ServerReference => {
                     if properties.server_reference.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ServerReference));
                     }
-                    properties.server_reference = Some(String::read(&mut property_data)?);
+                    properties.server_reference = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::AuthenticationMethod => {
                     if properties.authentication_method.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
                     }
-                    properties.authentication_method = Some(String::read(&mut property_data)?);
+                    properties.authentication_method = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::AuthenticationData => {
                     if properties.authentication_data.is_some() {

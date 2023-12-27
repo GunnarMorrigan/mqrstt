@@ -65,9 +65,9 @@ pub struct Connect {
     pub last_will: Option<LastWill>,
 
     /// 3.1.2.8 User Name Flag
-    pub username: Option<String>,
+    pub username: Option<Box<str>>,
     /// 3.1.2.9 Password Flag
-    pub password: Option<String>,
+    pub password: Option<Box<str>>,
 
     /// 3.1.2.10 Keep Alive
     /// Byte 9 and 10
@@ -77,7 +77,7 @@ pub struct Connect {
     pub connect_properties: ConnectProperties,
 
     /// 3.1.3.1 Client Identifier (ClientID)
-    pub client_id: String,
+    pub client_id: Box<str>,
 }
 
 impl Default for Connect {
@@ -90,7 +90,7 @@ impl Default for Connect {
             password: None,
             keep_alive: 60,
             connect_properties: ConnectProperties::default(),
-            client_id: "MQRSTT".to_string(),
+            client_id: "MQRSTT".into(),
         }
     }
 }
@@ -110,7 +110,7 @@ impl VariableHeaderRead for Connect {
 
         let connect_properties = ConnectProperties::read(&mut buf)?;
 
-        let client_id = String::read(&mut buf)?;
+        let client_id = Box::<str>::read(&mut buf)?;
         let mut last_will = None;
         if connect_flags.will_flag {
             let retain = connect_flags.will_retain;
@@ -118,8 +118,8 @@ impl VariableHeaderRead for Connect {
             last_will = Some(LastWill::read(connect_flags.will_qos, retain, &mut buf)?);
         }
 
-        let username = if connect_flags.username { Some(String::read(&mut buf)?) } else { None };
-        let password = if connect_flags.password { Some(String::read(&mut buf)?) } else { None };
+        let username = if connect_flags.username { Some(Box::<str>::read(&mut buf)?) } else { None };
+        let password = if connect_flags.password { Some(Box::<str>::read(&mut buf)?) } else { None };
 
         let connect = Connect {
             protocol_version,
@@ -305,11 +305,11 @@ pub struct ConnectProperties {
 
     /// 3.1.2.11.8 User Property
     /// 38 (0x26) Byte, Identifier of the User Property
-    pub user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
 
     /// 3.1.2.11.9 Authentication Method
     /// 21 (0x15) Byte, Identifier of the Authentication Method
-    pub authentication_method: Option<String>,
+    pub authentication_method: Option<Box::<str>>,
 
     /// 3.1.2.11.10 Authentication Data
     /// 22 (0x16) Byte, Identifier of the Authentication Data
@@ -416,12 +416,12 @@ impl MqttRead for ConnectProperties {
                     }
                     properties.request_problem_information = Some(property_data.get_u8());
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(&mut property_data)?, Box::<str>::read(&mut property_data)?)),
                 PropertyType::AuthenticationMethod => {
                     if properties.authentication_method.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod));
                     }
-                    properties.authentication_method = Some(String::read(&mut property_data)?);
+                    properties.authentication_method = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::AuthenticationData => {
                     if properties.authentication_data.is_empty() {
@@ -493,24 +493,24 @@ pub struct LastWill {
     /// 3.1.3.2 Will properties
     pub last_will_properties: LastWillProperties,
     /// 3.1.3.3 Will Topic
-    pub topic: String,
+    pub topic: Box::<str>,
     /// 3.1.3.4 Will payload
     pub payload: Bytes,
 }
 
 impl LastWill {
-    pub fn new<T: Into<String>, P: Into<Vec<u8>>>(qos: QoS, retain: bool, topic: T, payload: P) -> LastWill {
+    pub fn new<T: AsRef<str>, P: Into<Vec<u8>>>(qos: QoS, retain: bool, topic: T, payload: P) -> LastWill {
         Self {
             qos,
             retain,
             last_will_properties: LastWillProperties::default(),
-            topic: topic.into(),
+            topic: topic.as_ref().into(),
             payload: Bytes::from(payload.into()),
         }
     }
     pub fn read(qos: QoS, retain: bool, buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let last_will_properties = LastWillProperties::read(buf)?;
-        let topic = String::read(buf)?;
+        let topic = Box::<str>::read(buf)?;
         let payload = Bytes::read(buf)?;
 
         Ok(Self {
@@ -549,13 +549,13 @@ pub struct LastWillProperties {
     /// 3.1.3.2.4 Message Expiry Interval
     message_expiry_interval: Option<u32>,
     /// 3.1.3.2.5 Content Type
-    content_type: Option<String>,
+    content_type: Option<Box::<str>>,
     /// 3.1.3.2.6 Response Topic
-    response_topic: Option<String>,
+    response_topic: Option<Box::<str>>,
     /// 3.1.3.2.7 Correlation Data
     correlation_data: Option<Bytes>,
     /// 3.1.3.2.8 User Property
-    user_properties: Vec<(String, String)>,
+    user_properties: Vec<(Box::<str>, Box::<str>)>,
 }
 
 impl MqttRead for LastWillProperties {
@@ -595,13 +595,13 @@ impl MqttRead for LastWillProperties {
                     if properties.content_type.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ContentType));
                     }
-                    properties.content_type = Some(String::read(&mut property_data)?);
+                    properties.content_type = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::ResponseTopic => {
                     if properties.response_topic.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic));
                     }
-                    properties.response_topic = Some(String::read(&mut property_data)?);
+                    properties.response_topic = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::CorrelationData => {
                     if properties.correlation_data.is_some() {
@@ -609,7 +609,7 @@ impl MqttRead for LastWillProperties {
                     }
                     properties.correlation_data = Some(Bytes::read(&mut property_data)?);
                 }
-                PropertyType::UserProperty => properties.user_properties.push((String::read(&mut property_data)?, String::read(&mut property_data)?)),
+                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(&mut property_data)?, Box::<str>::read(&mut property_data)?)),
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Connect)),
             }
 

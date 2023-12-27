@@ -66,7 +66,7 @@ fn very_large_publish(id: u16, repeat: usize) -> Packet {
         dup: false,
         qos: mqrstt::packets::QoS::ExactlyOnce,
         retain: false,
-        topic: "BlaBla".to_string(),
+        topic: "BlaBla".into(),
         packet_identifier: Some(id),
         publish_properties: Default::default(),
         payload: Bytes::from_iter([0u8, 1u8, 2, 3, 4].repeat(repeat)),

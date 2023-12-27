@@ -49,9 +49,9 @@ impl VariableHeaderWrite for UnsubAck {
 pub struct UnsubAckProperties {
     /// 3.11.2.1.2 Reason String
     /// 31 (0x1F) Byte, Identifier of the Reason String.
-    pub reason_string: Option<String>,
+    pub reason_string: Option<Box<str>>,
 
-    pub user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl MqttRead for UnsubAckProperties {
@@ -72,13 +72,13 @@ impl MqttRead for UnsubAckProperties {
             match PropertyType::read(&mut properties_data)? {
                 PropertyType::ReasonString => {
                     if properties.reason_string.is_none() {
-                        properties.reason_string = Some(String::read(&mut properties_data)?);
+                        properties.reason_string = Some(Box::<str>::read(&mut properties_data)?);
                     } else {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifier));
                     }
                 }
                 PropertyType::UserProperty => {
-                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
+                    properties.user_properties.push((Box::<str>::read(&mut properties_data)?, Box::<str>::read(&mut properties_data)?));
                 }
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::UnsubAck)),
             }

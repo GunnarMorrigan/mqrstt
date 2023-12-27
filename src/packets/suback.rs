@@ -62,7 +62,7 @@ pub struct SubAckProperties {
 
     /// 3.8.2.1.3 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(String, String)>,
+    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
 }
 
 impl MqttRead for SubAckProperties {
@@ -91,7 +91,7 @@ impl MqttRead for SubAckProperties {
                     }
                 }
                 PropertyType::UserProperty => {
-                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
+                    properties.user_properties.push((Box::<str>::read(&mut properties_data)?, Box::<str>::read(&mut properties_data)?));
                 }
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::SubAck)),
             }

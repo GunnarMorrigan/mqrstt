@@ -11,11 +11,11 @@ use bytes::BufMut;
 pub struct Unsubscribe {
     pub packet_identifier: u16,
     pub properties: UnsubscribeProperties,
-    pub topics: Vec<String>,
+    pub topics: Vec<Box<str>>,
 }
 
 impl Unsubscribe {
-    pub fn new(packet_identifier: u16, topics: Vec<String>) -> Self {
+    pub fn new(packet_identifier: u16, topics: Vec<Box<str>>) -> Self {
         Self {
             packet_identifier,
             properties: UnsubscribeProperties::default(),
@@ -30,7 +30,7 @@ impl VariableHeaderRead for Unsubscribe {
         let properties = UnsubscribeProperties::read(&mut buf)?;
         let mut topics = vec![];
         loop {
-            let topic = String::read(&mut buf)?;
+            let topic = Box::<str>::read(&mut buf)?;
 
             topics.push(topic);
 
@@ -141,35 +141,105 @@ impl WireLength for UnsubscribeProperties {
     }
 }
 
-pub struct UnsubscribeTopics(pub Vec<String>);
 
+trait IntoUnsubscribeTopic{
+    fn into(value: Self) -> Box<str>;
+}
+
+impl IntoUnsubscribeTopic for &str {
+    #[inline]
+    fn into(value: Self) -> Box<str> {
+        Box::from(value)
+    }
+}
+impl IntoUnsubscribeTopic for String {
+    #[inline]
+    fn into(value: Self) -> Box<str> {
+        Box::from(value.as_str())
+    }
+}
+impl IntoUnsubscribeTopic for &String {
+    #[inline]
+    fn into(value: Self) -> Box<str> {
+        Box::from(value.as_str())
+    }
+}
+impl IntoUnsubscribeTopic for Box<str> {
+    #[inline]
+    fn into(value: Self) -> Box<str> {
+        value
+    }
+}
+
+pub struct UnsubscribeTopics(pub Vec<Box<str>>);
+// -------------------- Simple types --------------------
 impl From<&str> for UnsubscribeTopics {
+    #[inline]
     fn from(value: &str) -> Self {
-        Self(vec![value.to_string()])
+        Self(vec![Box::from(value)])
     }
 }
-
-impl From<&[&str]> for UnsubscribeTopics {
-    fn from(value: &[&str]) -> Self {
-        Self(value.iter().map(|s| s.to_string()).collect::<Vec<_>>())
-    }
-}
-
 impl From<String> for UnsubscribeTopics {
+    #[inline]
     fn from(value: String) -> Self {
+        Self(vec![Box::from(value.as_str())])
+    }
+}
+impl From<&String> for UnsubscribeTopics {
+    #[inline]
+    fn from(value: &String) -> Self {
+        Self(vec![Box::from(value.as_str())])
+    }
+}
+impl From<Box<str>> for UnsubscribeTopics {
+    #[inline]
+    fn from(value: Box<str>) -> Self {
         Self(vec![value])
     }
 }
-
-impl From<Vec<String>> for UnsubscribeTopics {
-    fn from(value: Vec<String>) -> Self {
-        Self(value)
+// -------------------- Arrays --------------------
+impl<T, const S: usize> From<&[T; S]> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+    fn from(value: &[T; S]) -> Self {
+        Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
+    }
+}
+// -------------------- Slices --------------------
+impl<T> From<&[T]> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+    fn from(value: &[T]) -> Self {
+        Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
+    }
+}
+// -------------------- Iterators --------------------
+impl<T> FromIterator<T> for UnsubscribeTopics where T: IntoUnsubscribeTopic,
+{
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
+        Self(iter.into_iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
     }
 }
 
-impl From<&[String]> for UnsubscribeTopics {
-    fn from(value: &[String]) -> Self {
-        Self(value.to_vec())
+// impl<T: ?Sized> From<&[&T]> for UnsubscribeTopics
+// where
+//     SingleUnsubscribeTopic: for<'any> From<&'any T>,
+// {
+//     fn from(value: &[&T]) -> Self {
+//         Self(
+//             value
+//                 .iter()
+//                 .map(|val| SingleUnsubscribeTopic::from(val).0)
+//                 .collect(),
+//         )
+//     }
+// }
+// -------------------- Vecs --------------------
+impl<T> From<Vec<T>> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+    fn from(value: Vec<T>) -> Self {
+        Self(value.into_iter().map(|val| IntoUnsubscribeTopic::into(&val)).collect())
+    }
+}
+
+impl<T> From<&Vec<T>> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+    fn from(value: &Vec<T>) -> Self {
+        Self(value.into_iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
     }
 }
 

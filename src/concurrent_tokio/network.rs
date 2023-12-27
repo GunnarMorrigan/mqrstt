@@ -64,7 +64,7 @@ impl<H, S> Network<H, S> {
 }
 
 /// Tokio impl
-#[cfg(feature = "tokio")]
+#[cfg(feature = "concurrent_tokio")]
 impl<H, S> Network<H, S>
 where
     H: AsyncEventHandler + Clone + Send + Sync + 'static,
@@ -83,13 +83,11 @@ where
         }
 
         let packets = self.state_handler.handle_incoming_connack(&conn_ack)?;
-
         handler.handle(Packet::ConnAck(conn_ack)).await;
         if let Some(mut packets) = packets {
             network.write_all(&mut packets).await?;
-
+            self.last_network_action = Instant::now();
         }
-        self.last_network_action = Instant::now();
 
         self.network = Some(network.split());
         self.handler = Some(handler);
@@ -184,7 +182,7 @@ pub struct NetworkReader<H, S> {
     to_writer_s: Sender<Packet>,
 }
 
-#[cfg(feature = "tokio")]
+#[cfg(feature = "concurrent_tokio")]
 impl<H, S> NetworkReader<H, S>
 where
     H: AsyncEventHandler + Clone + Send + Sync + 'static,
@@ -263,7 +261,6 @@ pub struct NetworkWriter<S> {
     to_network_r: Receiver<Packet>,
 }
 
-#[cfg(feature = "tokio")]
 impl<S> NetworkWriter<S>
 where
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin,

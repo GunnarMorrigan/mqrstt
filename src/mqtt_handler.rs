@@ -1,5 +1,5 @@
 use std::borrow::Borrow;
-use std::cell::{Ref, OnceCell};
+use std::cell::{OnceCell, Ref};
 use std::sync::atomic::AtomicBool;
 
 use crate::available_packet_ids::AvailablePacketIds;
@@ -50,8 +50,7 @@ impl StateHandler {
     /// true is returned if the users handler should be called
     /// false otherwise
     pub fn handle_incoming_packet(&self, packet: &Packet) -> Result<(Option<Packet>, bool), HandlerError> {
-        Ok(
-            match packet {
+        Ok(match packet {
             Packet::Publish(publish) => self.handle_incoming_publish(publish),
             Packet::PubAck(puback) => self.handle_incoming_puback(puback),
             Packet::PubRec(pubrec) => self.handle_incoming_pubrec(pubrec),
@@ -60,8 +59,7 @@ impl StateHandler {
             Packet::SubAck(suback) => self.handle_incoming_suback(suback),
             Packet::UnsubAck(unsuback) => self.handle_incoming_unsuback(unsuback),
             a => return Err(HandlerError::UnexpectedPacket(a.packet_type())),
-           }?
-        )
+        }?)
     }
 
     fn handle_incoming_publish(&self, publish: &Publish) -> Result<(Option<Packet>, bool), HandlerError> {
@@ -157,7 +155,7 @@ impl StateHandler {
         }
     }
 
-    fn handle_incoming_unsuback(&self, unsuback: &UnsubAck,) -> Result<(Option<Packet>, bool), HandlerError> {
+    fn handle_incoming_unsuback(&self, unsuback: &UnsubAck) -> Result<(Option<Packet>, bool), HandlerError> {
         if self.state.remove_outgoing_unsub(unsuback.packet_identifier) {
             self.state.make_pkid_available(unsuback.packet_identifier)?;
             Ok((None, false))
@@ -177,8 +175,7 @@ impl StateHandler {
                 self.state.make_pkid_available(i)?;
             }
             Ok(Some(republish))
-        }
-        else {
+        } else {
             Ok(None)
         }
     }
@@ -247,16 +244,17 @@ mod handler_tests {
     use async_channel::Receiver;
 
     use crate::{
+        available_packet_ids::AvailablePacketIds,
         packets::{
             reason_codes::{PubCompReasonCode, PubRecReasonCode, PubRelReasonCode, SubAckReasonCode, UnsubAckReasonCode},
             Packet, QoS, UnsubAck, UnsubAckProperties, {PubComp, PubCompProperties}, {PubRec, PubRecProperties}, {PubRel, PubRelProperties}, {SubAck, SubAckProperties},
         },
         tests::test_packets::{create_connack_packet, create_puback_packet, create_publish_packet, create_subscribe_packet, create_unsubscribe_packet},
-        AsyncEventHandler, ConnectOptions, StateHandler, available_packet_ids::AvailablePacketIds,
+        AsyncEventHandler, ConnectOptions, StateHandler,
     };
 
     pub struct Nop {}
-    
+
     impl AsyncEventHandler for Nop {
         async fn handle(&self, _event: Packet) {}
     }
@@ -264,8 +262,8 @@ mod handler_tests {
     fn handler(clean_start: bool) -> (StateHandler, Receiver<u16>) {
         let (apkids, apkids_r) = AvailablePacketIds::new(100);
 
-        let mut opt = ConnectOptions::new("test123123".to_string(), clean_start);
-        opt.set_receive_maximum(100);
+        let mut opt = ConnectOptions::new("test123123");
+        opt.set_receive_maximum(100).set_clean_start(clean_start);
 
         (StateHandler::new(&opt, apkids), apkids_r)
     }
@@ -314,26 +312,25 @@ mod handler_tests {
     #[tokio::test]
     async fn incoming_publish_qos_1() {
         let (mut handler, _apkid) = handler(false);
-        let mut resp_vec = Vec::new();
 
         let pub_packet = create_publish_packet(QoS::AtLeastOnce, false, false, Some(1));
 
-        handler.handle_incoming_packet(&pub_packet).unwrap();
+        let (packet, should_handle) = handler.handle_incoming_packet(&pub_packet).unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub_order().is_empty());
         assert!(handler.state.outgoing_rel().is_empty());
         assert!(handler.state.outgoing_sub().is_empty());
 
-        assert_eq!(1, resp_vec.len());
+        assert!(should_handle);
+        assert!(packet.is_some());
         let expected_puback = create_puback_packet(1);
-        assert_eq!(expected_puback, resp_vec.pop().unwrap());
+        assert_eq!(expected_puback, packet.unwrap());
     }
 
     #[tokio::test]
     async fn outgoing_publish_qos_2() {
         let (mut handler, apkid) = handler(false);
-        let mut resp_vec = Vec::new();
 
         let pkid = apkid.recv().await.unwrap();
         let pub_packet = create_publish_packet(QoS::ExactlyOnce, false, false, Some(pkid));
@@ -352,7 +349,7 @@ mod handler_tests {
             properties: PubRecProperties::default(),
         });
 
-        handler.handle_incoming_packet(&pubrec).unwrap();
+        let (packet1, should_handle) = handler.handle_incoming_packet(&pubrec).unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub()[pkid as usize - 1].clone().is_none());
@@ -366,7 +363,7 @@ mod handler_tests {
             reason_code: PubRelReasonCode::Success,
             properties: PubRelProperties::default(),
         });
-        assert_eq!(expected_pubrel, resp_vec.pop().unwrap());
+        assert_eq!(expected_pubrel, packet1.unwrap());
 
         let pubcomp = Packet::PubComp(PubComp {
             packet_identifier: pkid,
@@ -374,9 +371,10 @@ mod handler_tests {
             properties: PubCompProperties::default(),
         });
 
-        handler.handle_incoming_packet(&pubcomp).unwrap();
+        let (packet3, should_handle) = handler.handle_incoming_packet(&pubcomp).unwrap();
 
-        assert!(resp_vec.is_empty());
+        assert!(packet3.is_none());
+        assert!(!should_handle);
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub()[pkid as usize - 1].clone().is_none());
         assert!(handler.state.outgoing_pub_order().is_empty());
@@ -418,7 +416,7 @@ mod handler_tests {
             properties: PubRelProperties::default(),
         });
 
-        let (reply_packet, should_handle) =  handler.handle_incoming_packet(&pubrel).unwrap();
+        let (reply_packet, should_handle) = handler.handle_incoming_packet(&pubrel).unwrap();
 
         let pubcomp = Packet::PubComp(PubComp {
             packet_identifier: pkid,
@@ -487,10 +485,9 @@ mod handler_tests {
             properties: UnsubAckProperties::default(),
         });
 
-        let res = handler.handle_incoming_packet(&unsuback).unwrap();
+        let (packet, should_handle) = handler.handle_incoming_packet(&unsuback).unwrap();
 
-        
-        assert!(res.0.is_none());
+        assert!(packet.is_none());
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub_order().is_empty());
         assert!(handler.state.outgoing_rel().is_empty());
@@ -500,9 +497,9 @@ mod handler_tests {
 
     #[tokio::test]
     async fn retransmit_test_1() {
-        let (mut handler, apkid) = handler(false);
+        let (handler, apkid) = handler(false);
         let mut stored_published_packets = Vec::new();
-        let resp_vec = Vec::new();
+        // let resp_vec = Vec::new();
 
         let pkid = apkid.recv().await.unwrap();
         let pub1 = create_publish_packet(QoS::AtLeastOnce, false, false, Some(pkid));
@@ -527,15 +524,15 @@ mod handler_tests {
 
         assert_eq!(100 - 4, apkid.len());
 
-        let connack = create_connack_packet(true);
-        handler.handle_incoming_packet(&connack).unwrap();
+        let Packet::ConnAck(conn_ack) = create_connack_packet(true) else { panic!("Should return ConnAck packet") };
+        let retransmit_vec = handler.handle_incoming_connack(&conn_ack).unwrap().unwrap();
 
         assert_eq!(100 - 2, apkid.len());
 
-        assert_eq!(stored_published_packets.len(), resp_vec.len());
+        assert_eq!(stored_published_packets.len(), retransmit_vec.len());
         for i in 0..stored_published_packets.len() {
             let expected_pub = stored_published_packets.get(i).unwrap();
-            let res_pub = resp_vec.get(i).unwrap();
+            let res_pub = retransmit_vec.get(i).unwrap();
             match (expected_pub, res_pub) {
                 (Packet::Publish(expected), Packet::Publish(res)) => {
                     assert!(res.dup);
@@ -546,7 +543,7 @@ mod handler_tests {
                     assert_eq!(expected.publish_properties, res.publish_properties);
                     assert_eq!(expected.payload, res.payload);
                 }
-                (_, _) => panic!(),
+                (_, _) => panic!("Should only contain publish packets"),
             }
         }
     }

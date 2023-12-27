@@ -4,6 +4,7 @@ use futures::FutureExt;
 
 use std::time::{Duration, Instant};
 
+use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
@@ -22,14 +23,14 @@ pub struct Network<S> {
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
-    keep_alive_interval_s: u64,
+    keep_alive_interval: Duration,
     options: ConnectOptions,
 
     last_network_action: Instant,
     await_pingresp: Option<Instant>,
     perform_keep_alive: bool,
 
-    mqtt_handler: StateHandler,
+    state_handler: StateHandler,
     outgoing_packet_buffer: Vec<Packet>,
     incoming_packet_buffer: Vec<Packet>,
 
@@ -37,18 +38,19 @@ pub struct Network<S> {
 }
 
 impl<S> Network<S> {
-    pub fn new(options: ConnectOptions, mqtt_handler: StateHandler, to_network_r: Receiver<Packet>) -> Self {
+    pub fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
+        let state_handler = StateHandler::new(&options, apkids);
         Self {
             network: None,
 
-            keep_alive_interval_s: options.keep_alive_interval_s,
+            keep_alive_interval: options.keep_alive_interval,
             options,
 
             last_network_action: Instant::now(),
             await_pingresp: None,
             perform_keep_alive: true,
 
-            mqtt_handler,
+            state_handler,
             outgoing_packet_buffer: Vec::new(),
             incoming_packet_buffer: Vec::new(),
 
@@ -66,23 +68,26 @@ where
     where
         H: AsyncEventHandler,
     {
-        let (network, connack) = Stream::connect(&self.options, stream).await?;
+        let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
-        self.network = Some(network);
-
-        if let Some(keep_alive_interval) = connack.connack_properties.server_keep_alive {
-            self.keep_alive_interval_s = keep_alive_interval as u64;
+        
+        if let Some(keep_alive_interval) = conn_ack.connack_properties.server_keep_alive {
+            self.keep_alive_interval = Duration::from_secs(keep_alive_interval as u64);
         }
-        if self.keep_alive_interval_s == 0 {
+        if self.keep_alive_interval.is_zero() {
             self.perform_keep_alive = false;
         }
+        
+        let packets = self.state_handler.handle_incoming_connack(&conn_ack)?;
+        handler.handle(Packet::ConnAck(conn_ack)).await;
+        if let Some(mut packets) = packets {
+            network.write_all(&mut packets).await?;
+            self.last_network_action = Instant::now();
+        }
 
-        let packet = Packet::ConnAck(connack);
-
-        // self.mqtt_handler.handle_incoming_packet(&packet, &mut self.outgoing_packet_buffer)?;
-        // handler.handle(packet).await;
-
+        self.network = Some(network);
+        
         Ok(())
     }
 
@@ -124,11 +129,11 @@ where
         let Network {
             network,
             options: _,
-            keep_alive_interval_s,
+            keep_alive_interval,
             last_network_action,
             await_pingresp,
             perform_keep_alive,
-            mqtt_handler,
+            state_handler,
             outgoing_packet_buffer,
             incoming_packet_buffer,
             to_network_r,
@@ -138,9 +143,9 @@ where
         if !(*perform_keep_alive) {
             sleep = Duration::new(3600, 0);
         } else if let Some(instant) = await_pingresp {
-            sleep = *instant + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
+            sleep = *instant + *keep_alive_interval - Instant::now();
         } else {
-            sleep = *last_network_action + Duration::from_secs(*keep_alive_interval_s) - Instant::now();
+            sleep = *last_network_action + *keep_alive_interval - Instant::now();
         }
 
         if let Some(stream) = network {
@@ -165,9 +170,17 @@ where
                                 return Ok(NetworkStatus::IncomingDisconnect);
                             }
                             packet => {
-                                // if mqtt_handler.handle_incoming_packet(&packet, outgoing_packet_buffer)?{
-                                //    handler.handle(packet).await;
-                                // }
+                                match state_handler.handle_incoming_packet(&packet)? {
+                                    (maybe_reply_packet, true) => {
+                                        if let Some(reply_packet) = maybe_reply_packet {
+                                            outgoing_packet_buffer.push(reply_packet);
+                                        }
+                                    },
+                                    (Some(reply_packet), false) => {
+                                        outgoing_packet_buffer.push(reply_packet);
+                                    },
+                                    (None, false) => (),
+                                }
                             }
                         }
                     }
@@ -186,7 +199,7 @@ where
                         disconnect = true;
                     }
 
-                    mqtt_handler.handle_outgoing_packet(packet)?;
+                    state_handler.handle_outgoing_packet(packet)?;
                     *last_network_action = Instant::now();
 
 

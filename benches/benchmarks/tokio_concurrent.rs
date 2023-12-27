@@ -81,7 +81,7 @@ fn tokio_concurrent(c: &mut Criterion) {
                 let _server_box = black_box(server);
                 let _addr = black_box(addr);
 
-                let options = ConnectOptions::new("test", true);
+                let options = ConnectOptions::new("test");
                 let (mut network, _) = new_tokio(options);
 
                 network.connect(tcp_stream, ()).await.unwrap();

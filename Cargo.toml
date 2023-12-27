@@ -14,8 +14,9 @@ description = "Pure rust MQTTv5 client implementation for sync and async (Smol &
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["tokio"]
-tokio = ["dep:tokio"]
+default = ["smol", "sync", "tokio_mqtt", "concurrent_tokio"]
+concurrent_tokio = ["dep:tokio", "tokio/rt"]
+tokio_mqtt = ["dep:tokio"]
 smol = ["dep:smol"]
 sync = []
 logs = ["dep:tracing"]
