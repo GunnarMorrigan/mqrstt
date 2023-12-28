@@ -186,8 +186,8 @@ mod connect_options;
 mod mqtt_handler;
 mod util;
 
-#[cfg(feature = "concurrent_tokio")]
-pub mod concurrent_tokio;
+#[cfg(any(feature = "tokio", feature = "concurrent_tokio"))]
+pub mod tokio;
 #[cfg(feature = "smol")]
 pub mod smol;
 #[cfg(feature = "sync")]
@@ -298,7 +298,7 @@ where
 /// let options = ConnectOptions::new("ExampleClient");
 /// let (network, client) = mqrstt::new_tokio::<tokio::net::TcpStream>(options);
 /// ```
-pub fn new_tokio<H, S>(options: ConnectOptions) -> (concurrent_tokio::Network<H, S>, MqttClient)
+pub fn new_tokio<H, S>(options: ConnectOptions) -> (tokio::Network<H, S>, MqttClient)
 where
     H: AsyncEventHandler + Clone + Send + Sync,
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
@@ -313,7 +313,7 @@ where
 
     let client = MqttClient::new(apkids_r, to_network_s, max_packet_size);
 
-    let network = concurrent_tokio::Network::new(options, to_network_r, apkids);
+    let network = tokio::Network::new(options, to_network_r, apkids);
 
     (network, client)
 }
@@ -501,7 +501,7 @@ mod lib_test {
 
             let (n, _) = futures::join!(
                 async {
-                    network.poll(&mut pingpong).await
+                    network.run(&mut pingpong).await
                 },
                 async {
                     client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
