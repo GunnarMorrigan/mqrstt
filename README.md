@@ -16,17 +16,17 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
 </div>
 
 ## Features
-    - MQTT v5
-    - Runtime agnostic (Smol, Tokio)
-    - Sync
-    - TLS/TCP
-    - Lean
-    - Keep alive depends on actual communication
+- MQTT v5
+- Runtime agnostic (Smol, Tokio)
+- Sync
+- TLS/TCP
+- Lean
+- Keep alive depends on actual communication
   
 ### To do
-    - no_std (Requires a lot of work to use no heap allocations and depend on stack)
-    - Even More testing
-    - More documentation
+- no_std (Requires a lot of work to use no heap allocations and depend on stack)
+- Even More testing
+- More documentation
 
 ## MSRV
 From 0.3 the tokio and smol variants will require MSRV: 1.75 due to async fn in trait feature.

@@ -737,7 +737,7 @@ mod lib_test {
 
             let (n, _) = futures::join!(
                 async {
-                    match network.poll(&mut pingresp).await {
+                    match network.run(&mut pingresp).await {
                         Ok(crate::NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
                         Ok(crate::NetworkStatus::KeepAliveTimeout) => panic!(),
                         Ok(crate::NetworkStatus::IncomingDisconnect) => panic!(),
