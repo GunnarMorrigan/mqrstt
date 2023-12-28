@@ -305,11 +305,11 @@ pub struct ConnectProperties {
 
     /// 3.1.2.11.8 User Property
     /// 38 (0x26) Byte, Identifier of the User Property
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 
     /// 3.1.2.11.9 Authentication Method
     /// 21 (0x15) Byte, Identifier of the Authentication Method
-    pub authentication_method: Option<Box::<str>>,
+    pub authentication_method: Option<Box<str>>,
 
     /// 3.1.2.11.10 Authentication Data
     /// 22 (0x16) Byte, Identifier of the Authentication Data
@@ -493,7 +493,7 @@ pub struct LastWill {
     /// 3.1.3.2 Will properties
     pub last_will_properties: LastWillProperties,
     /// 3.1.3.3 Will Topic
-    pub topic: Box::<str>,
+    pub topic: Box<str>,
     /// 3.1.3.4 Will payload
     pub payload: Bytes,
 }
@@ -549,13 +549,13 @@ pub struct LastWillProperties {
     /// 3.1.3.2.4 Message Expiry Interval
     message_expiry_interval: Option<u32>,
     /// 3.1.3.2.5 Content Type
-    content_type: Option<Box::<str>>,
+    content_type: Option<Box<str>>,
     /// 3.1.3.2.6 Response Topic
-    response_topic: Option<Box::<str>>,
+    response_topic: Option<Box<str>>,
     /// 3.1.3.2.7 Correlation Data
     correlation_data: Option<Bytes>,
     /// 3.1.3.2.8 User Property
-    user_properties: Vec<(Box::<str>, Box::<str>)>,
+    user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl MqttRead for LastWillProperties {

@@ -62,7 +62,7 @@ pub struct ConnAckProperties {
 
     /// 3.2.2.3.7 Assigned Client Identifier
     /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier.
-    pub assigned_client_id: Option<Box::<str>>,
+    pub assigned_client_id: Option<Box<str>>,
 
     /// 3.2.2.3.8 Topic Alias Maximum
     /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum.
@@ -70,11 +70,11 @@ pub struct ConnAckProperties {
 
     /// 3.2.2.3.9 Reason String
     /// 31 (0x1F) Byte Identifier of the Reason String.
-    pub reason_string: Option<Box::<str>>,
+    pub reason_string: Option<Box<str>>,
 
     /// 3.2.2.3.10 User Property
     /// 38 (0x26) Byte, Identifier of User Property.
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 
     /// 3.2.2.3.11 Wildcard Subscription Available
     /// 40 (0x28) Byte, Identifier of Wildcard Subscription Available.
@@ -94,15 +94,15 @@ pub struct ConnAckProperties {
 
     /// 3.2.2.3.15 Response Information
     /// 26 (0x1A) Byte, Identifier of the Response Information.
-    pub response_info: Option<Box::<str>>,
+    pub response_info: Option<Box<str>>,
 
     /// 3.2.2.3.16 Server Reference
     /// 28 (0x1C) Byte, Identifier of the Server Reference
-    pub server_reference: Option<Box::<str>>,
+    pub server_reference: Option<Box<str>>,
 
     /// 3.2.2.3.17 Authentication Method
     /// 21 (0x15) Byte, Identifier of the Authentication Method
-    pub authentication_method: Option<Box::<str>>,
+    pub authentication_method: Option<Box<str>>,
 
     /// 3.2.2.3.18 Authentication Data
     /// 22 (0x16) Byte, Identifier of the Authentication Data

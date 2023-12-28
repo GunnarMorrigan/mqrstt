@@ -1,9 +1,12 @@
 use std::io;
 
-use bytes::{BytesMut, Bytes, Buf};
-use tokio::io::{ReadHalf, AsyncReadExt};
+use bytes::{Buf, BytesMut};
+use tokio::io::{AsyncReadExt, ReadHalf};
 
-use crate::{packets::{Packet, error::ReadBytes, FixedHeader}, error::ConnectionError};
+use crate::{
+    error::ConnectionError,
+    packets::{error::ReadBytes, FixedHeader, Packet},
+};
 
 #[derive(Debug)]
 pub struct ReadStream<S> {
@@ -16,13 +19,12 @@ pub struct ReadStream<S> {
     read_buffer: BytesMut,
 }
 
-impl<S> ReadStream<S> where S: tokio::io::AsyncRead + Sized + Unpin {
-    pub fn new(stream: ReadHalf<S>, const_buffer: [u8; 4096], read_buffer: BytesMut) -> Self{
-        Self{
-            stream,
-            const_buffer,
-            read_buffer,
-        }
+impl<S> ReadStream<S>
+where
+    S: tokio::io::AsyncRead + Sized + Unpin,
+{
+    pub fn new(stream: ReadHalf<S>, const_buffer: [u8; 4096], read_buffer: BytesMut) -> Self {
+        Self { stream, const_buffer, read_buffer }
     }
 
     pub fn parse_message(&mut self) -> Result<Packet, ReadBytes<ConnectionError>> {

@@ -30,7 +30,7 @@ impl MqttClient {
         Self {
             available_packet_ids_r,
             to_network_s,
-            max_packet_size
+            max_packet_size,
         }
     }
 }
@@ -160,7 +160,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -215,7 +215,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -299,7 +299,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -346,7 +346,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -479,7 +479,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
     /// # smol::block_on(async {
     ///
@@ -525,7 +525,7 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::QoS;
@@ -734,7 +734,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// // Unsubscribe from a single topic specified as a string:
@@ -862,7 +862,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-        /// # let options = mqrstt::ConnectOptions::new("example_id");
+    /// # let options = mqrstt::ConnectOptions::new("example_id");
     /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
     /// use mqrstt::packets::DisconnectProperties;

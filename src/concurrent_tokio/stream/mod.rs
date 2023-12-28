@@ -11,13 +11,12 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
 
 use crate::packets::ConnAck;
+use crate::packets::{
+    error::ReadBytes,
+    reason_codes::ConnAckReasonCode,
+    {FixedHeader, Packet},
+};
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
-use crate::
-    packets::{
-        error::ReadBytes,
-        reason_codes::ConnAckReasonCode,
-        {FixedHeader, Packet, PacketType},
-    };
 
 use self::read_half::ReadStream;
 use self::write_half::WriteStream;
@@ -60,7 +59,6 @@ impl<S> Stream<S>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Sized + Unpin,
 {
-
     pub fn split(self) -> (ReadStream<S>, WriteStream<S>) {
         let Self {
             stream,
@@ -71,10 +69,7 @@ where
 
         let (read_stream, write_stream) = tokio::io::split(stream);
 
-        (
-            ReadStream::new(read_stream, const_buffer, read_buffer),
-            WriteStream::new(write_stream, write_buffer)
-        )
+        (ReadStream::new(read_stream, const_buffer, read_buffer), WriteStream::new(write_stream, write_buffer))
     }
 
     pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {

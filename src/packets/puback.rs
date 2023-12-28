@@ -76,8 +76,8 @@ impl WireLength for PubAck {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
 pub struct PubAckProperties {
-    pub reason_string: Option<Box::<str>>,
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub reason_string: Option<Box<str>>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl PubAckProperties {

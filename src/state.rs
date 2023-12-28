@@ -1,6 +1,9 @@
-use std::{collections::{BTreeSet, VecDeque}, sync::Mutex};
+use std::{
+    collections::{BTreeSet, VecDeque},
+    sync::Mutex,
+};
 
-use async_channel::Receiver;
+
 
 use crate::{
     available_packet_ids::AvailablePacketIds,
@@ -53,6 +56,9 @@ impl State {
         self.apkid.mark_available(pkid)
     }
 
+
+    /// Returns true is newly inserted.
+    /// False otherwise
     pub fn add_incoming_pub(&self, pkid: u16) -> bool {
         self.incoming_pub.lock().unwrap().insert(pkid)
     }
@@ -136,7 +142,7 @@ impl State {
         let mut outgoing_pub_order = outgoing_pub_order.lock().unwrap();
         let mut outgoing_rel = outgoing_rel.lock().unwrap();
         let mut incoming_pub = incoming_pub.lock().unwrap();
-        
+
         let mut freeable_ids = Vec::<u16>::with_capacity(outgoing_sub.len() + outgoing_unsub.len());
         // let mut freeable_ids = outgoing_sub.iter().chain(outgoing_unsub.iter()).collect::<Vec<u16>>();
         let mut retransmit = Vec::with_capacity(outgoing_pub_order.len());
@@ -173,22 +179,22 @@ impl State {
 
 #[cfg(test)]
 impl State {
-    pub fn outgoing_sub(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>, > {
+    pub fn outgoing_sub(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>> {
         self.outgoing_sub.lock().unwrap()
     }
-    pub fn outgoing_unsub(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>, > {
+    pub fn outgoing_unsub(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>> {
         self.outgoing_unsub.lock().unwrap()
     }
-    pub fn outgoing_pub(&mut self) -> std::sync::MutexGuard<'_, Vec<Option<Publish>>, > {
+    pub fn outgoing_pub(&mut self) -> std::sync::MutexGuard<'_, Vec<Option<Publish>>> {
         self.outgoing_pub.lock().unwrap()
     }
-    pub fn outgoing_pub_order(&mut self) -> std::sync::MutexGuard<'_, VecDeque<u16>, > {
+    pub fn outgoing_pub_order(&mut self) -> std::sync::MutexGuard<'_, VecDeque<u16>> {
         self.outgoing_pub_order.lock().unwrap()
     }
-    pub fn outgoing_rel(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>, > {
+    pub fn outgoing_rel(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>> {
         self.outgoing_rel.lock().unwrap()
     }
-    pub fn incoming_pub(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>, > {
+    pub fn incoming_pub(&mut self) -> std::sync::MutexGuard<'_, BTreeSet<u16>> {
         self.incoming_pub.lock().unwrap()
     }
 }

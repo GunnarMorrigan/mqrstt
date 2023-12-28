@@ -62,7 +62,7 @@ pub struct SubAckProperties {
 
     /// 3.8.2.1.3 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl MqttRead for SubAckProperties {

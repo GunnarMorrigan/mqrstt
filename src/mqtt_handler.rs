@@ -1,6 +1,6 @@
-use std::borrow::Borrow;
-use std::cell::{OnceCell, Ref};
-use std::sync::atomic::AtomicBool;
+
+
+
 
 use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
@@ -20,7 +20,7 @@ use crate::packets::{Packet, PacketType};
 use crate::packets::{PubAck, PubAckProperties};
 use crate::state::State;
 
-use async_channel::Receiver;
+
 #[cfg(feature = "logs")]
 use tracing::{debug, error, info};
 
@@ -74,13 +74,13 @@ impl StateHandler {
                 Ok((Some(Packet::PubAck(puback)), true))
             }
             QoS::ExactlyOnce => {
-                let mut should_client_handle = true;
                 let pkid = publish.packet_identifier.ok_or(HandlerError::MissingPacketId)?;
+                
+                let should_client_handle = self.state.add_incoming_pub(pkid) && !publish.dup;
 
-                if !self.state.add_incoming_pub(pkid) && !publish.dup {
-                    #[cfg(feature = "logs")]
+                #[cfg(feature = "logs")]
+                if should_client_handle {
                     error!("Received publish with an packet ID ({}) that is in use and the packet was not a duplicate", pkid,);
-                    should_client_handle = false;
                 }
                 Ok((Some(Packet::PubRec(PubRec::new(pkid))), should_client_handle))
             }
@@ -128,7 +128,7 @@ impl StateHandler {
         if !self.state.remove_incoming_pub(pubrel.packet_identifier) {
             #[cfg(feature = "logs")]
             warn!("Received an unexpected / unsolicited PubRel packet with id {}", pubrel.packet_identifier);
-            let pubcomp = PubComp::new(pubrel.packet_identifier);
+            let _pubcomp = PubComp::new(pubrel.packet_identifier);
         }
         Ok((Some(Packet::PubComp(pubcomp)), false))
     }
@@ -188,7 +188,11 @@ impl StateHandler {
             Packet::Subscribe(sub) => self.handle_outgoing_subscribe(sub),
             Packet::Unsubscribe(unsub) => self.handle_outgoing_unsubscribe(unsub),
             Packet::Disconnect(discon) => self.handle_outgoing_disconnect(discon),
-            _ => unreachable!(),
+            _a => {
+                #[cfg(test)]
+                unreachable!("Was given unexpected packet {:?} ", _a);
+                Ok(())
+            },
         }
     }
 
@@ -349,7 +353,7 @@ mod handler_tests {
             properties: PubRecProperties::default(),
         });
 
-        let (packet1, should_handle) = handler.handle_incoming_packet(&pubrec).unwrap();
+        let (packet1, _should_handle) = handler.handle_incoming_packet(&pubrec).unwrap();
 
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub()[pkid as usize - 1].clone().is_none());
@@ -389,7 +393,7 @@ mod handler_tests {
         let pkid = apkid.recv().await.unwrap();
         let pub_packet = create_publish_packet(QoS::ExactlyOnce, false, false, Some(pkid));
 
-        let (reply_packet, should_handle) = handler.handle_incoming_packet(&pub_packet).unwrap();
+        let (reply_packet, _should_handle) = handler.handle_incoming_packet(&pub_packet).unwrap();
 
         assert_eq!(1, handler.state.incoming_pub().len());
         assert!(handler.state.outgoing_pub_order().is_empty());
@@ -416,7 +420,7 @@ mod handler_tests {
             properties: PubRelProperties::default(),
         });
 
-        let (reply_packet, should_handle) = handler.handle_incoming_packet(&pubrel).unwrap();
+        let (reply_packet, _should_handle) = handler.handle_incoming_packet(&pubrel).unwrap();
 
         let pubcomp = Packet::PubComp(PubComp {
             packet_identifier: pkid,
@@ -485,7 +489,7 @@ mod handler_tests {
             properties: UnsubAckProperties::default(),
         });
 
-        let (packet, should_handle) = handler.handle_incoming_packet(&unsuback).unwrap();
+        let (packet, _should_handle) = handler.handle_incoming_packet(&unsuback).unwrap();
 
         assert!(packet.is_none());
         assert!(handler.state.incoming_pub().is_empty());
@@ -524,7 +528,9 @@ mod handler_tests {
 
         assert_eq!(100 - 4, apkid.len());
 
-        let Packet::ConnAck(conn_ack) = create_connack_packet(true) else { panic!("Should return ConnAck packet") };
+        let Packet::ConnAck(conn_ack) = create_connack_packet(true) else {
+            panic!("Should return ConnAck packet")
+        };
         let retransmit_vec = handler.handle_incoming_connack(&conn_ack).unwrap().unwrap();
 
         assert_eq!(100 - 2, apkid.len());

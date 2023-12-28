@@ -150,7 +150,7 @@ pub struct PublishProperties {
 
     /// 3.3.2.3.7 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 
     /// 3.3.2.3.9 Content Type
     /// 3 (0x03) Identifier of the Content Type

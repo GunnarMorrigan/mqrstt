@@ -11,11 +11,11 @@ use bytes::{Buf, BufMut};
 pub struct Subscribe {
     pub packet_identifier: u16,
     pub properties: SubscribeProperties,
-    pub topics: Vec<(Box::<str>, SubscriptionOptions)>,
+    pub topics: Vec<(Box<str>, SubscriptionOptions)>,
 }
 
 impl Subscribe {
-    pub fn new(packet_identifier: u16, topics: Vec<(Box::<str>, SubscriptionOptions)>) -> Self {
+    pub fn new(packet_identifier: u16, topics: Vec<(Box<str>, SubscriptionOptions)>) -> Self {
         Self {
             packet_identifier,
             properties: SubscribeProperties::default(),
@@ -96,7 +96,7 @@ pub struct SubscribeProperties {
 
     /// 3.8.2.1.3 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl MqttRead for SubscribeProperties {
@@ -244,7 +244,6 @@ impl RetainHandling {
     }
 }
 
-
 // -------------------- Simple types --------------------
 trait IntoSingleSubscription {
     fn into(value: Self) -> (Box<str>, SubscriptionOptions);
@@ -262,7 +261,7 @@ impl IntoSingleSubscription for &String {
         (Box::from(value.as_str()), SubscriptionOptions::default())
     }
 }
-impl IntoSingleSubscription for String {   
+impl IntoSingleSubscription for String {
     #[inline]
     fn into(value: Self) -> (Box<str>, SubscriptionOptions) {
         (Box::from(value.as_str()), SubscriptionOptions::default())
@@ -274,13 +273,19 @@ impl IntoSingleSubscription for Box<str> {
         (value, SubscriptionOptions::default())
     }
 }
-impl<T> IntoSingleSubscription for (T, QoS) where T: AsRef<str> {
+impl<T> IntoSingleSubscription for (T, QoS)
+where
+    T: AsRef<str>,
+{
     #[inline]
     fn into((topic, qos): Self) -> (Box<str>, SubscriptionOptions) {
         (Box::from(topic.as_ref()), SubscriptionOptions { qos, ..Default::default() })
     }
 }
-impl<T> IntoSingleSubscription for (T, SubscriptionOptions) where T: AsRef<str> {
+impl<T> IntoSingleSubscription for (T, SubscriptionOptions)
+where
+    T: AsRef<str>,
+{
     #[inline]
     fn into((topic, sub): Self) -> (Box<str>, SubscriptionOptions) {
         (Box::from(topic.as_ref()), sub)
@@ -289,7 +294,7 @@ impl<T> IntoSingleSubscription for (T, SubscriptionOptions) where T: AsRef<str> 
 
 macro_rules! impl_subscription {
     ($t:ty) => {
-        impl From<$t> for Subscription{
+        impl From<$t> for Subscription {
             #[inline]
             fn from(value: $t) -> Self {
                 Self(vec![IntoSingleSubscription::into(value)])
@@ -298,42 +303,60 @@ macro_rules! impl_subscription {
     };
 }
 
-pub struct Subscription(pub Vec<(Box::<str>, SubscriptionOptions)>);
+pub struct Subscription(pub Vec<(Box<str>, SubscriptionOptions)>);
 
 // -------------------- Simple types --------------------
 impl_subscription!(&str);
 impl_subscription!(&String);
 impl_subscription!(String);
 impl_subscription!(Box<str>);
-impl<T> From<(T,QoS)> for Subscription where (T, QoS): IntoSingleSubscription {
-    fn from(value:(T, QoS)) -> Self {
+impl<T> From<(T, QoS)> for Subscription
+where
+    (T, QoS): IntoSingleSubscription,
+{
+    fn from(value: (T, QoS)) -> Self {
         Self(vec![IntoSingleSubscription::into(value)])
     }
 }
-impl <T>From<(T, SubscriptionOptions)> for Subscription where (T, SubscriptionOptions): IntoSingleSubscription {
-    fn from(value:(T, SubscriptionOptions)) -> Self {
+impl<T> From<(T, SubscriptionOptions)> for Subscription
+where
+    (T, SubscriptionOptions): IntoSingleSubscription,
+{
+    fn from(value: (T, SubscriptionOptions)) -> Self {
         Self(vec![IntoSingleSubscription::into(value)])
     }
 }
 // -------------------- Arrays --------------------
-impl<T, const S: usize> From<&[T; S]> for Subscription where for<'any> &'any T: IntoSingleSubscription {
+impl<T, const S: usize> From<&[T; S]> for Subscription
+where
+    for<'any> &'any T: IntoSingleSubscription,
+{
     fn from(value: &[T; S]) -> Self {
         Self(value.iter().map(|val| IntoSingleSubscription::into(val)).collect())
     }
 }
 // -------------------- Slices --------------------
-impl<T> From<&[T]> for Subscription where for<'any> &'any T: IntoSingleSubscription {
+impl<T> From<&[T]> for Subscription
+where
+    for<'any> &'any T: IntoSingleSubscription,
+{
     fn from(value: &[T]) -> Self {
         Self(value.iter().map(|val| IntoSingleSubscription::into(val)).collect())
     }
 }
 // -------------------- Vecs --------------------
-impl<T> From<Vec<T>> for Subscription where T: IntoSingleSubscription {
+impl<T> From<Vec<T>> for Subscription
+where
+    T: IntoSingleSubscription,
+{
     fn from(value: Vec<T>) -> Self {
         Self(value.into_iter().map(|val| IntoSingleSubscription::into(val)).collect())
     }
 }
-impl<T> From<&Vec<T>> for Subscription where for<'any> &'any T: IntoSingleSubscription {
+impl<T> From<&Vec<T>> for Subscription
+where
+    for<'any> &'any T: IntoSingleSubscription,
+{
     fn from(value: &Vec<T>) -> Self {
         Self(value.iter().map(|val| IntoSingleSubscription::into(val)).collect())
     }

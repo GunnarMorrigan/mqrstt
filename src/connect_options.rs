@@ -2,11 +2,14 @@ use std::time::Duration;
 
 use bytes::Bytes;
 
-use crate::{packets::{LastWill, ConnectProperties, mqtt_traits::WireLength}, util::constants::MAXIMUM_PACKET_SIZE};
 use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
+use crate::{
+    packets::{ConnectProperties, LastWill},
+    util::constants::MAXIMUM_PACKET_SIZE,
+};
 
 #[derive(Debug, thiserror::Error)]
-pub enum ConnectOptionsError{
+pub enum ConnectOptionsError {
     #[error("Maximum packet size is exceeded. Maximum is {MAXIMUM_PACKET_SIZE}, was provided {0}")]
     MaximumPacketSize(u32),
 }
@@ -25,7 +28,7 @@ pub struct ConnectOptions {
 
     // MQTT v5 Connect Properties:
     session_expiry_interval: Option<u32>,
-    
+
     /// The maximum number of packets that will be inflight from the broker to this client.
     receive_maximum: Option<u16>,
 
@@ -36,8 +39,8 @@ pub struct ConnectOptions {
     topic_alias_maximum: Option<u16>,
     request_response_information: Option<u8>,
     request_problem_information: Option<u8>,
-    user_properties: Vec<(Box::<str>, Box::<str>)>,
-    authentication_method: Option<Box::<str>>,
+    user_properties: Vec<(Box<str>, Box<str>)>,
+    authentication_method: Option<Box<str>>,
     authentication_data: Bytes,
 
     /// Last will that will be issued on unexpected disconnect
@@ -46,7 +49,7 @@ pub struct ConnectOptions {
 
 impl Default for ConnectOptions {
     fn default() -> Self {
-        Self{
+        Self {
             keep_alive_interval: Duration::from_secs(60),
             clean_start: true,
             client_id: Box::from("ChangeClientId_MQRSTT"),
@@ -67,13 +70,12 @@ impl Default for ConnectOptions {
     }
 }
 
-
 impl ConnectOptions {
     /// Create a new [`ConnectOptions`]
     /// ClientId recommendation:
     ///     - 1 to 23 bytes UTF-8 bytes
     ///     - Contains [a-zA-Z0-9] characters only.
-    /// 
+    ///
     /// Some brokers accept longer client ids with different characters
     pub fn new<S: AsRef<str>>(client_id: S) -> Self {
         Self {
@@ -109,7 +111,7 @@ impl ConnectOptions {
             authentication_method: self.authentication_method.clone(),
             authentication_data: self.authentication_data.clone(),
         };
-    
+
         let connect = crate::packets::Connect {
             client_id: self.client_id.clone(),
             clean_start: self.clean_start,
@@ -120,22 +122,22 @@ impl ConnectOptions {
             protocol_version: crate::packets::ProtocolVersion::V5,
             last_will: self.last_will.clone(),
         };
-    
+
         crate::packets::Packet::Connect(connect)
     }
 
-    /// The Client Identifier (ClientID) identifies the Client to the Server. Each Client connecting to the Server has a unique ClientID. 
+    /// The Client Identifier (ClientID) identifies the Client to the Server. Each Client connecting to the Server has a unique ClientID.
     /// The ClientID MUST be used by Clients and by Servers to identify state that they hold relating to this MQTT Session between the Client and the Server [MQTT-3.1.3-2].
     /// More info here: <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901059>
-    /// 
+    ///
     /// Non unique client ids often result in connect, disconnect loops due to auto reconnects and forced disconnects
     pub fn get_client_id(&self) -> &str {
         &self.client_id
     }
-    /// The Client Identifier (ClientID) identifies the Client to the Server. Each Client connecting to the Server has a unique ClientID. 
+    /// The Client Identifier (ClientID) identifies the Client to the Server. Each Client connecting to the Server has a unique ClientID.
     /// The ClientID MUST be used by Clients and by Servers to identify state that they hold relating to this MQTT Session between the Client and the Server [MQTT-3.1.3-2].
     /// More info here: <https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901059>
-    /// 
+    ///
     /// Non unique client ids often result in connect, disconnect loops due to auto reconnects and forced disconnects
     pub fn set_client_id<S: AsRef<str>>(&mut self, client_id: S) -> &mut Self {
         self.client_id = client_id.as_ref().into();

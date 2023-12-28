@@ -10,7 +10,7 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
-use crate::smol::NetworkStatus;
+use crate::NetworkStatus;
 use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
@@ -71,14 +71,13 @@ where
         let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
-        
         if let Some(keep_alive_interval) = conn_ack.connack_properties.server_keep_alive {
             self.keep_alive_interval = Duration::from_secs(keep_alive_interval as u64);
         }
         if self.keep_alive_interval.is_zero() {
             self.perform_keep_alive = false;
         }
-        
+
         let packets = self.state_handler.handle_incoming_connack(&conn_ack)?;
         handler.handle(Packet::ConnAck(conn_ack)).await;
         if let Some(mut packets) = packets {
@@ -87,11 +86,11 @@ where
         }
 
         self.network = Some(network);
-        
+
         Ok(())
     }
 
-    /// A single call to poll will perform one of three tasks:
+    /// A single call to run will perform one of three tasks:
     /// - Read from the stream and parse the bytes to packets for the user to handle
     /// - Write user packets to stream
     /// - Perform keepalive if necessary
@@ -101,28 +100,30 @@ where
     ///
     /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.
-    pub async fn poll<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    pub async fn run<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
         H: AsyncEventHandler,
     {
         if self.network.is_none() {
             return Err(ConnectionError::NoNetwork);
         }
-
-        match self.smol_select(handler).await {
-            Ok(NetworkStatus::Active) => Ok(NetworkStatus::Active),
-            otherwise => {
-                self.network = None;
-                self.await_pingresp = None;
-                self.outgoing_packet_buffer.clear();
-                self.incoming_packet_buffer.clear();
-
-                otherwise
+        loop {
+            match self.smol_select(handler).await {
+                Ok(None) => continue,
+                otherwise => {
+                    self.network = None;
+                    self.await_pingresp = None;
+                    self.outgoing_packet_buffer.clear();
+                    self.incoming_packet_buffer.clear();
+                    
+                    // This is safe as inside the Ok it is not possible to have a None due to the above Ok(None) pattern.
+                    return otherwise.map(|ok| ok.unwrap());
+                }
             }
         }
     }
 
-    async fn smol_select<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
+    async fn smol_select<H>(&mut self, handler: &mut H) -> Result<Option<NetworkStatus>, ConnectionError>
     where
         H: AsyncEventHandler,
     {
@@ -154,7 +155,7 @@ where
                     res?;
                     match stream.parse_messages(incoming_packet_buffer).await {
                         Err(ReadBytes::Err(err)) => return Err(err),
-                        Err(ReadBytes::InsufficientBytes(_)) => return Ok(NetworkStatus::Active),
+                        Err(ReadBytes::InsufficientBytes(_)) => return Ok(None),
                         Ok(_) => (),
                     }
 
@@ -167,7 +168,7 @@ where
                             },
                             Disconnect(_) => {
                                 handler.handle(packet).await;
-                                return Ok(NetworkStatus::IncomingDisconnect);
+                                return Ok(Some(NetworkStatus::IncomingDisconnect));
                             }
                             packet => {
                                 match state_handler.handle_incoming_packet(&packet)? {
@@ -188,7 +189,7 @@ where
                     stream.write_all(outgoing_packet_buffer).await?;
                     *last_network_action = Instant::now();
 
-                    Ok(NetworkStatus::Active)
+                    Ok(None)
                 },
                 outgoing = to_network_r.recv().fuse() => {
                     let packet = outgoing?;
@@ -204,10 +205,10 @@ where
 
 
                     if disconnect{
-                        Ok(NetworkStatus::OutgoingDisconnect)
+                        Ok(Some(NetworkStatus::OutgoingDisconnect))
                     }
                     else{
-                        Ok(NetworkStatus::Active)
+                        Ok(None)
                     }
                 },
                 _ = smol::Timer::after(sleep).fuse() => {
@@ -216,12 +217,12 @@ where
                         stream.write(&packet).await?;
                         *last_network_action = Instant::now();
                         *await_pingresp = Some(Instant::now());
-                        Ok(NetworkStatus::Active)
+                        Ok(None)
                     }
                     else{
                         let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
                         stream.write(&Packet::Disconnect(disconnect)).await?;
-                        Ok(NetworkStatus::NoPingResp)
+                        Ok(Some(NetworkStatus::KeepAliveTimeout))
                     }
                 },
             }

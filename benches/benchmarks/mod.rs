@@ -1,19 +1,18 @@
-use bytes::{Bytes, BytesMut, BufMut};
-use mqrstt::packets::{Packet, ConnAck, ConnAckFlags, Publish, Disconnect};
+use bytes::{BufMut, Bytes, BytesMut};
+use mqrstt::packets::{Disconnect, Packet, Publish};
 
 pub mod tokio_concurrent;
 
-
 fn fill_stuff(buffer: &mut BytesMut, publ_count: usize, publ_size: usize) {
     empty_connect(buffer);
-    for i in 0..publ_count{
-        very_large_publish(i as u16, publ_size/5).write(buffer).unwrap();
+    for i in 0..publ_count {
+        very_large_publish(i as u16, publ_size / 5).write(buffer).unwrap();
     }
     empty_disconnect().write(buffer).unwrap();
 }
 
-fn empty_disconnect() -> Packet{
-    let discon = Disconnect{
+fn empty_disconnect() -> Packet {
+    let discon = Disconnect {
         reason_code: mqrstt::packets::reason_codes::DisconnectReasonCode::ServerBusy,
         properties: Default::default(),
     };
@@ -21,7 +20,7 @@ fn empty_disconnect() -> Packet{
     Packet::Disconnect(discon)
 }
 
-fn empty_connect(buffer: &mut BytesMut){
+fn empty_connect(buffer: &mut BytesMut) {
     // let conn_ack = ConnAck{
     //     connack_flags: ConnAckFlags::default(),
     //     reason_code: mqrstt::packets::reason_codes::ConnAckReasonCode::Success,
@@ -55,14 +54,11 @@ fn empty_connect(buffer: &mut BytesMut){
     buffer.put_u8(0xff);
     buffer.put_u8(0x28);
     buffer.put_u8(0x01);
-    
-
 }
-
 
 /// Returns Publish Packet with 5x `repeat` as payload in bytes.
 fn very_large_publish(id: u16, repeat: usize) -> Packet {
-    let publ = Publish{
+    let publ = Publish {
         dup: false,
         qos: mqrstt::packets::QoS::ExactlyOnce,
         retain: false,

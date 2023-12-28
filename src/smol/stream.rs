@@ -8,14 +8,12 @@ use smol::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::trace;
 
 use crate::packets::ConnAck;
-use crate::{connect_options::ConnectOptions, error::ConnectionError};
-use crate::{
-    packets::{
-        error::ReadBytes,
-        reason_codes::ConnAckReasonCode,
-        {FixedHeader, Packet, PacketType},
-    },
+use crate::packets::{
+    error::ReadBytes,
+    reason_codes::ConnAckReasonCode,
+    {FixedHeader, Packet, PacketType},
 };
+use crate::{connect_options::ConnectOptions, error::ConnectionError};
 
 #[derive(Debug)]
 pub struct Stream<S> {

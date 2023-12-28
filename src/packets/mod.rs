@@ -782,7 +782,7 @@ impl PacketType {
     }
 }
 
-impl std::fmt::Display for PacketType{
+impl std::fmt::Display for PacketType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         std::fmt::Debug::fmt(&self, f)
     }

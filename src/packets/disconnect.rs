@@ -62,9 +62,9 @@ impl WireLength for Disconnect {
 #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct DisconnectProperties {
     pub session_expiry_interval: Option<u32>,
-    pub reason_string: Option<Box::<str>>,
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
-    pub server_reference: Option<Box::<str>>,
+    pub reason_string: Option<Box<str>>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
+    pub server_reference: Option<Box<str>>,
 }
 
 impl MqttRead for DisconnectProperties {

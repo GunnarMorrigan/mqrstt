@@ -53,7 +53,7 @@ pub struct AuthProperties {
 
     /// 3.15.2.2.5 User Property
     /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl MqttRead for AuthProperties {

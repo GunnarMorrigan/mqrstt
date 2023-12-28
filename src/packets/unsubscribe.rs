@@ -141,8 +141,7 @@ impl WireLength for UnsubscribeProperties {
     }
 }
 
-
-trait IntoUnsubscribeTopic{
+trait IntoUnsubscribeTopic {
     fn into(value: Self) -> Box<str>;
 }
 
@@ -198,19 +197,27 @@ impl From<Box<str>> for UnsubscribeTopics {
     }
 }
 // -------------------- Arrays --------------------
-impl<T, const S: usize> From<&[T; S]> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+impl<T, const S: usize> From<&[T; S]> for UnsubscribeTopics
+where
+    for<'any> &'any T: IntoUnsubscribeTopic,
+{
     fn from(value: &[T; S]) -> Self {
         Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
     }
 }
 // -------------------- Slices --------------------
-impl<T> From<&[T]> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+impl<T> From<&[T]> for UnsubscribeTopics
+where
+    for<'any> &'any T: IntoUnsubscribeTopic,
+{
     fn from(value: &[T]) -> Self {
         Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
     }
 }
 // -------------------- Iterators --------------------
-impl<T> FromIterator<T> for UnsubscribeTopics where T: IntoUnsubscribeTopic,
+impl<T> FromIterator<T> for UnsubscribeTopics
+where
+    T: IntoUnsubscribeTopic,
 {
     fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         Self(iter.into_iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
@@ -231,13 +238,19 @@ impl<T> FromIterator<T> for UnsubscribeTopics where T: IntoUnsubscribeTopic,
 //     }
 // }
 // -------------------- Vecs --------------------
-impl<T> From<Vec<T>> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+impl<T> From<Vec<T>> for UnsubscribeTopics
+where
+    for<'any> &'any T: IntoUnsubscribeTopic,
+{
     fn from(value: Vec<T>) -> Self {
         Self(value.into_iter().map(|val| IntoUnsubscribeTopic::into(&val)).collect())
     }
 }
 
-impl<T> From<&Vec<T>> for UnsubscribeTopics where for<'any> &'any T: IntoUnsubscribeTopic {
+impl<T> From<&Vec<T>> for UnsubscribeTopics
+where
+    for<'any> &'any T: IntoUnsubscribeTopic,
+{
     fn from(value: &Vec<T>) -> Self {
         Self(value.into_iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
     }

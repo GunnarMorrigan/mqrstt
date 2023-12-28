@@ -82,8 +82,8 @@ impl WireLength for PubComp {
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Hash)]
 pub struct PubCompProperties {
-    pub reason_string: Option<Box::<str>>,
-    pub user_properties: Vec<(Box::<str>, Box::<str>)>,
+    pub reason_string: Option<Box<str>>,
+    pub user_properties: Vec<(Box<str>, Box<str>)>,
 }
 
 impl PubCompProperties {
