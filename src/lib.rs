@@ -174,7 +174,7 @@ mod connect_options;
 mod mqtt_handler;
 mod util;
 
-#[cfg(any(feature = "tokio", feature = "tokio_concurrent"))]
+#[cfg(any(feature = "tokio"))]
 pub mod tokio;
 #[cfg(feature = "smol")]
 pub mod smol;
@@ -190,7 +190,6 @@ pub use event_handlers::*;
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 use mqtt_handler::StateHandler;
-use available_packet_ids::AvailablePacketIds;
 
 #[cfg(test)]
 pub mod tests;
@@ -234,11 +233,12 @@ impl<H, S> NetworkBuilder<H, S> {
     }
 }
 
+#[cfg(feature = "tokio")]
 impl<H, S> NetworkBuilder<H, S> 
 where 
     H: AsyncEventHandlerMut,
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
-{
+{   
     /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
     /// This network is supposed to be ran on a single task/thread. The read and write operations happen one after the other.
     /// This approach does not give the most speed in terms of reading and writing but provides a simple and easy to use client with low overhead for low throughput clients.
@@ -257,7 +257,7 @@ where
     pub fn tokio_sequential_network(self) -> (tokio::Network<tokio::SequentialHandler, H, S>, MqttClient) where H: AsyncEventHandlerMut {
         let (to_network_s, to_network_r) = async_channel::bounded(CHANNEL_SIZE);
 
-        let (apkids, apkids_r) = AvailablePacketIds::new(self.options.send_maximum());
+        let (apkids, apkids_r) = available_packet_ids::AvailablePacketIds::new(self.options.send_maximum());
 
         let max_packet_size = self.options.maximum_packet_size();
 
@@ -270,12 +270,12 @@ where
 }
 
 
+#[cfg(feature = "tokio")]
 impl<H, S> NetworkBuilder<H, S> 
 where 
     H: AsyncEventHandler,
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
 {
-    #[cfg(feature = "tokio_concurrent")]
     /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
     /// # Example
     ///
@@ -290,7 +290,7 @@ where
     pub fn tokio_concurrent_network(self) -> (tokio::Network<tokio::ConcurrentHandler, H, S>, MqttClient) {
         let (to_network_s, to_network_r) = async_channel::bounded(CHANNEL_SIZE);
 
-        let (apkids, apkids_r) = AvailablePacketIds::new(self.options.send_maximum());
+        let (apkids, apkids_r) = available_packet_ids::AvailablePacketIds::new(self.options.send_maximum());
 
         let max_packet_size = self.options.maximum_packet_size();
 
@@ -496,7 +496,7 @@ mod smol_lib_test {
     }
 }
 
-#[cfg(feature = "tokio_concurrent")]
+#[cfg(feature = "tokio")]
 #[cfg(test)]
 mod tokio_lib_test {
     use crate::example_handlers::PingPong;
@@ -513,7 +513,7 @@ mod tokio_lib_test {
     ;
    
 
-    #[cfg(feature = "tokio_concurrent")]
+
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn test_tokio_tcp() {
         use std::hint::black_box;
@@ -562,9 +562,7 @@ mod tokio_lib_test {
         let _ = black_box(read_result);
     }
 
-    
 
-    // #[cfg(feature = "tokio_concurrent")]
     // #[tokio::test]
     // async fn test_tokio_ping_req() {
     //     let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();

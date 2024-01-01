@@ -17,8 +17,6 @@ use crate::packets::{Disconnect, Packet, PacketType};
 use crate::{AsyncEventHandlerMut, StateHandler, NetworkStatus};
 
 use super::{SequentialHandler, HandlerExt};
-use super::stream::read_half::ReadStream;
-use super::stream::write_half::WriteStream;
 use super::stream::Stream;
 
 // type StreamType = tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static;
@@ -212,7 +210,6 @@ where
     }
 }
 
-
 impl<N, H, S> Network<N, H, S> 
 where 
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
@@ -262,21 +259,19 @@ where
     }
 }
 
-#[cfg(feature = "tokio_concurrent")]
 pub struct NetworkReader<N, H, S> {
     pub(crate) run_signal: Arc<AtomicBool>,
     
     pub(crate) handler_helper: PhantomData<N>,
     pub handler: H,
     
-    pub(crate) read_stream: ReadStream<S>,
+    pub(crate) read_stream: super::stream::read_half::ReadStream<S>,
     pub(crate) await_pingresp_atomic: Arc<AtomicBool>,
     pub(crate) state_handler: Arc<StateHandler>,
     pub(crate) to_writer_s: Sender<Packet>,
     pub(crate) join_set: JoinSet<Result<(), ConnectionError>>,
 }
 
-#[cfg(feature = "tokio_concurrent")]
 impl<N, H, S> NetworkReader<N, H, S>
 where
     N: HandlerExt<H>,
@@ -347,11 +342,10 @@ where
     }
 }
 
-#[cfg(feature = "tokio_concurrent")]
 pub struct NetworkWriter<S> {
     run_signal: Arc<AtomicBool>,
 
-    write_stream: WriteStream<S>,
+    write_stream: super::stream::write_half::WriteStream<S>,
 
     keep_alive_interval: Duration,
 
@@ -366,7 +360,6 @@ pub struct NetworkWriter<S> {
     to_network_r: Receiver<Packet>,
 }
 
-#[cfg(feature = "tokio_concurrent")]
 impl<S> NetworkWriter<S>
 where
     S: tokio::io::AsyncWriteExt + Sized + Unpin,

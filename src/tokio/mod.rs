@@ -4,11 +4,8 @@ pub(crate) mod network;
 
 use futures::Future;
 pub use network::Network;
-pub use network::NetworkReader;
-pub use network::NetworkWriter;
+pub use network::{NetworkReader, NetworkWriter};
 
-use crate::AsyncEventHandler;
-use crate::AsyncEventHandlerMut;
 use crate::error::ConnectionError;
 use crate::packets::Packet;
 
@@ -22,7 +19,6 @@ pub struct SequentialHandler;
 /// 
 /// This kind of handler is used for both concurrent message handling and concurrent TCP read and write operations.
 pub struct ConcurrentHandler;
-
 
 trait HandlerExt<H>: Sized{
     /// Should call the handler in the fashion of the handler.
@@ -45,7 +41,8 @@ trait HandlerExt<H>: Sized{
     ;
 
 }
-impl<H: AsyncEventHandlerMut + Send> HandlerExt<H> for SequentialHandler {
+
+impl<H: crate::AsyncEventHandlerMut + Send> HandlerExt<H> for SequentialHandler {
     #[inline]
     fn call_handler(handler: &mut H, incoming_packet: Packet) -> impl Future<Output = ()> + Send{
         handler.handle(incoming_packet)
@@ -67,7 +64,8 @@ impl<H: AsyncEventHandlerMut + Send> HandlerExt<H> for SequentialHandler {
         }
     }
 }
-impl<H: AsyncEventHandler + Send + Sync + Clone + 'static> HandlerExt<H> for ConcurrentHandler {
+
+impl<H: crate::AsyncEventHandler + Send + Sync + Clone + 'static> HandlerExt<H> for ConcurrentHandler {
     fn call_handler(handler: &mut H, incoming_packet: Packet) -> impl Future<Output = ()> + Send{
         let handler_clone = handler.clone();
         tokio::spawn(async move {
