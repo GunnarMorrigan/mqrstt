@@ -26,7 +26,7 @@ pub struct MqttClient {
 }
 
 impl MqttClient {
-    pub fn new(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
+    pub(crate) fn new(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
         Self {
             available_packet_ids_r,
             to_network_s,
@@ -44,8 +44,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("example_id").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -89,8 +88,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("example_id").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -160,8 +158,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (_, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -215,8 +212,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -271,6 +267,7 @@ impl MqttClient {
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtMostOnce, true, payload, properties).await;
     ///
     /// # });
+    /// # let _network = std::hint::black_box(network);
     /// ```
     pub async fn publish_with_properties<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
@@ -299,8 +296,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// // Unsubscribe from a single topic specified as a string:
@@ -324,6 +320,7 @@ impl MqttClient {
     /// mqtt_client.unsubscribe(topics.as_slice()).await;
     ///
     /// # });
+    /// # let _network = std::hint::black_box(network);
     /// ```
     pub async fn unsubscribe<T: Into<UnsubscribeTopics>>(&self, into_topics: T) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
@@ -346,8 +343,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (_, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::UnsubscribeProperties;
@@ -416,13 +412,13 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// mqtt_client.disconnect().await.unwrap();
     ///
     /// # });
+    /// # let _network = std::hint::black_box(network);
     /// ```
     pub async fn disconnect(&self) -> Result<(), ClientError> {
         let disconnect = Disconnect {
@@ -442,8 +438,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::DisconnectProperties;
@@ -457,6 +452,7 @@ impl MqttClient {
     /// mqtt_client.disconnect_with_properties(DisconnectReasonCode::NormalDisconnection, properties).await.unwrap();
     ///
     /// # });
+    /// # let _network = std::hint::black_box(network);
     /// ```
     pub async fn disconnect_with_properties(&self, reason_code: DisconnectReasonCode, properties: DisconnectProperties) -> Result<(), ClientError> {
         let disconnect = Disconnect { reason_code, properties };
@@ -908,6 +904,56 @@ mod tests {
         let client = MqttClient::new(r, client_to_handler_s, 500000);
 
         (client, client_to_handler_r, to_network_r)
+    }
+
+    #[tokio::test]
+    async fn test_subscribe() {
+        let (mqtt_client, _client_to_handler_r, _) = create_new_test_client();
+
+        // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
+        let _ = mqtt_client.subscribe("test/topic").await;
+
+        // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
+        let _ = mqtt_client.subscribe(("test/topic", QoS::ExactlyOnce)).await;
+
+        let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtMostOnce)];
+        let _ = mqtt_client.subscribe(vec).await;
+
+        let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtLeastOnce)];
+        let _ = mqtt_client.subscribe(vec.as_slice()).await;
+
+        let sub_options = crate::packets::SubscriptionOptions{
+        retain_handling: crate::packets::RetainHandling::TWO,
+        retain_as_publish: false,
+        no_local: false,
+        qos: QoS::AtLeastOnce,
+        };
+        let _ = mqtt_client.subscribe(("final/test/topic", sub_options)).await;
+    }
+
+    #[tokio::test]
+    async fn test_unsubscribe() {
+        let (mqtt_client, _client_to_handler_r, _) = create_new_test_client();
+
+        // Unsubscribe from a single topic specified as a string:
+        let topic = "test/topic";
+        let _ = mqtt_client.unsubscribe(topic).await;
+
+        // Unsubscribe from multiple topics specified as an array of string slices:
+        let topics = ["test/topic1", "test/topic2"];
+        let _ = mqtt_client.unsubscribe(topics.as_slice()).await;
+
+        // Unsubscribe from a single topic specified as a String:
+        let topic = String::from("test/topic");
+        let _ = mqtt_client.unsubscribe(topic).await;
+
+        // Unsubscribe from multiple topics specified as a Vec<String>:
+        let topics = vec![String::from("test/topic1"), String::from("test/topic2")];
+        let _ = mqtt_client.unsubscribe(topics).await;
+
+        // Unsubscribe from multiple topics specified as an array of String:
+        let topics = &[String::from("test/topic1"), String::from("test/topic2")];
+        let _ = mqtt_client.unsubscribe(topics.as_slice()).await;
     }
 
     #[tokio::test]

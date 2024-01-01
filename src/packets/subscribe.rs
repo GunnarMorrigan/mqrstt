@@ -273,6 +273,15 @@ impl IntoSingleSubscription for Box<str> {
         (value, SubscriptionOptions::default())
     }
 }
+impl<T> IntoSingleSubscription for &(T, QoS)
+where
+    T: AsRef<str>,
+{
+    #[inline]
+    fn into((topic, qos): Self) -> (Box<str>, SubscriptionOptions) {
+        (Box::from(topic.as_ref()), SubscriptionOptions { qos: *qos, ..Default::default() })
+    }
+}
 impl<T> IntoSingleSubscription for (T, QoS)
 where
     T: AsRef<str>,
@@ -280,6 +289,15 @@ where
     #[inline]
     fn into((topic, qos): Self) -> (Box<str>, SubscriptionOptions) {
         (Box::from(topic.as_ref()), SubscriptionOptions { qos, ..Default::default() })
+    }
+}
+impl<T> IntoSingleSubscription for &(T, SubscriptionOptions)
+where
+    T: AsRef<str>,
+{
+    #[inline]
+    fn into((topic, sub): Self) -> (Box<str>, SubscriptionOptions) {
+        (Box::from(topic.as_ref()), *sub)
     }
 }
 impl<T> IntoSingleSubscription for (T, SubscriptionOptions)
@@ -310,6 +328,11 @@ impl_subscription!(&str);
 impl_subscription!(&String);
 impl_subscription!(String);
 impl_subscription!(Box<str>);
+impl From<&(&str, QoS)> for Subscription {
+    fn from(value: &(&str, QoS)) -> Self {
+        Self(vec![IntoSingleSubscription::into(value)])
+    }
+}
 impl<T> From<(T, QoS)> for Subscription
 where
     (T, QoS): IntoSingleSubscription,

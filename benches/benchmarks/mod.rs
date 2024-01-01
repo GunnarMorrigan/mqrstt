@@ -1,7 +1,7 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use mqrstt::packets::{Disconnect, Packet, Publish};
 
-pub mod tokio_concurrent;
+pub mod tokio;
 
 fn fill_stuff(buffer: &mut BytesMut, publ_count: usize, publ_size: usize) {
     empty_connect(buffer);
@@ -65,8 +65,91 @@ fn very_large_publish(id: u16, repeat: usize) -> Packet {
         topic: "BlaBla".into(),
         packet_identifier: Some(id),
         publish_properties: Default::default(),
-        payload: Bytes::from_iter([0u8, 1u8, 2, 3, 4].repeat(repeat)),
+        payload: Bytes::from_iter("ping".repeat(repeat).into_bytes()),
     };
 
     Packet::Publish(publ)
+}
+
+
+mod test_handlers{
+    use std::{sync::{atomic::AtomicU16, Arc}, ops::AddAssign, time::Duration};
+
+    use bytes::Bytes;
+    use mqrstt::{AsyncEventHandler, packets::{self, Packet}, MqttClient, AsyncEventHandlerMut};
+
+    pub struct PingPong {
+        pub client: MqttClient,
+        pub number: Arc<AtomicU16>,
+    }
+
+    impl PingPong{
+        pub fn new(client: MqttClient) -> Self {
+            Self { 
+                client,
+                number: Arc::new(AtomicU16::new(0)),
+            }
+        }
+    }
+
+    impl AsyncEventHandler for PingPong {
+        async fn handle(&self, event: packets::Packet) -> () {
+            self.number.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            match event {
+                Packet::Publish(p) => {
+                    if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+                        let max_len = payload.len().min(10);
+                        let a = &payload[0..max_len];
+                        if payload.to_lowercase().contains("ping") {
+                            self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
+                        }
+                    }
+                }
+                Packet::ConnAck(_) => (),
+                _ => (),
+            }
+        }
+    }
+
+    impl AsyncEventHandlerMut for PingPong {
+        async fn handle(&mut self, event: packets::Packet) -> () {
+            self.number.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            match event {
+                Packet::Publish(p) => {
+                    if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
+                        let max_len = payload.len().min(10);
+                        let a = &payload[0..max_len];
+                        if payload.to_lowercase().contains("ping") {
+                            self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
+                        }
+                    }
+                }
+                Packet::ConnAck(_) => (),
+                _ => (),
+            }
+        }
+    }
+
+    pub struct SimpleDelay{
+        delay: Duration,
+    }
+
+    impl SimpleDelay{
+        pub fn new(delay: Duration) -> Self{
+            Self {
+                delay,
+            }
+        }
+    }
+
+    impl AsyncEventHandler for SimpleDelay {
+        fn handle(&self, _: Packet) -> impl futures::prelude::Future<Output = ()> + Send + Sync {
+            tokio::time::sleep(self.delay)
+        }
+    }
+    impl AsyncEventHandlerMut for SimpleDelay{
+        fn handle(&mut self, _: Packet) -> impl futures::prelude::Future<Output = ()> + Send + Sync {
+            tokio::time::sleep(self.delay)
+        }
+    }
 }

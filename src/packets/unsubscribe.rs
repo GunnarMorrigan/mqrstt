@@ -214,6 +214,11 @@ where
         Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
     }
 }
+impl From<&[&str]> for UnsubscribeTopics{
+    fn from(value: &[&str]) -> Self {
+        Self(value.iter().map(|val| IntoUnsubscribeTopic::into(*val)).collect())
+    }
+}
 // -------------------- Iterators --------------------
 impl<T> FromIterator<T> for UnsubscribeTopics
 where

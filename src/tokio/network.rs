@@ -1,8 +1,8 @@
 use async_channel::{Receiver, Sender};
-use futures::Future;
-use tokio::join;
+use tokio::task::JoinSet;
 
 
+use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -14,8 +14,9 @@ use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 
-use crate::{AsyncEventHandler, StateHandler, NetworkStatus};
+use crate::{AsyncEventHandlerMut, StateHandler, NetworkStatus};
 
+use super::{SequentialHandler, HandlerExt};
 use super::stream::read_half::ReadStream;
 use super::stream::write_half::WriteStream;
 use super::stream::Stream;
@@ -26,32 +27,27 @@ use super::stream::Stream;
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
-pub struct Network<H, S> {
-    handler: Option<H>,
-
+pub struct Network<N, H, S> {
+    handler_helper: PhantomData<N>,
+    handler: PhantomData<H>,
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
     options: ConnectOptions,
-
     last_network_action: Instant,
-
-    await_pingresp_atomic: Arc<AtomicBool>,
     perform_keep_alive: bool,
-
     state_handler: Arc<StateHandler>,
-
     to_network_r: Receiver<Packet>,
 }
 
-impl<H, S> Network<H, S> {
+impl<N, H, S> Network<N, H, S> {
     pub fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
         Self {
-            handler: None,
+            handler_helper: PhantomData,
+            handler: PhantomData,
             network: None,
 
             last_network_action: Instant::now(),
-            await_pingresp_atomic: Arc::new(AtomicBool::new(false)),
             perform_keep_alive: true,
 
             state_handler: Arc::new(StateHandler::new(&options, apkids)),
@@ -64,13 +60,13 @@ impl<H, S> Network<H, S> {
 }
 
 /// Tokio impl
-impl<H, S> Network<H, S>
+impl<N, H, S> Network<N, H, S>
 where
-    H: AsyncEventHandler + Clone + Send + Sync + 'static,
+    N: HandlerExt<H>,
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect(&mut self, stream: S, handler: H) -> Result<(), ConnectionError> {
+    pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> {
         let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
@@ -82,23 +78,148 @@ where
         }
 
         let packets = self.state_handler.handle_incoming_connack(&conn_ack)?;
-        handler.handle(Packet::ConnAck(conn_ack)).await;
+        N::call_handler_await(handler, Packet::ConnAck(conn_ack)).await;
         if let Some(mut packets) = packets {
             network.write_all(&mut packets).await?;
             self.last_network_action = Instant::now();
         }
 
         self.network = Some(network);
-        self.handler = Some(handler);
 
         Ok(())
     }
+}
+
+impl<H, S> Network<SequentialHandler, H, S> 
+where
+    H: AsyncEventHandlerMut,
+    SequentialHandler: HandlerExt<H>,
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
+{
+
+    /// A single call to run will perform one of three tasks:
+    /// - Read from the stream and parse the bytes to packets for the user to handle
+    /// - Write user packets to stream
+    /// - Perform keepalive if necessary
+    ///
+    /// In all other cases the network is unusable anymore.
+    /// The stream will be dropped and the internal buffers will be cleared.
+    pub async fn run(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError> {
+        if self.network.is_none() {
+            return Err(ConnectionError::NoNetwork);
+        }
+
+        
+        match self.tokio_select(handler).await {
+            otherwise => {
+                self.network = None;
+
+                otherwise
+            }
+        }
+    }
+
+    async fn tokio_select(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError> {
+        let Network {
+            network,
+            options,
+            last_network_action,
+            perform_keep_alive,
+            to_network_r,
+            handler_helper: _,
+            handler: _,
+            state_handler,
+        } = self;
+
+        let mut await_pingresp = None;
+        let mut outgoing_packet_buffer = Vec::new();
+
+        loop {
+            let sleep;
+            if let Some(instant) = await_pingresp {
+                sleep = instant + options.get_keep_alive_interval() - Instant::now();
+            } else {
+                sleep = *last_network_action + options.get_keep_alive_interval() - Instant::now();
+            }
+
+            if let Some(stream) = network {
+                tokio::select! {
+                    res = stream.read_bytes() => {
+                        res?;
+                        loop{
+                            let packet = match stream.parse_message().await {
+                                Err(ReadBytes::Err(err)) => return Err(err),
+                                Err(ReadBytes::InsufficientBytes(_)) => break,
+                                Ok(packet) => packet,
+                            };
+                            match packet{
+                                Packet::PingResp => {
+                                    SequentialHandler::call_handler_await(handler, packet).await;
+                                    await_pingresp = None;
+                                },
+                                Packet::Disconnect(_) => {
+                                    SequentialHandler::call_handler_await(handler, packet).await;
+                                    return Ok(NetworkStatus::IncomingDisconnect);
+                                }
+                                packet => {
+                                    match state_handler.handle_incoming_packet(&packet)? {
+                                        (maybe_reply_packet, true) => {
+                                            SequentialHandler::call_handler_await(handler, packet).await;
+                                            if let Some(reply_packet) = maybe_reply_packet {
+                                                outgoing_packet_buffer.push(reply_packet);
+                                            }
+                                        },
+                                        (Some(reply_packet), false) => {
+                                            outgoing_packet_buffer.push(reply_packet);
+                                        },
+                                        (None, false) => (),
+                                    }
+                                }
+                            }
+                            stream.write_all(&mut outgoing_packet_buffer).await?;
+                            *last_network_action = Instant::now();
+                        }
+                    },
+                    outgoing = to_network_r.recv() => {
+                        let packet = outgoing?;
+                        stream.write(&packet).await?;
+                        let disconnect = packet.packet_type() == PacketType::Disconnect;
+
+                        state_handler.handle_outgoing_packet(packet)?;
+                        *last_network_action = Instant::now();
 
 
-    #[cfg(feature = "concurrent_tokio")]
+                        if disconnect{
+                            return Ok(NetworkStatus::OutgoingDisconnect);
+                        }
+                    },
+                    _ = tokio::time::sleep(sleep), if await_pingresp.is_none() && *perform_keep_alive => {
+                        let packet = Packet::PingReq;
+                        stream.write(&packet).await?;
+                        *last_network_action = Instant::now();
+                        await_pingresp = Some(Instant::now());
+                    },
+                    _ = tokio::time::sleep(sleep), if await_pingresp.is_some() => {
+                        let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
+                        stream.write(&Packet::Disconnect(disconnect)).await?;
+                        return Ok(NetworkStatus::KeepAliveTimeout);
+                    }
+                }
+            } else {
+                return Err(ConnectionError::NoNetwork);
+            }
+        }
+    }
+}
+
+
+impl<N, H, S> Network<N, H, S> 
+where 
+    S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
+{   
     /// Creates both read and write tasks to run this them in parallel.
     /// If you want to run concurrently (not parallel) the [`Self::run`] method is a better aproach!
-    pub fn read_write_tasks(&mut self) -> Result<(NetworkReader<H, S>, NetworkWriter<S>), ConnectionError> {
+    pub fn split(&mut self, handler: H) -> Result<(NetworkReader<N, H, S>, NetworkWriter<S>), ConnectionError> {
         if self.network.is_none() {
             return Err(ConnectionError::NoNetwork)?;
         }
@@ -108,14 +229,17 @@ where
                 let (read_stream, write_stream) = network.split();
                 let run_signal = Arc::new(AtomicBool::new(true));
                 let (to_writer_s, to_writer_r) = async_channel::bounded(100);
+                let await_pingresp_atomic = Arc::new(AtomicBool::new(false));
 
                 let read_network = NetworkReader {
                     run_signal: run_signal.clone(),
-                    handler: self.handler.as_ref().unwrap().clone(),
+                    handler_helper: PhantomData,
+                    handler: handler,
                     read_stream,
-                    await_pingresp_atomic: self.await_pingresp_atomic.clone(),
+                    await_pingresp_atomic: await_pingresp_atomic.clone(),
                     state_handler: self.state_handler.clone(),
                     to_writer_s,
+                    join_set: JoinSet::new(),
                 };
 
                 let write_network = NetworkWriter {
@@ -123,7 +247,7 @@ where
                     write_stream,
                     keep_alive_interval: self.options.keep_alive_interval,
                     last_network_action: self.last_network_action,
-                    await_pingresp_bool: self.await_pingresp_atomic.clone(),
+                    await_pingresp_bool: await_pingresp_atomic.clone(),
                     await_pingresp_time: None,
                     perform_keep_alive: self.perform_keep_alive,
                     state_handler: self.state_handler.clone(),
@@ -136,50 +260,41 @@ where
             None => Err(ConnectionError::NoNetwork),
         }
     }
-
-    /// A single call to run will perform one of three tasks:
-    /// - Read from the stream and parse the bytes to packets for the user to handle
-    /// - Write user packets to stream
-    /// - Perform keepalive if necessary
-    ///
-    /// This function can produce an indication of the state of the network or an error.
-    /// When the network is still active (i.e. stream is not closed and no disconnect packet has been processed) the network will return [`NetworkStatus::Active`]
-    ///
-    /// In all other cases the network is unusable anymore.
-    /// The stream will be dropped and the internal buffers will be cleared.
-    pub fn run() {
-
-    }
-
 }
 
-#[cfg(feature = "concurrent_tokio")]
-pub struct NetworkReader<H, S> {
-    run_signal: Arc<AtomicBool>,
-
-    handler: H,
-    read_stream: ReadStream<S>,
-    await_pingresp_atomic: Arc<AtomicBool>,
-    state_handler: Arc<StateHandler>,
-    to_writer_s: Sender<Packet>,
+#[cfg(feature = "tokio_concurrent")]
+pub struct NetworkReader<N, H, S> {
+    pub(crate) run_signal: Arc<AtomicBool>,
+    
+    pub(crate) handler_helper: PhantomData<N>,
+    pub handler: H,
+    
+    pub(crate) read_stream: ReadStream<S>,
+    pub(crate) await_pingresp_atomic: Arc<AtomicBool>,
+    pub(crate) state_handler: Arc<StateHandler>,
+    pub(crate) to_writer_s: Sender<Packet>,
+    pub(crate) join_set: JoinSet<Result<(), ConnectionError>>,
 }
 
-#[cfg(feature = "concurrent_tokio")]
-impl<H, S> NetworkReader<H, S>
+#[cfg(feature = "tokio_concurrent")]
+impl<N, H, S> NetworkReader<N, H, S>
 where
-    H: AsyncEventHandler + Clone + Send + Sync + 'static,
+    N: HandlerExt<H>,
     S: tokio::io::AsyncReadExt + Sized + Unpin + Send + 'static,
 {   
-    /// Runs the read half of the concurrent read & write tokio client.
+    /// Runs the read half with a [`AsyncEventHandlerMut`].
     /// Continuously loops until disconnect or error.
     /// 
     /// # Return
-    ///     - Ok(None) in the case that the write task requested shutdown.
-    ///     - Ok(Some(reason)) in the case that this task initiates a shutdown.
-    ///     - Err in the case of IO, or protocol errors.
+    /// - Ok(None) in the case that the write task requested shutdown.
+    /// - Ok(Some(reason)) in the case that this task initiates a shutdown.
+    /// - Err in the case of IO, or protocol errors.
     pub async fn run(mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
         let ret = self.read().await;
         self.run_signal.store(false, std::sync::atomic::Ordering::Release);
+        while let Some(_) = self.join_set.join_next().await {
+            ()
+        }
         ret
     }
     async fn read(&mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
@@ -196,7 +311,7 @@ where
 
                 match packet {
                     Packet::PingResp => {
-                        self.handler.handle(packet).await;
+                        N::call_handler(&mut self.handler, packet).await;
                         #[cfg(feature = "logs")]
                         if !self.await_pingresp_atomic.fetch_and(false, std::sync::atomic::Ordering::SeqCst) {
                             tracing::warn!("Received PingResp but did not expect it");
@@ -205,7 +320,7 @@ where
                         self.await_pingresp_atomic.store(false, std::sync::atomic::Ordering::SeqCst);
                     }
                     Packet::Disconnect(_) => {
-                        self.handler.handle(packet).await;
+                        N::call_handler(&mut self.handler, packet).await;
                         return Ok(Some(NetworkStatus::IncomingDisconnect));
                     }
                     Packet::ConnAck(conn_ack) => {
@@ -214,14 +329,11 @@ where
                                 self.to_writer_s.send(packet).await?;
                             }
                         }
-                        self.handler.handle(Packet::ConnAck(conn_ack)).await;
+                        N::call_handler(&mut self.handler, Packet::ConnAck(conn_ack)).await;
                     }
                     packet => match self.state_handler.handle_incoming_packet(&packet)? {
                         (maybe_reply_packet, true) => {
-                            self.handler.handle(packet).await;
-                            if let Some(reply_packet) = maybe_reply_packet {
-                                let _ = self.to_writer_s.send(reply_packet).await?;
-                            }
+                            N::call_handler_with_reply(self, packet, maybe_reply_packet).await?;
                         }
                         (Some(reply_packet), false) => {
                             self.to_writer_s.send(reply_packet).await?;
@@ -235,7 +347,7 @@ where
     }
 }
 
-#[cfg(feature = "concurrent_tokio")]
+#[cfg(feature = "tokio_concurrent")]
 pub struct NetworkWriter<S> {
     run_signal: Arc<AtomicBool>,
 
@@ -254,18 +366,18 @@ pub struct NetworkWriter<S> {
     to_network_r: Receiver<Packet>,
 }
 
-#[cfg(feature = "concurrent_tokio")]
+#[cfg(feature = "tokio_concurrent")]
 impl<S> NetworkWriter<S>
 where
     S: tokio::io::AsyncWriteExt + Sized + Unpin,
-{   
+{
     /// Runs the write half of the concurrent read & write tokio client
     /// Continuously loops until disconnect or error.
     /// 
     /// # Return
-    ///     - Ok(None) in the case that the read task requested shutdown
-    ///     - Ok(Some(reason)) in the case that this task initiates a shutdown
-    ///     - Err in the case of IO, or protocol errors.
+    /// - Ok(None) in the case that the read task requested shutdown
+    /// - Ok(Some(reason)) in the case that this task initiates a shutdown
+    /// - Err in the case of IO, or protocol errors.
     pub async fn run(mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
         let ret = self.write().await;
         self.run_signal.store(false, std::sync::atomic::Ordering::Release);
@@ -283,13 +395,13 @@ where
             } else {
                 sleep = self.last_network_action + self.keep_alive_interval - Instant::now();
             }
-
+            ;
             tokio::select! {
                 outgoing = self.to_network_r.recv() => {
                     let packet = outgoing?;
                     self.write_stream.write(&packet).await?;
 
-                    let disconnect = if packet.packet_type() == PacketType::Disconnect { true } else { false };
+                    let disconnect = packet.packet_type() == PacketType::Disconnect;
 
                     self.state_handler.handle_outgoing_packet(packet)?;
                     self.last_network_action = Instant::now();

@@ -2,6 +2,7 @@ use async_channel::Receiver;
 
 use futures::FutureExt;
 
+use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
 use crate::available_packet_ids::AvailablePacketIds;
@@ -11,7 +12,7 @@ use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 use crate::NetworkStatus;
-use crate::{AsyncEventHandler, StateHandler};
+use crate::{AsyncEventHandlerMut, StateHandler};
 
 use super::stream::Stream;
 
@@ -19,7 +20,8 @@ use super::stream::Stream;
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
-pub struct Network<S> {
+pub struct Network<H, S> {
+    handler: PhantomData<H>,
     network: Option<Stream<S>>,
 
     /// Options of the current mqtt connection
@@ -32,15 +34,15 @@ pub struct Network<S> {
 
     state_handler: StateHandler,
     outgoing_packet_buffer: Vec<Packet>,
-    incoming_packet_buffer: Vec<Packet>,
 
     to_network_r: Receiver<Packet>,
 }
 
-impl<S> Network<S> {
+impl<H, S> Network<H, S> {
     pub fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
         let state_handler = StateHandler::new(&options, apkids);
         Self {
+            handler: PhantomData,
             network: None,
 
             keep_alive_interval: options.keep_alive_interval,
@@ -52,22 +54,19 @@ impl<S> Network<S> {
 
             state_handler,
             outgoing_packet_buffer: Vec::new(),
-            incoming_packet_buffer: Vec::new(),
 
             to_network_r,
         }
     }
 }
 
-impl<S> Network<S>
+impl<H, S> Network<H, S>
 where
+    H: AsyncEventHandlerMut,
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect<H>(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>
-    where
-        H: AsyncEventHandler,
-    {
+    pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>{
         let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
@@ -100,10 +99,7 @@ where
     ///
     /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.
-    pub async fn run<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
-    where
-        H: AsyncEventHandler,
-    {
+    pub async fn run(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError> {
         if self.network.is_none() {
             return Err(ConnectionError::NoNetwork);
         }
@@ -114,7 +110,6 @@ where
                     self.network = None;
                     self.await_pingresp = None;
                     self.outgoing_packet_buffer.clear();
-                    self.incoming_packet_buffer.clear();
                     
                     // This is safe as inside the Ok it is not possible to have a None due to the above Ok(None) pattern.
                     return otherwise.map(|ok| ok.unwrap());
@@ -123,11 +118,9 @@ where
         }
     }
 
-    async fn smol_select<H>(&mut self, handler: &mut H) -> Result<Option<NetworkStatus>, ConnectionError>
-    where
-        H: AsyncEventHandler,
-    {
+    async fn smol_select(&mut self, handler: &mut H) -> Result<Option<NetworkStatus>, ConnectionError> {
         let Network {
+            handler: _, 
             network,
             options: _,
             keep_alive_interval,
@@ -136,7 +129,6 @@ where
             perform_keep_alive,
             state_handler,
             outgoing_packet_buffer,
-            incoming_packet_buffer,
             to_network_r,
         } = self;
 
@@ -153,52 +145,46 @@ where
             futures::select! {
                 res = stream.read_bytes().fuse() => {
                     res?;
-                    match stream.parse_messages(incoming_packet_buffer).await {
+                    match stream.parse_message().await {
                         Err(ReadBytes::Err(err)) => return Err(err),
                         Err(ReadBytes::InsufficientBytes(_)) => return Ok(None),
-                        Ok(_) => (),
-                    }
-
-                    for packet in incoming_packet_buffer.drain(0..){
-                        use Packet::*;
-                        match packet{
-                            PingResp => {
-                                handler.handle(packet).await;
-                                *await_pingresp = None;
-                            },
-                            Disconnect(_) => {
-                                handler.handle(packet).await;
-                                return Ok(Some(NetworkStatus::IncomingDisconnect));
-                            }
-                            packet => {
-                                match state_handler.handle_incoming_packet(&packet)? {
-                                    (maybe_reply_packet, true) => {
-                                        if let Some(reply_packet) = maybe_reply_packet {
+                        Ok(packet) => {
+                            match packet{
+                                Packet::PingResp => {
+                                    handler.handle(packet).await;
+                                    *await_pingresp = None;
+                                },
+                                Packet::Disconnect(_) => {
+                                    handler.handle(packet).await;
+                                    return Ok(Some(NetworkStatus::IncomingDisconnect));
+                                }
+                                packet => {
+                                    match state_handler.handle_incoming_packet(&packet)? {
+                                        (maybe_reply_packet, true) => {
+                                            handler.handle(packet).await;
+                                            if let Some(reply_packet) = maybe_reply_packet {
+                                                outgoing_packet_buffer.push(reply_packet);
+                                            }
+                                        },
+                                        (Some(reply_packet), false) => {
                                             outgoing_packet_buffer.push(reply_packet);
-                                        }
-                                    },
-                                    (Some(reply_packet), false) => {
-                                        outgoing_packet_buffer.push(reply_packet);
-                                    },
-                                    (None, false) => (),
+                                        },
+                                        (None, false) => (),
+                                    }
                                 }
                             }
-                        }
+                            stream.write_all(outgoing_packet_buffer).await?;
+                            *last_network_action = Instant::now();
+                        },
                     }
-
-                    stream.write_all(outgoing_packet_buffer).await?;
-                    *last_network_action = Instant::now();
 
                     Ok(None)
                 },
                 outgoing = to_network_r.recv().fuse() => {
                     let packet = outgoing?;
                     stream.write(&packet).await?;
-                    let mut disconnect = false;
 
-                    if packet.packet_type() == PacketType::Disconnect{
-                        disconnect = true;
-                    }
+                    let disconnect = packet.packet_type() == PacketType::Disconnect;
 
                     state_handler.handle_outgoing_packet(packet)?;
                     *last_network_action = Instant::now();

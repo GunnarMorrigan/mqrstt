@@ -136,7 +136,6 @@ impl WireLength for SubAckProperties {
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
-    use pretty_assertions::assert_eq;
 
     use super::SubAck;
     use crate::packets::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite};

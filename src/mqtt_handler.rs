@@ -254,15 +254,8 @@ mod handler_tests {
             Packet, QoS, UnsubAck, UnsubAckProperties, {PubComp, PubCompProperties}, {PubRec, PubRecProperties}, {PubRel, PubRelProperties}, {SubAck, SubAckProperties},
         },
         tests::test_packets::{create_connack_packet, create_puback_packet, create_publish_packet, create_subscribe_packet, create_unsubscribe_packet},
-        AsyncEventHandler, ConnectOptions, StateHandler,
+        ConnectOptions, StateHandler,
     };
-
-    pub struct Nop {}
-
-    impl AsyncEventHandler for Nop {
-        async fn handle(&self, _event: Packet) {}
-    }
-
     fn handler(clean_start: bool) -> (StateHandler, Receiver<u16>) {
         let (apkids, apkids_r) = AvailablePacketIds::new(100);
 
