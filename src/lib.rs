@@ -526,8 +526,7 @@ mod tokio_lib_test {
             ::new_from_client_id(client_id)
             .tokio_concurrent_network();
         
-        let stream = tokio::net::TcpStream::connect(("azurewe1576.azureexternal.dnvgl.com", 1883)).await.unwrap();
-        // let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
+        let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
         let mut pingpong = Arc::new(PingPong::new(client.clone()));
 
@@ -578,7 +577,7 @@ mod tokio_lib_test {
 
     //     let (mut network, client) = new_tokio(options);
 
-    //     let stream = tokio::net::TcpStream::connect(("azurewe1576.azureexternal.dnvgl.com", 1883)).await.unwrap();
+    //     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
     //     let pingresp = Arc::new(crate::test_handlers::PingResp::new(client.clone()));
 
