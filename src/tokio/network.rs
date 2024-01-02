@@ -277,20 +277,20 @@ where
     N: HandlerExt<H>,
     S: tokio::io::AsyncReadExt + Sized + Unpin + Send + 'static,
 {   
-    /// Runs the read half with a [`AsyncEventHandlerMut`].
+    /// Runs the read half of the mqtt connection.
     /// Continuously loops until disconnect or error.
     /// 
     /// # Return
     /// - Ok(None) in the case that the write task requested shutdown.
     /// - Ok(Some(reason)) in the case that this task initiates a shutdown.
     /// - Err in the case of IO, or protocol errors.
-    pub async fn run(mut self) -> Result<NetworkStatus, ConnectionError> {
+    pub async fn run(mut self) -> (Result<NetworkStatus, ConnectionError>, H) {
         let ret = self.read().await;
         self.run_signal.store(false, std::sync::atomic::Ordering::Release);
         while let Some(_) = self.join_set.join_next().await {
             ()
         }
-        ret
+        (ret, self.handler)
     }
     async fn read(&mut self) -> Result<NetworkStatus, ConnectionError> {
         while self.run_signal.load(std::sync::atomic::Ordering::Acquire) {
@@ -364,7 +364,7 @@ impl<S> NetworkWriter<S>
 where
     S: tokio::io::AsyncWriteExt + Sized + Unpin,
 {
-    /// Runs the write half of the concurrent read & write tokio client
+    /// Runs the read half of the mqtt connection.
     /// Continuously loops until disconnect or error.
     /// 
     /// # Return
