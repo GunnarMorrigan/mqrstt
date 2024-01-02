@@ -123,21 +123,21 @@ pub mod example_handlers{
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                         let max_len = payload.len().min(10);
-                        let a = &payload[0..max_len];
+                        // let a = &payload[0..max_len];
                         if payload.to_lowercase().contains("ping") {
                             self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
-                            println!("Received publish payload: {}", a);
+                            // println!("Received publish payload: {}", a);
                             
                             if !p.retain{
                                 self.number.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                             }
 
-                            println!("DBG: \n {}", &Packet::Publish(p));
+                            // println!("DBG: \n {}", &Packet::Publish(p));
                         }
                     }
                 }
                 Packet::ConnAck(_) => {
-                    println!("Connected!")
+                    // println!("Connected!")
                 }
                 _ => (),
             }

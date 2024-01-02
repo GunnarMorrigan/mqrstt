@@ -117,7 +117,7 @@ where
         }
     }
 
-    fn run<H>(&mut self, handler: &mut H) -> Result<Option<NetworkStatus>, ConnectionError>
+    fn run<H>(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError>
     where
         H: EventHandler,
     {

@@ -96,8 +96,8 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 let read_res = read_res.unwrap();
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
-                assert!(read_res.is_some());
-                assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
+                assert_eq!(read_res, NetworkStatus::IncomingDisconnect);
+                assert_eq!(write_res.unwrap().unwrap(), NetworkStatus::ShutdownSignal);
             },
         )
     });
@@ -122,9 +122,9 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 let read_res = read_res.unwrap();
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
-                assert!(read_res.is_some());
-                assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
+                assert_eq!(read_res, NetworkStatus::IncomingDisconnect);
                 assert_eq!(102, pingpong.number.load(std::sync::atomic::Ordering::SeqCst));
+                assert_eq!(write_res.unwrap().unwrap(), NetworkStatus::ShutdownSignal);
                 
                 let _server_box = black_box(client.clone());
                 let _server_box = black_box(server);
@@ -159,9 +159,9 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
                 assert!(read_res.is_ok());
-                let read_res = read_res.unwrap();
-                assert!(read_res.is_some());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
+                
+                assert_eq!(write_res.unwrap().unwrap(), NetworkStatus::ShutdownSignal);
 
                 let _network_box = black_box(network);
             },
@@ -192,9 +192,9 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
                 assert!(read_res.is_ok());
-                let read_res = read_res.unwrap();
-                assert!(read_res.is_some());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
+                
+                assert_eq!(write_res.unwrap().unwrap(), NetworkStatus::ShutdownSignal);
             }
         )
     });
@@ -220,10 +220,10 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
                 assert!(read_res.is_ok());
-                let read_res = read_res.unwrap();
-                assert!(read_res.is_some());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
                 assert_eq!(102, num_packets_received.load(std::sync::atomic::Ordering::SeqCst));
+                
+                assert_eq!(write_res.unwrap().unwrap(), NetworkStatus::ShutdownSignal);
                 
                 let _server_box = black_box(client.clone());
                 let _server_box = black_box(server);
@@ -258,9 +258,9 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
                 assert!(read_res.is_ok());
-                let read_res = read_res.unwrap();
-                assert!(read_res.is_some());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
+                
+                assert_eq!(write_res.unwrap().unwrap(), NetworkStatus::ShutdownSignal);
 
                 let _network_box = black_box(network);
             },

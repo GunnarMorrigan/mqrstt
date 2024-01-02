@@ -20,7 +20,7 @@ pub struct SequentialHandler;
 /// This kind of handler is used for both concurrent message handling and concurrent TCP read and write operations.
 pub struct ConcurrentHandler;
 
-trait HandlerExt<H>: Sized{
+pub trait HandlerExt<H>: Sized{
     /// Should call the handler in the fashion of the handler.
     /// (e.g. spawn a task if or await the handle call)
     fn call_handler(handler: &mut H, incoming_packet: Packet) -> impl Future<Output = ()> + Send;

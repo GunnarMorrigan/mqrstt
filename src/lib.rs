@@ -198,6 +198,8 @@ pub mod tests;
 /// It is returned when the run handle returns from performing an operation.
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum NetworkStatus {
+    /// The other side indicated a shutdown shutdown, Only used in concurrent context
+    ShutdownSignal,
     /// Indicate that there was an incoming disconnect and the socket has been closed.
     IncomingDisconnect,
     /// Indicate that an outgoing disconnect has been transmited and the socket is closed
@@ -441,7 +443,9 @@ mod smol_lib_test {
             let (n, _) = futures::join!(
                 async {
                     match network.run(&mut pingresp).await {
+                        
                         Ok(crate::NetworkStatus::OutgoingDisconnect) => return Ok(pingresp),
+                        Ok(crate::NetworkStatus::ShutdownSignal) => unreachable!(),
                         Ok(crate::NetworkStatus::KeepAliveTimeout) => panic!(),
                         Ok(crate::NetworkStatus::IncomingDisconnect) => panic!(),
                         Err(err) => return Err(err),
@@ -472,6 +476,8 @@ mod smol_lib_test {
             let address = "127.0.0.1";
             let port = 2001;
 
+            let listener = smol::net::TcpListener::bind((address, port)).await.unwrap();
+
             let (n, _) = futures::join!(
                 async {
                     let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
@@ -479,8 +485,7 @@ mod smol_lib_test {
                     let mut pingresp = crate::example_handlers::PingResp::new(client.clone());
                     network.connect(stream, &mut pingresp).await
                 },
-                async {
-                    let listener = smol::net::TcpListener::bind((address, port)).await.unwrap();
+                async move {
                     let (stream, _) = listener.accept().await.unwrap();
                     smol::Timer::after(std::time::Duration::from_secs(10)).await;
                     stream.shutdown(std::net::Shutdown::Write).unwrap();
@@ -532,7 +537,11 @@ mod tokio_lib_test {
 
         network.connect(stream, &mut pingpong).await.unwrap();
 
-        client.subscribe(("mqrstt", QoS::ExactlyOnce)).await.unwrap();
+        let topic = crate::random_chars() + "_mqrstt";
+
+        client.subscribe((topic.as_str(), QoS::ExactlyOnce)).await.unwrap();
+
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
         let (read, write) = network.split(pingpong.clone()).unwrap();
 
@@ -543,21 +552,27 @@ mod tokio_lib_test {
             read_handle,
             write_handle,
             async {
-                client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
-                client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".to_vec()).await.unwrap();
-                client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".to_vec()).await.unwrap();
-                client.publish("mqrstt".to_string(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
+                client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
+                client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".to_vec()).await.unwrap();
+                client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".to_vec()).await.unwrap();
+                client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
 
-                client.unsubscribe("mqrstt").await.unwrap();
-
-                tokio::time::sleep(Duration::from_secs(30)).await;
+                client.unsubscribe(topic.as_str()).await.unwrap();
+                
+                for _ in 0..30 {
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    if pingpong.number.load(std::sync::atomic::Ordering::SeqCst) == 4 {
+                        break;
+                    }
+                }
+                
                 client.disconnect().await.unwrap();
             }
         );
 
         let write_result = write_result.unwrap();
         assert!(write_result.is_ok());
-        assert_eq!(crate::NetworkStatus::OutgoingDisconnect, write_result.unwrap().unwrap());
+        assert_eq!(crate::NetworkStatus::OutgoingDisconnect, write_result.unwrap());
         assert_eq!(4, pingpong.number.load(std::sync::atomic::Ordering::SeqCst));
         let _ = black_box(read_result);
     }

@@ -284,7 +284,7 @@ where
     /// - Ok(None) in the case that the write task requested shutdown.
     /// - Ok(Some(reason)) in the case that this task initiates a shutdown.
     /// - Err in the case of IO, or protocol errors.
-    pub async fn run(mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
+    pub async fn run(mut self) -> Result<NetworkStatus, ConnectionError> {
         let ret = self.read().await;
         self.run_signal.store(false, std::sync::atomic::Ordering::Release);
         while let Some(_) = self.join_set.join_next().await {
@@ -292,7 +292,7 @@ where
         }
         ret
     }
-    async fn read(&mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
+    async fn read(&mut self) -> Result<NetworkStatus, ConnectionError> {
         while self.run_signal.load(std::sync::atomic::Ordering::Acquire) {
             let _ = self.read_stream.read_bytes().await?;
             loop {
@@ -316,7 +316,7 @@ where
                     }
                     Packet::Disconnect(_) => {
                         N::call_handler(&mut self.handler, packet).await;
-                        return Ok(Some(NetworkStatus::IncomingDisconnect));
+                        return Ok(NetworkStatus::IncomingDisconnect);
                     }
                     Packet::ConnAck(conn_ack) => {
                         if let Some(retransmit_packets) = self.state_handler.handle_incoming_connack(&conn_ack)? {
@@ -338,7 +338,7 @@ where
                 }
             }
         }
-        Ok(None)
+        Ok(NetworkStatus::ShutdownSignal)
     }
 }
 
@@ -371,12 +371,12 @@ where
     /// - Ok(None) in the case that the read task requested shutdown
     /// - Ok(Some(reason)) in the case that this task initiates a shutdown
     /// - Err in the case of IO, or protocol errors.
-    pub async fn run(mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
+    pub async fn run(mut self) -> Result<NetworkStatus, ConnectionError> {
         let ret = self.write().await;
         self.run_signal.store(false, std::sync::atomic::Ordering::Release);
         ret
     }
-    async fn write(&mut self) -> Result<Option<NetworkStatus>, ConnectionError> {
+    async fn write(&mut self) -> Result<NetworkStatus, ConnectionError> {
         while self.run_signal.load(std::sync::atomic::Ordering::Acquire) {
             if self.await_pingresp_time.is_some() && !self.await_pingresp_bool.load(std::sync::atomic::Ordering::Acquire) {
                 self.await_pingresp_time = None;
@@ -400,7 +400,7 @@ where
                     self.last_network_action = Instant::now();
 
                     if disconnect{
-                        return Ok(Some(NetworkStatus::OutgoingDisconnect))
+                        return Ok(NetworkStatus::OutgoingDisconnect);
                     }
                 },
                 from_reader = self.to_writer_r.recv() => {
@@ -426,11 +426,11 @@ where
                     if self.await_pingresp_bool.load(std::sync::atomic::Ordering::SeqCst){
                         let disconnect = Disconnect{ reason_code: DisconnectReasonCode::KeepAliveTimeout, properties: Default::default() };
                         self.write_stream.write(&Packet::Disconnect(disconnect)).await?;
-                        return Ok(Some(NetworkStatus::KeepAliveTimeout))
+                        return Ok(NetworkStatus::KeepAliveTimeout);
                     }
                 }
             }
         }
-        Ok(None)
+        Ok(NetworkStatus::ShutdownSignal)
     }
 }
