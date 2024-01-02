@@ -332,7 +332,7 @@ where
 
 }
 
-#[cfg(feature = "sync")]
+#[cfg(feature = "todo")]
 /// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
 /// S should implement [`std::io::Read`] and [`std::io::Write`].
 /// Additionally, S should be made non_blocking otherwise it will not progress.

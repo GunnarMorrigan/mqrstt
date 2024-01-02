@@ -36,7 +36,6 @@ impl MqttClient {
 }
 
 /// Async functions to perform MQTT operations
-#[cfg(any(feature = "tokio", feature = "smol", feature = "quic"))]
 impl MqttClient {
     /// Creates a subscribe packet that is then asynchronously transferred to the Network stack for transmission
     ///
@@ -462,7 +461,6 @@ impl MqttClient {
 }
 
 /// Sync functions to perform MQTT operations
-#[cfg(feature = "sync")]
 impl MqttClient {
     /// Creates a subscribe packet that is then transferred to the Network stack for transmission
     ///

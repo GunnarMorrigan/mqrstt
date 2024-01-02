@@ -16,8 +16,9 @@ description = "Pure rust MQTTv5 client implementation Smol and Tokio"
 [features]
 default = [
     "smol",
-    "tokio", 
+    "tokio",
 ]
+sync = []
 tokio = ["dep:tokio", "tokio/rt"]
 smol = ["dep:smol"]
 logs = ["dep:tracing"]

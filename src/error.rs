@@ -38,7 +38,7 @@ pub enum ConnectionError {
     #[error("Handler Error: {0:?}")]
     HandlerError(#[from] HandlerError),
 
-    #[cfg(feature = "tokio_concurrent")]
+    #[cfg(feature = "tokio")]
     #[error("Join error")]
     JoinError(#[from] tokio::task::JoinError),
 }
