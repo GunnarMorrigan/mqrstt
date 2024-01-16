@@ -66,8 +66,9 @@ impl MqttRead for ProtocolVersion {
 }
 
 /// Quality of service
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QoS {
+    #[default]
     AtMostOnce = 0,
     AtLeastOnce = 1,
     ExactlyOnce = 2,

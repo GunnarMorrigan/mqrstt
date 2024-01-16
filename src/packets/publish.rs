@@ -9,7 +9,7 @@ use super::{
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Publish {
     /// 3.3.1.1 dup
     pub dup: bool,
