@@ -22,7 +22,7 @@ use crate::state::State;
 
 
 #[cfg(feature = "logs")]
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 /// Eventloop with all the state of a connection
 pub struct StateHandler {
