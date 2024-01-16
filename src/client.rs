@@ -35,9 +35,9 @@ impl MqttClient {
     }
 
     /// This function is only here for you to use during testing of for example your handler
-    /// For a simple client look at [`MqttClient::dummy_client`]
+    /// For a simple client look at [`MqttClient::test_client`]
     #[cfg(feature = "test")]
-    pub fn dummy_custom_client(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
+    pub fn test_custom_client(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
         Self {
             available_packet_ids_r,
             to_network_s,
@@ -46,9 +46,9 @@ impl MqttClient {
     }
 
     /// This function is only here for you to use during testing of for example your handler
-    /// For control over the input of this type look at [`MqttClient::dummy_custom_client`]
+    /// For control over the input of this type look at [`MqttClient::test_custom_client`]
     #[cfg(feature = "test")]
-    pub fn dummy_client() -> (Self, crate::available_packet_ids::AvailablePacketIds, Receiver<Packet>) {
+    pub fn test_client() -> (Self, crate::available_packet_ids::AvailablePacketIds, Receiver<Packet>) {
         use async_channel::unbounded;
 
         use crate::{available_packet_ids::AvailablePacketIds, util::constants::MAXIMUM_PACKET_SIZE};
