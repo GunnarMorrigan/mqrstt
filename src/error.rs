@@ -43,7 +43,7 @@ pub enum ConnectionError {
     JoinError(#[from] tokio::task::JoinError),
 }
 
-/// Errors that the [`crate::MqttClient`] can emit
+/// Errors that the [`crate::StateHandler`] can emit
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum HandlerError {
     #[error("Missing Packet ID")]

@@ -170,7 +170,7 @@ const CHANNEL_SIZE: usize = 100;
 mod available_packet_ids;
 mod client;
 mod connect_options;
-mod mqtt_handler;
+mod state_handler;
 mod util;
 
 #[cfg(any(feature = "tokio"))]
@@ -188,7 +188,7 @@ pub use event_handlers::*;
 
 pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
-use mqtt_handler::StateHandler;
+use state_handler::StateHandler;
 
 #[cfg(test)]
 pub mod tests;
