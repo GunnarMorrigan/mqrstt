@@ -33,6 +33,40 @@ impl MqttClient {
             max_packet_size,
         }
     }
+
+    /// This function is only here for you to use during testing of for example your handler
+    /// For a simple client look at [`MqttClient::dummy_client`]
+    #[cfg(feature = "test")]
+    pub fn dummy_custom_client(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
+        Self {
+            available_packet_ids_r,
+            to_network_s,
+            max_packet_size,
+        }
+    }
+
+    /// This function is only here for you to use during testing of for example your handler
+    /// For control over the input of this type look at [`MqttClient::dummy_custom_client`]
+    #[cfg(feature = "test")]
+    pub fn dummy_client() -> (Self, crate::available_packet_ids::AvailablePacketIds, Receiver<Packet>) {
+        use async_channel::unbounded;
+
+        use crate::{available_packet_ids::AvailablePacketIds, util::constants::MAXIMUM_PACKET_SIZE};
+
+        let (available_packet_ids, available_packet_ids_r) = AvailablePacketIds::new(u16::MAX);
+
+        let (s, r) = unbounded();
+
+        (
+            Self {
+                available_packet_ids_r,
+                to_network_s: s,
+                max_packet_size: MAXIMUM_PACKET_SIZE as usize,
+            },
+            available_packet_ids,
+            r
+        )
+    }
 }
 
 /// Async functions to perform MQTT operations

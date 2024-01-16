@@ -18,12 +18,13 @@ rust-version = "1.75"
 [features]
 default = [
     "smol",
-    "tokio",
+    "tokio"
 ]
 sync = []
 tokio = ["dep:tokio", "tokio/rt"]
 smol = ["dep:smol"]
 logs = ["dep:tracing"]
+test = []
 
 [dependencies]
 # Packets
