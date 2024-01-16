@@ -8,6 +8,9 @@ use crate::{
     packets::{error::ReadBytes, FixedHeader, Packet},
 };
 
+#[cfg(feature = "logs")]
+use tracing::trace;
+
 #[derive(Debug)]
 pub struct ReadStream<S> {
     stream: ReadHalf<S>,

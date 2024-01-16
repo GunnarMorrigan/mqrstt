@@ -3,6 +3,9 @@ use tokio::io::{AsyncWriteExt, WriteHalf};
 
 use crate::{error::ConnectionError, packets::Packet};
 
+#[cfg(feature = "logs")]
+use tracing::trace;
+
 #[derive(Debug)]
 pub struct WriteStream<S> {
     pub stream: WriteHalf<S>,
