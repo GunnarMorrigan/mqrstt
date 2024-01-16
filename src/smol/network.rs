@@ -16,7 +16,7 @@ use crate::{AsyncEventHandlerMut, StateHandler};
 
 use super::stream::Stream;
 
-/// [`Network`] reads and writes to the network based on tokios [`AsyncReadExt`] [`AsyncWriteExt`].
+/// [`Network`] reads and writes to the network based on tokios [`::smol::io::AsyncReadExt`] [`::smol::io::AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
@@ -89,13 +89,12 @@ where
         Ok(())
     }
 
-    /// A single call to run will perform one of three tasks:
-    /// - Read from the stream and parse the bytes to packets for the user to handle
-    /// - Write user packets to stream
-    /// - Perform keepalive if necessary
+    /// A single call to [`Network::run`] will continiously perform the tasks mentioned below until an error is encountered.
+    /// 1. Read from the stream and parse the bytes to packets for the user to handle
+    /// 2. Write user packets to stream
+    /// 3. Perform keepalive if necessary
     ///
     /// This function can produce an indication of the state of the network or an error.
-    /// When the network is still active (i.e. stream is not closed and no disconnect packet has been processed) the network will return [`NetworkStatus::Active`]
     ///
     /// In all other cases the network is unusable anymore.
     /// The stream will be dropped and the internal buffers will be cleared.

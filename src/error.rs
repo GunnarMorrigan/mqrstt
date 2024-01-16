@@ -43,7 +43,7 @@ pub enum ConnectionError {
     JoinError(#[from] tokio::task::JoinError),
 }
 
-/// Errors that the [`mqrstt::MqttHandler`] can emit
+/// Errors that the [`crate::MqttClient`] can emit
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum HandlerError {
     #[error("Missing Packet ID")]
@@ -71,7 +71,7 @@ pub enum HandlerError {
     UnexpectedPacket(PacketType),
 }
 
-/// Errors producable by the [`mqrstt::AsyncClient`]
+/// Errors producable by the [`crate::MqttClient`]
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ClientError {
     #[error("Internal network channel is closed")]

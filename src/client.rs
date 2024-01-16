@@ -47,6 +47,22 @@ impl MqttClient {
 
     /// This function is only here for you to use during testing of for example your handler
     /// For control over the input of this type look at [`MqttClient::test_custom_client`]
+    /// 
+    /// The returned values should not be dropped otherwise the client won't be able to operate normally.
+    /// 
+    /// # Example
+    /// ```
+    /// let (
+    ///     client, // An instance of this client
+    ///     ids, // Allows you to indicate which packet IDs have become available again.
+    ///     network_receiver // Messages send through the `client` will be dispatched through this channel
+    /// ) = MqttClient::test_client();
+    /// 
+    /// // perform testing
+    /// 
+    /// // Make sure to not drop these before the test is done!
+    /// std::hint::black_box((ids, network_receiver));
+    /// ```
     #[cfg(feature = "test")]
     pub fn test_client() -> (Self, crate::available_packet_ids::AvailablePacketIds, Receiver<Packet>) {
         use async_channel::unbounded;

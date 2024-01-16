@@ -1,14 +1,13 @@
 //! A pure rust MQTT client which is easy to use, efficient and provides both sync and async options.
 //!
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
-//! For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
-//! For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
+//! For an async approach the stream has to implement the `AsyncReadExt` and `AsyncWriteExt` traits. 
+//! That is [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`] for tokio and [`::smol::io::AsyncReadExt`] and [`::smol::io::AsyncWriteExt`] for smol.
 //!
 //! Features:
 //! ----------------------------
 //!  - MQTT v5
 //!  - Runtime agnostic (Smol, Tokio)
-//!  - Sync
 //!  - TLS/TCP
 //!  - Lean
 //!  - Keep alive depends on actual communication
@@ -241,7 +240,7 @@ where
     H: AsyncEventHandlerMut,
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
 {   
-    /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
+    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`]
     /// This network is supposed to be ran on a single task/thread. The read and write operations happen one after the other.
     /// This approach does not give the most speed in terms of reading and writing but provides a simple and easy to use client with low overhead for low throughput clients.
     /// 
@@ -278,7 +277,7 @@ where
     H: AsyncEventHandler,
     S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
 {
-    /// Creates the needed components to run the MQTT client using a stream that implements [`tokio::io::AsyncReadExt`] and [`tokio::io::AsyncWriteExt`]
+    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`] 
     /// # Example
     ///
     /// ```
@@ -310,7 +309,7 @@ where
     H: AsyncEventHandlerMut,
     S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
 {
-    /// Creates the needed components to run the MQTT client using a stream that implements [`smol::io::AsyncReadExt`] and [`smol::io::AsyncWriteExt`]
+    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncReadExt`]  and [`::tokio::io::AsyncWriteExt`] 
     /// ```
     /// let (mut network, client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>
     ///     ::new_from_client_id("ExampleClient")
