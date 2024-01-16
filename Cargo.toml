@@ -11,6 +11,8 @@ license = "MPL-2.0"
 keywords = ["MQTT", "IoT", "MQTTv5", "messaging", "client"]
 description = "Pure rust MQTTv5 client implementation Smol and Tokio"
 
+rust-version = "1.75"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]

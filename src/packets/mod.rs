@@ -91,6 +91,7 @@ impl QoS {
 }
 
 impl MqttRead for QoS {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
             return Err(DeserializeError::InsufficientData("QoS".to_string(), 0, 1));
@@ -106,6 +107,7 @@ impl MqttRead for QoS {
 }
 
 impl MqttWrite for QoS {
+    #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         let val = match self {
             QoS::AtMostOnce => 0,
@@ -118,6 +120,7 @@ impl MqttWrite for QoS {
 }
 
 impl MqttRead for Box<str> {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let content = Bytes::read(buf)?;
 
@@ -143,6 +146,7 @@ impl WireLength for Box<str> {
 }
 
 impl MqttWrite for &str {
+    #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.len() as u16);
         buf.extend(self.as_bytes());
@@ -158,6 +162,7 @@ impl WireLength for &str {
 }
 
 impl MqttRead for String {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let content = Bytes::read(buf)?;
 
@@ -169,6 +174,7 @@ impl MqttRead for String {
 }
 
 impl MqttWrite for String {
+    #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         if self.len() > 65535 {
             return Err(SerializeError::StringTooLong(self.len()));
@@ -188,6 +194,7 @@ impl WireLength for String {
 }
 
 impl MqttRead for Bytes {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         let len = buf.get_u16() as usize;
 
@@ -200,6 +207,7 @@ impl MqttRead for Bytes {
 }
 
 impl MqttWrite for Bytes {
+    #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.len() as u16);
         buf.extend(self);
@@ -230,6 +238,7 @@ impl MqttRead for bool {
 }
 
 impl MqttWrite for bool {
+    #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         if *self {
             buf.put_u8(1);
@@ -242,6 +251,7 @@ impl MqttWrite for bool {
 }
 
 impl MqttRead for u8 {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
             return Err(DeserializeError::InsufficientData("u8".to_string(), 0, 1));
@@ -251,6 +261,7 @@ impl MqttRead for u8 {
 }
 
 impl MqttRead for u16 {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 2 {
             return Err(DeserializeError::InsufficientData("u16".to_string(), buf.len(), 2));
@@ -259,12 +270,28 @@ impl MqttRead for u16 {
     }
 }
 
+impl MqttWrite for u16 {
+    #[inline]
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        buf.put_u16(*self);
+        Ok(())
+    }
+}
+
 impl MqttRead for u32 {
+    #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 4 {
             return Err(DeserializeError::InsufficientData("u32".to_string(), buf.len(), 4));
         }
         Ok(buf.get_u32())
+    }
+}
+
+impl MqttWrite for u32 {
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        buf.put_u32(*self);
+        Ok(())
     }
 }
 
@@ -563,8 +590,10 @@ impl Packet {
 
                 p.write(buf)?;
             }
-            Packet::ConnAck(_) => {
-                unreachable!()
+            Packet::ConnAck(p) => {
+                buf.put_u8(0b0010_0000);
+                write_variable_integer(buf, p.wire_len())?;
+                p.write(buf)?;
             }
             Packet::Publish(p) => {
                 let mut first_byte = 0b0011_0000u8;
@@ -615,8 +644,8 @@ impl Packet {
                 p.write(buf)?;
             }
             Packet::UnsubAck(_) => {
+                unreachable!();
                 buf.put_u8(0b1011_0000);
-                unreachable!()
             }
             Packet::PingReq => {
                 buf.put_u8(0b1100_0000);
