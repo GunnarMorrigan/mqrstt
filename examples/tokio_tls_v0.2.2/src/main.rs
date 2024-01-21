@@ -1,7 +1,8 @@
-use std::{io::{BufReader, Cursor}, sync::Arc};
+use std::{io::{BufReader, Cursor}, sync::Arc, time::Duration};
 
-use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, new_smol, NetworkStatus};
-use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate, ServerName};
+use async_trait::async_trait;
+use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, tokio::NetworkStatus, new_tokio};
+use tokio_rustls::rustls::{ClientConfig, RootCertStore, OwnedTrustAnchor, Certificate, ServerName};
 
 
 pub const EMQX_CERT: &[u8] = include_bytes!("broker.emqx.io-ca.crt");
@@ -11,6 +12,7 @@ pub struct PingPong {
     pub client: MqttClient,
 }
 
+#[async_trait]
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
     async fn handle(&mut self, event: packets::Packet) -> () {
@@ -74,7 +76,7 @@ pub fn simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth: Opt
             let client_certs = rustls_pemfile::certs(&mut BufReader::new(Cursor::new(client_cert_info))).unwrap();
             let client_cert_chain = client_certs.into_iter().map(Certificate).collect();
 
-            config.with_single_cert(client_cert_chain, rustls::PrivateKey(key))?
+            config.with_single_cert(client_cert_chain, tokio_rustls::rustls::PrivateKey(key)).unwrap()
         }
         None => config.with_no_client_auth(),
     };
@@ -86,44 +88,43 @@ pub fn simple_rust_tls(ca: Vec<u8>, alpn: Option<Vec<Vec<u8>>>, client_auth: Opt
     Ok(Arc::new(config))
 }
 
-fn main() {
-    smol::block_on(async {
-        let client_id = "SmolTls_MQrsTT_Example".to_string();
-        let options = ConnectOptions::new(client_id);
+#[tokio::main]
+async fn main() {
+    let client_id = "TokioTls_MQrsTT_Example".to_string();
+    let options = ConnectOptions::new(client_id);
 
-        let address = "broker.emqx.io";
-        let port = 8883;
+    let address = "broker.emqx.io";
+    let port = 8883;
 
-        let (mut network, client) = new_smol(options);
+    let (mut network, client) = new_tokio(options);
 
-        let arc_client_config = simple_rust_tls(EMQX_CERT.to_vec(), None, None).unwrap();
+    let arc_client_config = simple_rust_tls(EMQX_CERT.to_vec(), None, None).unwrap();
 
-        let domain = ServerName::try_from(address).unwrap();
-        let connector = async_rustls::TlsConnector::from(arc_client_config);
+    let domain = ServerName::try_from(address).unwrap();
+    let connector = tokio_rustls::TlsConnector::from(arc_client_config);
 
-        let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
-        let connection = connector.connect(domain, stream).await.unwrap();
+    let stream = tokio::net::TcpStream::connect((address, port)).await.unwrap();
+    let connection = connector.connect(domain, stream).await.unwrap();
 
-        let mut pingpong = PingPong { client: client.clone() };
+    let mut pingpong = PingPong { client: client.clone() };
 
-        network.connect(connection, &mut pingpong).await.unwrap();
+    network.connect(connection, &mut pingpong).await.unwrap();
 
-        client.subscribe("mqrstt").await.unwrap();
+    client.subscribe("mqrstt").await.unwrap();
 
-        let (n, _) = futures::join!(
-            async {
-                loop {
-                    return match network.poll(&mut pingpong).await {
-                        Ok(NetworkStatus::Active) => continue,
-                        otherwise => otherwise,
-                    };
-                }
-            },
-            async {
-                smol::Timer::after(std::time::Duration::from_secs(30)).await;
-                client.disconnect().await.unwrap();
+    let (n, _) = tokio::join!(
+        async {
+            loop {
+                return match network.poll(&mut pingpong).await {
+                    Ok(NetworkStatus::Active) => continue,
+                    otherwise => otherwise,
+                };
             }
-        );
-        assert!(n.is_ok());
-    });
+        },
+        async {
+            tokio::time::sleep(Duration::from_secs(30)).await;
+            client.disconnect().await.unwrap();
+        }
+    );
+    assert!(n.is_ok());
 }

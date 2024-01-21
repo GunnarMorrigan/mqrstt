@@ -1,0 +1,85 @@
+[package]
+name = "mqrstt"
+version = "0.3.0-alpha.5"
+homepage = "https://github.com/GunnarMorrigan/mqrstt"
+repository = "https://github.com/GunnarMorrigan/mqrstt"
+documentation = "https://docs.rs/mqrstt"
+categories = ["network-programming"]
+readme = "README.md"
+edition = "2021"
+license = "MPL-2.0"
+keywords = ["MQTT", "IoT", "MQTTv5", "messaging", "client"]
+description = "Pure rust MQTTv5 client implementation Smol and Tokio"
+
+rust-version = "1.75"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+default = [
+    "smol",
+    "tokio"
+]
+sync = []
+tokio = ["dep:tokio", "tokio/rt"]
+smol = ["dep:smol"]
+logs = ["dep:tracing"]
+test = []
+
+[dependencies]
+# Packets
+bytes = "1.5.0"
+
+# Errors
+thiserror = "1.0.53"
+tracing = { version = "0.1.40", optional = true }
+
+async-channel = "2.1.1"
+#async-mutex = "1.4.0"
+futures = { version = "0.3.30", default-features = false, features = [
+    "std",
+    "async-await",
+] }
+
+# quic feature flag
+# quinn = {version = "0.9.0", optional = true }
+
+# tokio feature flag
+tokio = { version = "1.35.1", features = [
+    "macros",
+    "io-util",
+    "net",
+    "time",
+], optional = true }
+
+# smol feature flag
+smol = { version = "2.0.0", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5.1", features = ["async_tokio"] }
+
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+smol = { version = "2.0.0" }
+tokio = { version = "1.33.0", features = [
+    "rt-multi-thread",
+    "rt",
+    "macros",
+    "sync",
+    "io-util",
+    "net",
+    "time",
+] }
+
+rustls = { version = "0.21.7" }
+rustls-pemfile = { version = "1.0.3" }
+webpki = { version = "0.22.4" }
+async-rustls = { version = "0.4.1" }
+tokio-rustls = "0.24.1"
+rstest = "0.18.2"
+rand = "0.8.5"
+
+
+[[bench]]
+name = "bench_main"
+harness = false
