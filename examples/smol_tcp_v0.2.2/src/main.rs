@@ -1,8 +1,8 @@
-use std::{io::{BufReader, Cursor}, sync::Arc};
+
 
 use async_trait::async_trait;
 use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, new_smol, smol::NetworkStatus};
-use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate, ServerName};
+
 
 pub struct PingPong {
     pub client: MqttClient,

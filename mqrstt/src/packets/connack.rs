@@ -451,12 +451,12 @@ impl MqttWrite for ConnAckFlags {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Buf;
+    
 
     use crate::packets::{
         connack::{ConnAck, ConnAckProperties},
         mqtt_traits::{MqttRead, VariableHeaderRead, MqttWrite, VariableHeaderWrite},
-        reason_codes::ConnAckReasonCode, Packet, FixedHeader, PacketType,
+        reason_codes::ConnAckReasonCode, Packet,
     };
 
     #[test]
@@ -528,7 +528,7 @@ mod tests {
 
         c1.write(&mut buf).unwrap();
 
-        let buf_clone = buf.to_vec();
+        let _buf_clone = buf.to_vec();
 
         let c2 = ConnAckProperties::read(&mut buf.into()).unwrap();
 

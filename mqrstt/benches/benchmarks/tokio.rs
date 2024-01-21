@@ -1,6 +1,6 @@
 use std::{
     hint::black_box,
-    io::{Cursor, Write},
+    io::{Write},
     time::Duration, net::SocketAddr, sync::Arc,
 };
 
@@ -59,7 +59,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
 
                 let (read_res, write_res) = tokio::join!(read_handle, write_handle);
                 assert!(read_res.is_ok());
-                let (read_res, handler) = read_res.unwrap();
+                let (read_res, _handler) = read_res.unwrap();
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
                 assert_eq!(read_res, NetworkStatus::IncomingDisconnect);
@@ -85,7 +85,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 
                 let (read_res, write_res) = futures::join!(read_handle, write_handle);
                 assert!(read_res.is_ok());
-                let (read_res, handler) = read_res.unwrap();
+                let (read_res, _handler) = read_res.unwrap();
                 assert!(read_res.is_ok());
                 let read_res = read_res.unwrap();
                 assert_eq!(read_res, NetworkStatus::IncomingDisconnect);
@@ -123,7 +123,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 
                 let (read_res, write_res) = tokio::join!(read_handle, write_handle);
                 assert!(read_res.is_ok());
-                let (read_res, handler) = read_res.unwrap();
+                let (read_res, _handler) = read_res.unwrap();
                 assert!(read_res.is_ok());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
                 
@@ -156,7 +156,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
 
                 let (read_res, write_res) = tokio::join!(read_handle, write_handle);
                 assert!(read_res.is_ok());
-                let (read_res, handler) = read_res.unwrap();
+                let (read_res, _handler) = read_res.unwrap();
                 assert!(read_res.is_ok());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
                 
@@ -184,7 +184,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 
                 let (read_res, write_res) = futures::join!(read_handle, write_handle);
                 assert!(read_res.is_ok());
-                let (read_res, handler) = read_res.unwrap();
+                let (read_res, _handler) = read_res.unwrap();
                 assert!(read_res.is_ok());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
                 assert_eq!(102, num_packets_received.load(std::sync::atomic::Ordering::SeqCst));
@@ -222,7 +222,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
                 
                 let (read_res, write_res) = futures::join!(read_handle, write_handle);
                 assert!(read_res.is_ok());
-                let (read_res, handler) = read_res.unwrap();
+                let (read_res, _handler) = read_res.unwrap();
                 assert!(read_res.is_ok());
                 assert_eq!(read_res.unwrap(), NetworkStatus::IncomingDisconnect);
                 

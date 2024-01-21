@@ -73,7 +73,7 @@ fn very_large_publish(id: u16, repeat: usize) -> Packet {
 
 
 mod test_handlers{
-    use std::{sync::{atomic::AtomicU16, Arc}, ops::AddAssign, time::Duration};
+    use std::{sync::{atomic::AtomicU16, Arc}, time::Duration};
 
     use bytes::Bytes;
     use mqrstt::{AsyncEventHandler, packets::{self, Packet}, MqttClient, AsyncEventHandlerMut};
@@ -99,7 +99,7 @@ mod test_handlers{
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                         let max_len = payload.len().min(10);
-                        let a = &payload[0..max_len];
+                        let _a = &payload[0..max_len];
                         if payload.to_lowercase().contains("ping") {
                             self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
                         }
@@ -118,7 +118,7 @@ mod test_handlers{
                 Packet::Publish(p) => {
                     if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                         let max_len = payload.len().min(10);
-                        let a = &payload[0..max_len];
+                        let _a = &payload[0..max_len];
                         if payload.to_lowercase().contains("ping") {
                             self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
                         }

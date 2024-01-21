@@ -1,8 +1,8 @@
-use std::{io::{BufReader, Cursor}, sync::Arc, time::Duration};
+use std::{time::Duration};
 
 use async_trait::async_trait;
 use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, tokio::NetworkStatus, new_tokio};
-use tokio_rustls::rustls::{ClientConfig, RootCertStore, OwnedTrustAnchor, Certificate, ServerName};
+
 
 pub struct PingPong {
     pub client: MqttClient,
