@@ -368,7 +368,7 @@ mod handler_tests {
         let (packet3, should_handle) = handler.handle_incoming_packet(&pubcomp).unwrap();
 
         assert!(packet3.is_none());
-        assert!(!should_handle);
+        assert!(should_handle);
         assert!(handler.state.incoming_pub().is_empty());
         assert!(handler.state.outgoing_pub()[pkid as usize - 1].clone().is_none());
         assert!(handler.state.outgoing_pub_order().is_empty());
