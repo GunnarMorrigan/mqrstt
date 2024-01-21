@@ -71,21 +71,26 @@ fn very_large_publish(id: u16, repeat: usize) -> Packet {
     Packet::Publish(publ)
 }
 
-
-mod test_handlers{
-    use std::{sync::{atomic::AtomicU16, Arc}, time::Duration};
+mod test_handlers {
+    use std::{
+        sync::{atomic::AtomicU16, Arc},
+        time::Duration,
+    };
 
     use bytes::Bytes;
-    use mqrstt::{AsyncEventHandler, packets::{self, Packet}, MqttClient, AsyncEventHandlerMut};
+    use mqrstt::{
+        packets::{self, Packet},
+        AsyncEventHandler, AsyncEventHandlerMut, MqttClient,
+    };
 
     pub struct PingPong {
         pub client: MqttClient,
         pub number: Arc<AtomicU16>,
     }
 
-    impl PingPong{
+    impl PingPong {
         pub fn new(client: MqttClient) -> Self {
-            Self { 
+            Self {
                 client,
                 number: Arc::new(AtomicU16::new(0)),
             }
@@ -130,15 +135,13 @@ mod test_handlers{
         }
     }
 
-    pub struct SimpleDelay{
+    pub struct SimpleDelay {
         delay: Duration,
     }
 
-    impl SimpleDelay{
-        pub fn new(delay: Duration) -> Self{
-            Self {
-                delay,
-            }
+    impl SimpleDelay {
+        pub fn new(delay: Duration) -> Self {
+            Self { delay }
         }
     }
 
@@ -147,7 +150,7 @@ mod test_handlers{
             tokio::time::sleep(self.delay)
         }
     }
-    impl AsyncEventHandlerMut for SimpleDelay{
+    impl AsyncEventHandlerMut for SimpleDelay {
         fn handle(&mut self, _: Packet) -> impl futures::prelude::Future<Output = ()> + Send + Sync {
             tokio::time::sleep(self.delay)
         }

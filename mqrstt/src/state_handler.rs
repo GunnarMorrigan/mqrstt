@@ -1,7 +1,3 @@
-
-
-
-
 use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::HandlerError;
@@ -19,7 +15,6 @@ use crate::packets::{ConnAck, Disconnect};
 use crate::packets::{Packet, PacketType};
 use crate::packets::{PubAck, PubAckProperties};
 use crate::state::State;
-
 
 #[cfg(feature = "logs")]
 use tracing::{debug, error, info, warn};
@@ -77,7 +72,7 @@ impl StateHandler {
             }
             QoS::ExactlyOnce => {
                 let pkid = publish.packet_identifier.ok_or(HandlerError::MissingPacketId)?;
-                
+
                 let should_client_handle = self.state.add_incoming_pub(pkid) && !publish.dup;
 
                 #[cfg(feature = "logs")]
@@ -194,7 +189,7 @@ impl StateHandler {
                 #[cfg(test)]
                 unreachable!("Was given unexpected packet {:?} ", _a);
                 Ok(())
-            },
+            }
         }
     }
 

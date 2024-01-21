@@ -1,12 +1,18 @@
-use std::{io::{BufReader, Cursor}, sync::Arc};
+use std::{
+    io::{BufReader, Cursor},
+    sync::Arc,
+};
 
 use async_trait::async_trait;
-use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, new_smol, smol::NetworkStatus};
-use rustls::{RootCertStore, OwnedTrustAnchor, ClientConfig, Certificate, ServerName};
-
+use mqrstt::{
+    new_smol,
+    packets::{self, Packet},
+    smol::NetworkStatus,
+    AsyncEventHandler, ConnectOptions, MqttClient,
+};
+use rustls::{Certificate, ClientConfig, OwnedTrustAnchor, RootCertStore, ServerName};
 
 pub const EMQX_CERT: &[u8] = include_bytes!("broker.emqx.io-ca.crt");
-
 
 pub struct PingPong {
     pub client: MqttClient,
@@ -20,20 +26,14 @@ impl AsyncEventHandler for PingPong {
             Packet::Publish(p) => {
                 if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                     if payload.to_lowercase().contains("ping") {
-                        self.client
-                            .publish(
-                                p.topic.clone(),
-                                p.qos,
-                                p.retain,
-                                "pong",
-                            )
-                            .await
-                            .unwrap();
+                        self.client.publish(p.topic.clone(), p.qos, p.retain, "pong").await.unwrap();
                         println!("Received Ping, Send pong!");
                     }
                 }
-            },
-            Packet::ConnAck(_) => { println!("Connected!") },
+            }
+            Packet::ConnAck(_) => {
+                println!("Connected!")
+            }
             _ => (),
         }
     }

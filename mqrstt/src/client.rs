@@ -47,9 +47,9 @@ impl MqttClient {
 
     /// This function is only here for you to use during testing of for example your handler
     /// For control over the input of this type look at [`MqttClient::test_custom_client`]
-    /// 
+    ///
     /// The returned values should not be dropped otherwise the client won't be able to operate normally.
-    /// 
+    ///
     /// # Example
     /// ```
     /// let (
@@ -57,9 +57,9 @@ impl MqttClient {
     ///     ids, // Allows you to indicate which packet IDs have become available again.
     ///     network_receiver // Messages send through the `client` will be dispatched through this channel
     /// ) = MqttClient::test_client();
-    /// 
+    ///
     /// // perform testing
-    /// 
+    ///
     /// // Make sure to not drop these before the test is done!
     /// std::hint::black_box((ids, network_receiver));
     /// ```
@@ -80,7 +80,7 @@ impl MqttClient {
                 max_packet_size: MAXIMUM_PACKET_SIZE as usize,
             },
             available_packet_ids,
-            r
+            r,
         )
     }
 }
@@ -970,11 +970,11 @@ mod tests {
         let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtLeastOnce)];
         let _ = mqtt_client.subscribe(vec.as_slice()).await;
 
-        let sub_options = crate::packets::SubscriptionOptions{
-        retain_handling: crate::packets::RetainHandling::TWO,
-        retain_as_publish: false,
-        no_local: false,
-        qos: QoS::AtLeastOnce,
+        let sub_options = crate::packets::SubscriptionOptions {
+            retain_handling: crate::packets::RetainHandling::TWO,
+            retain_as_publish: false,
+            no_local: false,
+            qos: QoS::AtLeastOnce,
         };
         let _ = mqtt_client.subscribe(("final/test/topic", sub_options)).await;
     }

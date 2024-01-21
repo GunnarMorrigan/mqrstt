@@ -66,7 +66,7 @@ where
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError>{
+    pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> {
         let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 
@@ -109,7 +109,7 @@ where
                     self.network = None;
                     self.await_pingresp = None;
                     self.outgoing_packet_buffer.clear();
-                    
+
                     // This is safe as inside the Ok it is not possible to have a None due to the above Ok(None) pattern.
                     return otherwise.map(|ok| ok.unwrap());
                 }
@@ -119,7 +119,7 @@ where
 
     async fn smol_select(&mut self, handler: &mut H) -> Result<Option<NetworkStatus>, ConnectionError> {
         let Network {
-            handler: _, 
+            handler: _,
             network,
             options: _,
             keep_alive_interval,

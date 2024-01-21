@@ -1,9 +1,9 @@
 use super::{
     error::{DeserializeError, SerializeError},
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, WireLength, VariableHeaderWrite},
+    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
     read_variable_integer,
     reason_codes::ConnAckReasonCode,
-    PacketType, PropertyType, QoS, write_variable_integer, variable_integer_len,
+    variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 use bytes::{Buf, BufMut, Bytes};
 
@@ -40,7 +40,6 @@ impl VariableHeaderRead for ConnAck {
 
 impl VariableHeaderWrite for ConnAck {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
-        
         self.connack_flags.write(buf)?;
         self.reason_code.write(buf)?;
         self.connack_properties.write(buf)?;
@@ -280,8 +279,6 @@ impl MqttWrite for ConnAckProperties {
             authentication_data,
         } = self;
 
-
-
         if let Some(session_expiry_interval) = session_expiry_interval {
             PropertyType::SessionExpiryInterval.write(buf)?;
             buf.put_u32(*session_expiry_interval);
@@ -294,7 +291,7 @@ impl MqttWrite for ConnAckProperties {
             PropertyType::MaximumQos.write(buf)?;
             maximum_qos.write(buf)?;
         }
-        if let Some(retain_available) = retain_available{
+        if let Some(retain_available) = retain_available {
             PropertyType::RetainAvailable.write(buf)?;
             retain_available.write(buf)?;
         }
@@ -319,19 +316,19 @@ impl MqttWrite for ConnAckProperties {
             key.write(buf)?;
             val.write(buf)?;
         }
-        if let Some(wildcards_available) = wildcards_available{
+        if let Some(wildcards_available) = wildcards_available {
             PropertyType::WildcardSubscriptionAvailable.write(buf)?;
             wildcards_available.write(buf)?;
         }
-        if let Some(subscription_ids_available) = subscription_ids_available{
+        if let Some(subscription_ids_available) = subscription_ids_available {
             PropertyType::SubscriptionIdentifierAvailable.write(buf)?;
             subscription_ids_available.write(buf)?;
         }
-        if let Some(shared_subscription_available) = shared_subscription_available{
+        if let Some(shared_subscription_available) = shared_subscription_available {
             PropertyType::SharedSubscriptionAvailable.write(buf)?;
             shared_subscription_available.write(buf)?;
         }
-        if let Some(server_keep_alive) = server_keep_alive{
+        if let Some(server_keep_alive) = server_keep_alive {
             PropertyType::ServerKeepAlive.write(buf)?;
             server_keep_alive.write(buf)?;
         }
@@ -359,7 +356,7 @@ impl MqttWrite for ConnAckProperties {
     }
 }
 
-impl WireLength for ConnAckProperties{
+impl WireLength for ConnAckProperties {
     fn wire_len(&self) -> usize {
         let mut len: usize = 0;
 
@@ -451,25 +448,23 @@ impl MqttWrite for ConnAckFlags {
 
 #[cfg(test)]
 mod tests {
-    
 
     use crate::packets::{
         connack::{ConnAck, ConnAckProperties},
-        mqtt_traits::{MqttRead, VariableHeaderRead, MqttWrite, VariableHeaderWrite},
-        reason_codes::ConnAckReasonCode, Packet,
+        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        reason_codes::ConnAckReasonCode,
+        Packet,
     };
 
     #[test]
     fn read_write_connack_packet() {
-        let c = ConnAck{
-            ..Default::default()
-        };
+        let c = ConnAck { ..Default::default() };
 
         let p1 = Packet::ConnAck(c);
         let mut buf = bytes::BytesMut::new();
 
         p1.write(&mut buf).unwrap();
-        
+
         let p2 = Packet::read_from_buffer(&mut buf).unwrap();
 
         assert_eq!(p1, p2);
@@ -483,13 +478,13 @@ mod tests {
             0x00, // Reason code,
             0x00, // empty properties
         ];
-        
+
         buf.extend_from_slice(packet);
         let c1 = ConnAck::read(0, packet.len(), buf.into()).unwrap();
-        
+
         assert_eq!(ConnAckReasonCode::Success, c1.reason_code);
         assert_eq!(ConnAckProperties::default(), c1.connack_properties);
-        
+
         let mut buf = bytes::BytesMut::new();
 
         c1.write(&mut buf).unwrap();
@@ -497,9 +492,7 @@ mod tests {
         let c2 = ConnAck::read(0, packet.len(), buf.into()).unwrap();
 
         assert_eq!(c1, c2)
-
     }
-
 
     #[test]
     fn read_write_connack_properties() {
@@ -507,17 +500,14 @@ mod tests {
         let packet = &[
             56, // ConnAckProperties variable length
             17, // session_expiry_interval
-            0xff, 0xff, 
-            37,  // retain_available
+            0xff, 0xff, 37,  // retain_available
             0x1, // true
             18,  // Assigned Client Id
             0, 11, // 11 bytes "KeanuReeves" without space
-            b'K', b'e', b'a', b'n', b'u', b'R', b'e', b'e', b'v', b'e', b's',
-            36, // Max QoS
+            b'K', b'e', b'a', b'n', b'u', b'R', b'e', b'e', b'v', b'e', b's', 36, // Max QoS
             2,  // QoS 2 Exactly Once
             34, // Topic Alias Max = 255
-            0, 255, 
-            31, // Reason String = 'Houston we have got a problem'
+            0, 255, 31, // Reason String = 'Houston we have got a problem'
             0, 29, b'H', b'o', b'u', b's', b't', b'o', b'n', b' ', b'w', b'e', b' ', b'h', b'a', b'v', b'e', b' ', b'g', b'o', b't', b' ', b'a', b' ', b'p', b'r', b'o', b'b', b'l', b'e', b'm',
         ];
 
@@ -534,5 +524,4 @@ mod tests {
 
         assert_eq!(c1, c2);
     }
-
 }

@@ -1,7 +1,6 @@
 use async_channel::{Receiver, Sender};
 use tokio::task::JoinSet;
 
-
 use std::marker::PhantomData;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
@@ -14,10 +13,10 @@ use crate::packets::error::ReadBytes;
 use crate::packets::reason_codes::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 
-use crate::{AsyncEventHandlerMut, StateHandler, NetworkStatus};
+use crate::{AsyncEventHandlerMut, NetworkStatus, StateHandler};
 
-use super::{SequentialHandler, HandlerExt};
 use super::stream::Stream;
+use super::{HandlerExt, SequentialHandler};
 
 /// [`Network`] reads and writes to the network based on tokios [`::tokio::io::AsyncReadExt`] [`::tokio::io::AsyncWriteExt`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
@@ -86,13 +85,12 @@ where
     }
 }
 
-impl<H, S> Network<SequentialHandler, H, S> 
+impl<H, S> Network<SequentialHandler, H, S>
 where
     H: AsyncEventHandlerMut,
     SequentialHandler: HandlerExt<H>,
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
 {
-
     /// A single call to run will perform one of three tasks:
     /// - Read from the stream and parse the bytes to packets for the user to handle
     /// - Write user packets to stream
@@ -105,7 +103,6 @@ where
             return Err(ConnectionError::NoNetwork);
         }
 
-        
         match self.tokio_select(handler).await {
             otherwise => {
                 self.network = None;
@@ -208,10 +205,10 @@ where
     }
 }
 
-impl<N, H, S> Network<N, H, S> 
-where 
+impl<N, H, S> Network<N, H, S>
+where
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
-{   
+{
     /// Creates both read and write tasks to run this them in parallel.
     /// If you want to run concurrently (not parallel) the [`Self::run`] method is a better aproach!
     pub fn split(&mut self, handler: H) -> Result<(NetworkReader<N, H, S>, NetworkWriter<S>), ConnectionError> {
@@ -259,10 +256,10 @@ where
 
 pub struct NetworkReader<N, H, S> {
     pub(crate) run_signal: Arc<AtomicBool>,
-    
+
     pub(crate) handler_helper: PhantomData<N>,
     pub handler: H,
-    
+
     pub(crate) read_stream: super::stream::read_half::ReadStream<S>,
     pub(crate) await_pingresp_atomic: Arc<AtomicBool>,
     pub(crate) state_handler: Arc<StateHandler>,
@@ -274,10 +271,10 @@ impl<N, H, S> NetworkReader<N, H, S>
 where
     N: HandlerExt<H>,
     S: tokio::io::AsyncReadExt + Sized + Unpin + Send + 'static,
-{   
+{
     /// Runs the read half of the mqtt connection.
     /// Continuously loops until disconnect or error.
-    /// 
+    ///
     /// # Return
     /// - Ok(None) in the case that the write task requested shutdown.
     /// - Ok(Some(reason)) in the case that this task initiates a shutdown.
@@ -364,7 +361,7 @@ where
 {
     /// Runs the read half of the mqtt connection.
     /// Continuously loops until disconnect or error.
-    /// 
+    ///
     /// # Return
     /// - Ok(None) in the case that the read task requested shutdown
     /// - Ok(Some(reason)) in the case that this task initiates a shutdown
@@ -385,8 +382,7 @@ where
                 sleep = *instant + self.keep_alive_interval - Instant::now();
             } else {
                 sleep = self.last_network_action + self.keep_alive_interval - Instant::now();
-            }
-            ;
+            };
             tokio::select! {
                 outgoing = self.to_network_r.recv() => {
                     let packet = outgoing?;

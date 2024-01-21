@@ -23,8 +23,8 @@ pub trait MqttWrite: Sized {
 }
 
 impl<T> MqttWrite for &T
-where 
-    T: MqttWrite
+where
+    T: MqttWrite,
 {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         <T>::write(self, buf)

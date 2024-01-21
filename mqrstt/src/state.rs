@@ -3,8 +3,6 @@ use std::{
     sync::Mutex,
 };
 
-
-
 use crate::{
     available_packet_ids::AvailablePacketIds,
     error::HandlerError,
@@ -55,7 +53,6 @@ impl State {
     pub fn make_pkid_available(&self, pkid: u16) -> Result<(), HandlerError> {
         self.apkid.mark_available(pkid)
     }
-
 
     /// Returns true is newly inserted.
     /// False otherwise

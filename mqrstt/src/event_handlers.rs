@@ -9,19 +9,25 @@ use crate::packets::Packet;
 /// Trait for async mutable access to handler.
 /// Usefull when you have a single handler
 
-/// This trait can be used types which 
+/// This trait can be used types which
 pub trait AsyncEventHandler {
     fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
 }
-impl<T> AsyncEventHandler for &T where T: AsyncEventHandler {
+impl<T> AsyncEventHandler for &T
+where
+    T: AsyncEventHandler,
+{
     #[inline]
-    fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync{
+    fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync {
         AsyncEventHandler::handle(*self, incoming_packet)
     }
 }
-impl<T> AsyncEventHandler for Arc<T> where T: AsyncEventHandler {
+impl<T> AsyncEventHandler for Arc<T>
+where
+    T: AsyncEventHandler,
+{
     #[inline]
-    fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync{
+    fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync {
         <T>::handle(&self, incoming_packet)
     }
 }
@@ -41,7 +47,6 @@ impl AsyncEventHandlerMut for () {
     }
 }
 
-
 pub trait EventHandler {
     fn handle(&mut self, incoming_packet: Packet);
 }
@@ -50,12 +55,15 @@ impl EventHandler for () {
     fn handle(&mut self, _: Packet) {}
 }
 
-pub mod example_handlers{
-    use std::{sync::atomic::AtomicU16, ops::AddAssign};
+pub mod example_handlers {
+    use std::{ops::AddAssign, sync::atomic::AtomicU16};
 
     use bytes::Bytes;
 
-    use crate::{AsyncEventHandlerMut, packets::{Packet, self}, EventHandler, MqttClient, AsyncEventHandler};
+    use crate::{
+        packets::{self, Packet},
+        AsyncEventHandler, AsyncEventHandlerMut, EventHandler, MqttClient,
+    };
 
     /// Most basic no op handler
     /// This handler performs no operations on incoming messages.
@@ -108,12 +116,9 @@ pub mod example_handlers{
         pub number: AtomicU16,
     }
 
-    impl PingPong{
+    impl PingPong {
         pub fn new(client: MqttClient) -> Self {
-            Self { 
-                client,
-                number: AtomicU16::new(0),
-            }
+            Self { client, number: AtomicU16::new(0) }
         }
     }
 
@@ -127,8 +132,8 @@ pub mod example_handlers{
                         if payload.to_lowercase().contains("ping") {
                             self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
                             // println!("Received publish payload: {}", a);
-                            
-                            if !p.retain{
+
+                            if !p.retain {
                                 self.number.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
                             }
 
@@ -154,8 +159,8 @@ pub mod example_handlers{
                         if payload.to_lowercase().contains("ping") {
                             self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
                             println!("Received publish payload: {}", a);
-                            
-                            if !p.retain{
+
+                            if !p.retain {
                                 self.number.get_mut().add_assign(1);
                             }
 

@@ -1,8 +1,12 @@
-use std::{time::Duration};
+use std::time::Duration;
 
 use async_trait::async_trait;
-use mqrstt::{MqttClient, AsyncEventHandler, packets::{self, Packet}, ConnectOptions, tokio::NetworkStatus, new_tokio};
-
+use mqrstt::{
+    new_tokio,
+    packets::{self, Packet},
+    tokio::NetworkStatus,
+    AsyncEventHandler, ConnectOptions, MqttClient,
+};
 
 pub struct PingPong {
     pub client: MqttClient,
@@ -16,20 +20,14 @@ impl AsyncEventHandler for PingPong {
             Packet::Publish(p) => {
                 if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
                     if payload.to_lowercase().contains("ping") {
-                        self.client
-                            .publish(
-                                p.topic.clone(),
-                                p.qos,
-                                p.retain,
-                                "pong",
-                            )
-                            .await
-                            .unwrap();
+                        self.client.publish(p.topic.clone(), p.qos, p.retain, "pong").await.unwrap();
                         println!("Received Ping, Send pong!");
                     }
                 }
-            },
-            Packet::ConnAck(_) => { println!("Connected!") },
+            }
+            Packet::ConnAck(_) => {
+                println!("Connected!")
+            }
             _ => (),
         }
     }
