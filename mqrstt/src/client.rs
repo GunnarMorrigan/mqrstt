@@ -45,13 +45,15 @@ impl MqttClient {
         }
     }
 
+
+
     /// This function is only here for you to use during testing of for example your handler
     /// For control over the input of this type look at [`MqttClient::test_custom_client`]
     ///
     /// The returned values should not be dropped otherwise the client won't be able to operate normally.
     ///
     /// # Example
-    /// ```
+    /// ```ignore
     /// let (
     ///     client, // An instance of this client
     ///     ids, // Allows you to indicate which packet IDs have become available again.
@@ -523,24 +525,22 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_smol::<smol::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
-    ///
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::{SubscriptionOptions, RetainHandling};
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
-    /// mqtt_client.subscribe_blocking("test/topic");
+    /// mqtt_client.subscribe_blocking("test/topic").unwrap();
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
-    /// mqtt_client.subscribe_blocking(("test/topic", QoS::ExactlyOnce));
+    /// mqtt_client.subscribe_blocking(("test/topic", QoS::ExactlyOnce)).unwrap();
     ///
     /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtMostOnce)];
-    /// mqtt_client.subscribe_blocking(vec);
+    /// mqtt_client.subscribe_blocking(vec).unwrap();
     ///
     /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtLeastOnce)];
-    /// mqtt_client.subscribe_blocking(vec.as_slice());
+    /// mqtt_client.subscribe_blocking(vec.as_slice()).unwrap();
     ///
     /// let sub_options = SubscriptionOptions{
     ///   retain_handling: RetainHandling::TWO,
@@ -548,7 +548,7 @@ impl MqttClient {
     ///   no_local: false,
     ///   qos: QoS::AtLeastOnce,
     /// };
-    /// mqtt_client.subscribe_blocking(("final/test/topic", sub_options));
+    /// mqtt_client.subscribe_blocking(("final/test/topic", sub_options)).unwrap();
     /// # });
     /// ```
     pub fn subscribe_blocking<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
@@ -569,9 +569,8 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-    ///
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::{SubscribeProperties, SubscriptionOptions, RetainHandling};
     ///
@@ -581,7 +580,7 @@ impl MqttClient {
     /// };
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
-    /// mqtt_client.subscribe_with_properties_blocking("test/topic", sub_properties);
+    /// mqtt_client.subscribe_with_properties_blocking("test/topic", sub_properties).unwrap();
     ///
     /// # let sub_properties = SubscribeProperties{
     /// #   subscription_id: Some(1),
@@ -589,7 +588,7 @@ impl MqttClient {
     /// # };
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
-    /// mqtt_client.subscribe_with_properties_blocking(("test/topic", QoS::ExactlyOnce), sub_properties);
+    /// mqtt_client.subscribe_with_properties_blocking(("test/topic", QoS::ExactlyOnce), sub_properties).unwrap();
     ///
     /// # let sub_properties = SubscribeProperties{
     /// #   subscription_id: Some(1),
@@ -597,7 +596,7 @@ impl MqttClient {
     /// # };
     ///
     /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
-    /// mqtt_client.subscribe_with_properties_blocking(vec, sub_properties);
+    /// mqtt_client.subscribe_with_properties_blocking(vec, sub_properties).unwrap();
     ///
     /// # let sub_properties = SubscribeProperties{
     /// #   subscription_id: Some(1),
@@ -605,7 +604,7 @@ impl MqttClient {
     /// # };
     ///  
     /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
-    /// mqtt_client.subscribe_with_properties_blocking(vec.as_slice(), sub_properties);
+    /// mqtt_client.subscribe_with_properties_blocking(vec.as_slice(), sub_properties).unwrap();
     ///
     /// # let sub_properties = SubscribeProperties{
     /// #   subscription_id: Some(1),
@@ -618,7 +617,8 @@ impl MqttClient {
     ///   no_local: false,
     ///   qos: QoS::AtLeastOnce,
     /// };
-    /// mqtt_client.subscribe_with_properties_blocking(("final/test/topic", sub_options), sub_properties);
+    /// mqtt_client.subscribe_with_properties_blocking(("final/test/topic", sub_options), sub_properties).unwrap();
+    /// # });
     /// ```
     pub fn subscribe_with_properties_blocking<S: Into<Subscription>>(&self, into_subscribtions: S, properties: SubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
@@ -640,29 +640,30 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-    ///
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
+    /// 
     /// use mqrstt::packets::QoS;
     /// use bytes::Bytes;
     ///
     /// // publish a message with QoS 0, without a packet identifier
-    /// mqtt_client.publish("test/topic", QoS::AtMostOnce, false, "Hello world");
+    /// mqtt_client.publish_blocking("test/topic", QoS::AtMostOnce, false, "Hello world").unwrap();
     ///
     /// // publish a message with QoS 1, with a packet identifier
-    /// mqtt_client.publish("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"));
+    /// mqtt_client.publish_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world")).unwrap();
     ///
     /// // publish a message with QoS 2, with a packet identifier
-    /// mqtt_client.publish("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"));
+    /// mqtt_client.publish_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world")).unwrap();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload: &[u8] = "Hello World!".as_bytes();
-    /// mqtt_client.publish("test/topic", QoS::AtLeastOnce, true, payload);
+    /// mqtt_client.publish_blocking("test/topic", QoS::AtLeastOnce, true, payload).unwrap();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload: Vec<u8> = "Hello World!".as_bytes().to_vec();
-    /// mqtt_client.publish("test/topic", QoS::AtMostOnce, true, payload);
+    /// mqtt_client.publish_blocking("test/topic", QoS::AtMostOnce, true, payload).unwrap();
     ///
+    /// # });
     /// ```
     pub fn publish_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
@@ -695,9 +696,9 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-    ///
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
+    /// 
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::PublishProperties;
     /// use bytes::Bytes;
@@ -709,7 +710,7 @@ impl MqttClient {
     /// };
     ///
     /// // publish a message with QoS 0, without a packet identifier
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties);
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties).unwrap();
     ///
     /// # let properties = PublishProperties{
     /// #     response_topic: Some("response/topic".into()),
@@ -718,7 +719,7 @@ impl MqttClient {
     /// # };
     ///
     /// // publish a message with QoS 1, with a packet identifier
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties);
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties).unwrap();
     ///
     /// # let properties = PublishProperties{
     /// #     response_topic: Some("response/topic".into()),
@@ -727,7 +728,7 @@ impl MqttClient {
     /// # };
     ///
     /// // publish a message with QoS 2, with a packet identifier
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties);
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties).unwrap();
     ///
     /// # let properties = PublishProperties{
     /// #     response_topic: Some("response/topic".into()),
@@ -737,7 +738,7 @@ impl MqttClient {
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload = "Hello World!".as_bytes();
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, true, payload, properties);
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, true, payload, properties).unwrap();
     ///
     /// # let properties = PublishProperties{
     /// #     response_topic: Some("response/topic".into()),
@@ -747,7 +748,12 @@ impl MqttClient {
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload = "Hello World!".as_bytes().to_vec();
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, true, payload, properties);
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, true, payload, properties).unwrap();
+    ///
+    /// # });
+    /// 
+    /// 
+
     ///
     /// ```
     pub fn publish_with_properties_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
@@ -778,29 +784,31 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
     ///
     /// // Unsubscribe from a single topic specified as a string:
     /// let topic = "test/topic";
-    /// mqtt_client.unsubscribe(topic);
+    /// mqtt_client.unsubscribe_blocking(topic);
     ///
     /// // Unsubscribe from multiple topics specified as an array of string slices:
-    /// let topics = &["test/topic1", "test/topic2"];
-    /// mqtt_client.unsubscribe(topics.as_slice());
+    /// let topics = ["test/topic1", "test/topic2"];
+    /// mqtt_client.unsubscribe_blocking(topics.as_slice());
     ///
     /// // Unsubscribe from a single topic specified as a String:
     /// let topic = String::from("test/topic");
-    /// mqtt_client.unsubscribe(topic);
+    /// mqtt_client.unsubscribe_blocking(topic);
     ///
     /// // Unsubscribe from multiple topics specified as a Vec<String>:
     /// let topics = vec![String::from("test/topic1"), String::from("test/topic2")];
-    /// mqtt_client.unsubscribe(topics);
+    /// mqtt_client.unsubscribe_blocking(topics);
     ///
     /// // Unsubscribe from multiple topics specified as an array of String:
     /// let topics = &[String::from("test/topic1"), String::from("test/topic2")];
-    /// mqtt_client.unsubscribe(topics.as_slice());
-    ///
+    /// mqtt_client.unsubscribe_blocking(topics.as_slice());
+    /// 
+    /// # });
+    /// # std::hint::black_box(network);
     /// ```
     pub fn unsubscribe_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
@@ -824,8 +832,8 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::UnsubscribeProperties;
     ///
@@ -861,6 +869,9 @@ impl MqttClient {
     /// // Unsubscribe from multiple topics specified as an array of String:
     /// let topics = ["test/topic1","test/topic2"];
     /// mqtt_client.unsubscribe_with_properties_blocking(topics.as_slice(), properties);
+    /// 
+    /// # });
+    /// # std::hint::black_box(network);
     /// ```
     pub fn unsubscribe_with_properties_blocking<T: Into<UnsubscribeTopics>>(&self, into_topics: T, properties: UnsubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
@@ -882,11 +893,12 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-    ///
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
+    /// 
     /// mqtt_client.disconnect_blocking().unwrap();
     ///
+    /// # });
     /// ```
     pub fn disconnect_blocking(&self) -> Result<(), ClientError> {
         let disconnect = Disconnect {
@@ -906,9 +918,10 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let options = mqrstt::ConnectOptions::new("example_id");
-    /// # let (network, mqtt_client) = mqrstt::new_sync::<std::net::TcpStream>(options);
     ///
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # smol::block_on(async {
+    /// 
     /// use mqrstt::packets::DisconnectProperties;
     /// use mqrstt::packets::reason_codes::DisconnectReasonCode;
     ///
@@ -919,6 +932,7 @@ impl MqttClient {
     ///
     /// mqtt_client.disconnect_with_properties_blocking(DisconnectReasonCode::NormalDisconnection, properties).unwrap();
     ///
+    /// # });
     /// ```
     pub fn disconnect_with_properties_blocking(&self, reason_code: DisconnectReasonCode, properties: DisconnectProperties) -> Result<(), ClientError> {
         let disconnect = Disconnect { reason_code, properties };
