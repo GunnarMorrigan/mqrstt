@@ -1218,7 +1218,12 @@ mod tests {
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        assert!(matches!(disconnect, Packet::Disconnect(res) if res.properties == DisconnectProperties::default() && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
+        assert!(
+            matches!(disconnect, Packet::Disconnect(res) 
+                if res.properties == DisconnectProperties::default() && 
+                DisconnectReasonCode::NormalDisconnection == res.reason_code
+            )
+        );
     }
 
     #[tokio::test]
