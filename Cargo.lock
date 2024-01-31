@@ -1490,6 +1490,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "sync_tcp_v0_2_2"
+version = "0.1.0"
+dependencies = [
+ "mqrstt 0.2.2",
+]
+
+[[package]]
 name = "thiserror"
 version = "1.0.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"

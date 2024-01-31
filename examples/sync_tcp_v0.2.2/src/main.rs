@@ -29,7 +29,7 @@ impl EventHandler for PingPong {
 }
 
 fn main() {
-    let client_id = "SyncTls_MQrsTT_Example".to_string();
+    let client_id = "SyncTcp_MQrsTT_Example".to_string();
     let options = ConnectOptions::new(client_id);
 
     let address = "broker.emqx.io";
