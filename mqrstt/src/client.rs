@@ -14,6 +14,9 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
+/// A Clonable client that can be used to perform MQTT operations
+/// 
+/// This object is never self constructed but is a obtained by calling the builder functions on [`crate::NetworkBuilder`]
 pub struct MqttClient {
     /// Provides this client with an available packet id or waits on it.
     available_packet_ids_r: Receiver<u16>,
