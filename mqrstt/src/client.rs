@@ -152,38 +152,28 @@ impl MqttClient {
     ///   subscription_id: Some(1),
     ///   user_properties: vec![],
     /// };
+    /// 
+    /// let sub_properties_clone = sub_properties.clone();
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
     /// mqtt_client.subscribe_with_properties("test/topic", sub_properties).await;
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
     /// mqtt_client.subscribe_with_properties(("test/topic", QoS::ExactlyOnce), sub_properties).await;
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///
     /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
     /// mqtt_client.subscribe_with_properties(vec, sub_properties).await;
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///  
     /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
     /// mqtt_client.subscribe_with_properties(vec.as_slice(), sub_properties).await;
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///  
     /// let sub_options = SubscriptionOptions{
     ///   retain_handling: RetainHandling::ZERO,
@@ -278,43 +268,29 @@ impl MqttClient {
     ///     correlation_data: Some("correlation_data".into()),
     ///     ..Default::default()
     /// };
+    /// 
+    /// # let properties_clone = properties.clone();
     ///
     /// // publish a message with QoS 0, without a packet identifier
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties).await;
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties).await;
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 2, with a packet identifier
     /// mqtt_client.publish_with_properties("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties).await;
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload = "Hello World!".as_bytes();
     /// mqtt_client.publish_with_properties("test/topic", QoS::AtLeastOnce, true, payload, properties).await;
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload = "Hello World!".as_bytes().to_vec();
@@ -581,38 +557,27 @@ impl MqttClient {
     ///   subscription_id: Some(1),
     ///   user_properties: vec![],
     /// };
-    ///
+    /// # let sub_properties_clone = sub_properties.clone();
+    /// 
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
     /// mqtt_client.subscribe_with_properties_blocking("test/topic", sub_properties).unwrap();
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
     /// mqtt_client.subscribe_with_properties_blocking(("test/topic", QoS::ExactlyOnce), sub_properties).unwrap();
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///
     /// let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
     /// mqtt_client.subscribe_with_properties_blocking(vec, sub_properties).unwrap();
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///  
     /// let vec = [("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::ExactlyOnce)];
     /// mqtt_client.subscribe_with_properties_blocking(vec.as_slice(), sub_properties).unwrap();
     ///
-    /// # let sub_properties = SubscribeProperties{
-    /// #   subscription_id: Some(1),
-    /// #   user_properties: vec![],
-    /// # };
+    /// # let sub_properties = sub_properties_clone.clone();
     ///  
     /// let sub_options = SubscriptionOptions{
     ///   retain_handling: RetainHandling::ZERO,
@@ -711,53 +676,35 @@ impl MqttClient {
     ///     correlation_data: Some("correlation_data".into()),
     ///     ..Default::default()
     /// };
+    /// 
+    /// # let properties_clone = properties.clone();
     ///
     /// // publish a message with QoS 0, without a packet identifier
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties).unwrap();
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties).unwrap();
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 2, with a packet identifier
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties).unwrap();
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload = "Hello World!".as_bytes();
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, true, payload, properties).unwrap();
     ///
-    /// # let properties = PublishProperties{
-    /// #     response_topic: Some("response/topic".into()),
-    /// #     correlation_data: Some("correlation_data".into()),
-    /// #     ..Default::default()
-    /// # };
+    /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload = "Hello World!".as_bytes().to_vec();
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, true, payload, properties).unwrap();
     ///
     /// # });
-    /// 
-    /// 
-
-    ///
     /// ```
     pub fn publish_with_properties_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
@@ -951,7 +898,7 @@ mod tests {
 
     use crate::{
         error::{ClientError, PacketValidationError},
-        packets::{reason_codes::DisconnectReasonCode, DisconnectProperties, Packet, PacketType, QoS, UnsubscribeProperties},
+        packets::{reason_codes::DisconnectReasonCode, DisconnectProperties, Packet, PacketType, Publish, QoS, Subscribe, SubscribeProperties, UnsubscribeProperties},
     };
 
     use super::MqttClient;
@@ -997,28 +944,131 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_subscribe_with_properties() {
+        let (mqtt_client, client_to_handler_r, to_network_r) = create_new_test_client();
+        
+        let sub_properties = SubscribeProperties{
+            subscription_id: Some(1),
+            user_properties: vec![],
+        };
+
+        // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
+        let res = mqtt_client.subscribe_with_properties("test/topic", sub_properties.clone()).await;
+        
+        assert!(res.is_ok());
+        let packet = client_to_handler_r.recv().await.unwrap();
+        // assert!(matches!(packet, Packet::Subscribe(sub) if sub.properties.subscription_id == Some(1)));
+        assert!(matches!(packet, Packet::Subscribe(sub) if sub.properties == sub_properties && sub.topics[0].0.as_ref() == "test/topic"));
+
+        std::hint::black_box((mqtt_client, client_to_handler_r, to_network_r));
+    }
+
+    #[test]
+    
+    fn test_subscribe_blocking() {
+        let (client, client_to_handler_r, to_network_r) = create_new_test_client();
+
+        // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
+        client.subscribe_blocking("test/topic").unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Subscribe(sub) if sub.topics[0].0.as_ref() == "test/topic"));
+
+        // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::ExactlyOnce,
+        client.subscribe_blocking(("test/topic", QoS::ExactlyOnce)).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Subscribe(sub) if sub.topics[0].0.as_ref() == "test/topic"));
+
+        let vec = vec![("test/topic1", QoS::ExactlyOnce), ("test/topic2", QoS::AtMostOnce)];
+        client.subscribe_blocking(vec).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Subscribe(sub) if sub.topics[0].0.as_ref() == "test/topic1" && sub.topics[1].0.as_ref() == "test/topic2"));
+
+        let sub_options = crate::packets::SubscriptionOptions {
+            retain_handling: crate::packets::RetainHandling::TWO,
+            retain_as_publish: false,
+            no_local: false,
+            qos: QoS::AtLeastOnce,
+        };
+        client.subscribe_blocking(("final/test/topic", sub_options.clone())).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Subscribe(sub) if sub.topics[0].0.as_ref() == "final/test/topic" && sub.topics[0].1 == sub_options));
+
+        std::hint::black_box((client, client_to_handler_r, to_network_r));
+    }
+
+    #[tokio::test]
     async fn test_unsubscribe() {
-        let (mqtt_client, _client_to_handler_r, _) = create_new_test_client();
+        let (client, client_to_handler_r, to_network_r) = create_new_test_client();
 
         // Unsubscribe from a single topic specified as a string:
         let topic = "test/topic";
-        let _ = mqtt_client.unsubscribe(topic).await;
-
-        // Unsubscribe from multiple topics specified as an array of string slices:
-        let topics = ["test/topic1", "test/topic2"];
-        let _ = mqtt_client.unsubscribe(topics.as_slice()).await;
-
-        // Unsubscribe from a single topic specified as a String:
-        let topic = String::from("test/topic");
-        let _ = mqtt_client.unsubscribe(topic).await;
-
-        // Unsubscribe from multiple topics specified as a Vec<String>:
-        let topics = vec![String::from("test/topic1"), String::from("test/topic2")];
-        let _ = mqtt_client.unsubscribe(topics).await;
+        client.unsubscribe(topic).await.unwrap();
+        let packet = client_to_handler_r.recv().await.unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic" ));
 
         // Unsubscribe from multiple topics specified as an array of String:
         let topics = &[String::from("test/topic1"), String::from("test/topic2")];
-        let _ = mqtt_client.unsubscribe(topics.as_slice()).await;
+        client.unsubscribe(topics.as_slice()).await.unwrap();
+        let packet = client_to_handler_r.recv().await.unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic1" && unsub.topics[1].as_ref() == "test/topic2" ));
+
+        std::hint::black_box((client, client_to_handler_r, to_network_r));
+    }
+
+
+    #[test]
+    fn test_unsubscribe_blocking() {
+        let (client, client_to_handler_r, to_network_r) = create_new_test_client();
+
+        // Unsubscribe from a single topic specified as a string:
+        let topic = "test/topic";
+        client.unsubscribe_blocking(topic).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic" ));
+
+        // Unsubscribe from a single topic specified as a String:
+        let topic = String::from("test/topic");
+        client.unsubscribe_blocking(topic).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic" ));
+
+        // Unsubscribe from multiple topics specified as an array of String:
+        let topics = &[String::from("test/topic1"), String::from("test/topic2")];
+        client.unsubscribe_blocking(topics.as_slice()).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic1" && unsub.topics[1].as_ref() == "test/topic2" ));
+
+        std::hint::black_box((client, client_to_handler_r, to_network_r));
+    }
+
+
+    #[test]
+    fn test_unsubscribe_with_properties_blocking() {
+        let (client, client_to_handler_r, to_network_r) = create_new_test_client();
+
+        let properties = UnsubscribeProperties{
+            user_properties: vec![("property".to_string(), "value".to_string())],
+        };
+
+        // Unsubscribe from a single topic specified as a string:
+        let topic = "test/topic";
+        client.unsubscribe_with_properties_blocking(topic, properties.clone()).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic" ));
+
+        // Unsubscribe from multiple topics specified as an array of string slices:
+        let topics = ["test/topic1", "test/topic2"];
+        client.unsubscribe_with_properties_blocking(topics.as_slice(), properties.clone()).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic1" && unsub.topics[1].as_ref() == "test/topic2" ));
+
+        // Unsubscribe from multiple topics specified as a Vec<String>:
+        let topics = vec![String::from("test/topic1"), String::from("test/topic2")];
+        client.unsubscribe_with_properties_blocking(topics, properties.clone()).unwrap();
+        let packet = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(packet, Packet::Unsubscribe(unsub) if unsub.topics[0].as_ref() == "test/topic1" && unsub.topics[1].as_ref() == "test/topic2" ));
+
+        std::hint::black_box((client, client_to_handler_r, to_network_r));
     }
 
     #[tokio::test]
@@ -1035,6 +1085,71 @@ mod tests {
         let (client, _client_to_handler_r, _) = create_new_test_client();
 
         let res = client.publish("way".repeat(21846).to_string(), QoS::ExactlyOnce, false, "hello").await;
+
+        assert!(res.is_err());
+        assert_eq!(res.unwrap_err(), ClientError::ValidationError(PacketValidationError::TopicSize(65538)));
+    }
+
+
+    #[tokio::test]
+    async fn publish_with_properties() {
+        let (client, client_to_handler_r, to_network_r) = create_new_test_client();
+
+        let properties = crate::packets::PublishProperties{
+            response_topic: Some("response/topic".into()),
+            correlation_data: Some("correlation_other_data".into()),
+            ..Default::default()
+        };
+
+        for (id, qos) in [QoS::AtMostOnce, QoS::AtLeastOnce, QoS::ExactlyOnce].iter().enumerate() {
+            let res = client.publish_with_properties("way".repeat(21845).to_string(), *qos, false, "hello", properties.clone()).await;
+
+            assert!(res.is_ok());
+            let packet = client_to_handler_r.recv().await.unwrap();
+
+            let publ = Publish{
+                dup: false,
+                qos: *qos,
+                retain: false,
+                topic: "way".repeat(21845).into(),
+                packet_identifier: if *qos == QoS::AtMostOnce { None } else { Some(id as u16) },
+                publish_properties: properties.clone(),
+                payload: "hello".into(),
+            };
+
+            assert_eq!(Packet::Publish(publ), packet);
+        }
+
+        std::hint::black_box((client, client_to_handler_r, to_network_r));
+    }
+
+
+    #[tokio::test]
+    async fn publish_with_just_right_topic_len_properties() {
+        let (client, _client_to_handler_r, _) = create_new_test_client();
+
+        let properties = crate::packets::PublishProperties{
+            response_topic: Some("response/topic".into()),
+            correlation_data: Some("correlation_data".into()),
+            ..Default::default()
+        };
+
+        let res = client.publish_with_properties("way".repeat(21845).to_string(), QoS::ExactlyOnce, false, "hello", properties).await;
+
+        assert!(res.is_ok());
+    }
+
+    #[tokio::test]
+    async fn publish_with_too_long_topic_properties() {
+        let (client, _client_to_handler_r, _) = create_new_test_client();
+
+        let properties = crate::packets::PublishProperties{
+            response_topic: Some("response/topic".into()),
+            correlation_data: Some("correlation_data".into()),
+            ..Default::default()
+        };
+
+        let res = client.publish_with_properties("way".repeat(21846).to_string(), QoS::ExactlyOnce, false, "hello", properties).await;
 
         assert!(res.is_err());
         assert_eq!(res.unwrap_err(), ClientError::ValidationError(PacketValidationError::TopicSize(65538)));
@@ -1103,33 +1218,21 @@ mod tests {
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        if let Packet::Disconnect(res) = disconnect {
-            assert_eq!(DisconnectReasonCode::NormalDisconnection, res.reason_code);
-            assert_eq!(DisconnectProperties::default(), res.properties);
-        } else {
-            // To make sure we did the if branch
-            unreachable!();
-        }
+        assert!(matches!(disconnect, Packet::Disconnect(res) if res.properties == DisconnectProperties::default() && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
     }
 
     #[tokio::test]
-    async fn disconnect_with_properties_test() {
+    async fn test_disconnect_with_properties() {
         let (client, client_to_handler_r, _) = create_new_test_client();
         client.disconnect_with_properties(DisconnectReasonCode::KeepAliveTimeout, Default::default()).await.unwrap();
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        if let Packet::Disconnect(res) = disconnect {
-            assert_eq!(DisconnectReasonCode::KeepAliveTimeout, res.reason_code);
-            assert_eq!(DisconnectProperties::default(), res.properties);
-        } else {
-            // To make sure we did the if branch
-            unreachable!();
-        }
+        assert!(matches!(disconnect, Packet::Disconnect(res) if res.properties == DisconnectProperties::default() && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
     }
 
     #[tokio::test]
-    async fn disconnect_with_properties_test2() {
+    async fn test_disconnect_with_properties_2() {
         let (client, client_to_handler_r, _) = create_new_test_client();
         let properties = DisconnectProperties {
             reason_string: Some("TestString".into()),
@@ -1140,12 +1243,37 @@ mod tests {
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        if let Packet::Disconnect(res) = disconnect {
-            assert_eq!(DisconnectReasonCode::KeepAliveTimeout, res.reason_code);
-            assert_eq!(properties, res.properties);
-        } else {
-            // To make sure we did the if branch
-            unreachable!();
-        }
+        assert!(matches!(disconnect, Packet::Disconnect(res) if properties == res.properties && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
     }
+
+
+    #[test]
+    fn test_disconnect_blocking() {
+        let (client, client_to_handler_r, _) = create_new_test_client();
+
+        let result = client.disconnect_blocking();
+
+        // Check that the function returns Ok
+        assert!(result.is_ok());
+
+        // Check that the last message sent was a Disconnect
+        let last_message = client_to_handler_r.recv_blocking().unwrap();
+        assert!(matches!(last_message, Packet::Disconnect(_)));
+    }
+
+    #[test]
+    fn test_disconnect_blocking_with_properties() {
+        let (client, client_to_handler_r, _) = create_new_test_client();
+        let properties = DisconnectProperties {
+            reason_string: Some("TestString".into()),
+            ..Default::default()
+        };
+
+        client.disconnect_with_properties_blocking(DisconnectReasonCode::KeepAliveTimeout, properties.clone()).unwrap();
+        let disconnect = client_to_handler_r.recv_blocking().unwrap();
+        assert_eq!(PacketType::Disconnect, disconnect.packet_type());
+
+        assert!(matches!(disconnect, Packet::Disconnect(res) if properties == res.properties && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
+    }
+
 }

@@ -8,19 +8,10 @@ use super::{
     variable_integer_len, write_variable_integer, PacketType, PropertyType,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Disconnect {
     pub reason_code: DisconnectReasonCode,
     pub properties: DisconnectProperties,
-}
-
-impl Default for Disconnect {
-    fn default() -> Self {
-        Self {
-            reason_code: DisconnectReasonCode::NormalDisconnection,
-            properties: Default::default(),
-        }
-    }
 }
 
 impl VariableHeaderRead for Disconnect {
@@ -118,16 +109,20 @@ impl MqttWrite for DisconnectProperties {
         write_variable_integer(buf, self.wire_len())?;
 
         if let Some(session_expiry_interval) = self.session_expiry_interval {
+            PropertyType::SessionExpiryInterval.write(buf)?;
             buf.put_u32(session_expiry_interval);
         }
         if let Some(reason_string) = &self.reason_string {
+            PropertyType::ReasonString.write(buf)?;
             reason_string.write(buf)?;
         }
         for (key, val) in self.user_properties.iter() {
+            PropertyType::UserProperty.write(buf)?;
             key.write(buf)?;
             val.write(buf)?;
         }
         if let Some(server_refrence) = &self.server_reference {
+            PropertyType::ServerReference.write(buf)?;
             server_refrence.write(buf)?;
         }
         Ok(())
@@ -138,17 +133,94 @@ impl WireLength for DisconnectProperties {
     fn wire_len(&self) -> usize {
         let mut len = 0;
         if self.session_expiry_interval.is_some() {
-            len += 4;
+            len += 4 + 1;
         }
         if let Some(reason_string) = &self.reason_string {
-            len += reason_string.wire_len();
+            len += reason_string.wire_len() + 1;
         }
-        for (key, val) in self.user_properties.iter() {
-            len += key.wire_len() + val.wire_len();
-        }
+        len += self.user_properties.iter().fold(0, |acc, (k, v)| acc + k.wire_len() + v.wire_len() + 1);
         if let Some(server_refrence) = &self.server_reference {
-            len += server_refrence.wire_len();
+            len += server_refrence.wire_len() + 1;
         }
         len
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_write_and_read_disconnect() {
+        let mut buf = bytes::BytesMut::new();
+        let packet = Disconnect {
+            properties: DisconnectProperties {
+                session_expiry_interval: Some(123),
+                reason_string: Some(Box::from("Some reason")),
+                user_properties: vec![
+                    (Box::from("key1"), Box::from("value1")),
+                    (Box::from("key2"), Box::from("value2")),
+                ],
+                server_reference: Some(Box::from("Server reference")),
+            },
+            reason_code: DisconnectReasonCode::NormalDisconnection,
+        };
+
+        packet.write(&mut buf).unwrap();
+
+        let read_packet = Disconnect::read(0, buf.len(), buf.into()).unwrap();
+
+        assert_eq!(read_packet.properties.session_expiry_interval, Some(123));
+        assert_eq!(read_packet.properties.reason_string, Some(Box::from("Some reason")));
+        assert_eq!(
+            read_packet.properties.user_properties,
+            vec![
+                (Box::from("key1"), Box::from("value1")),
+                (Box::from("key2"), Box::from("value2")),
+            ]
+        );
+        assert_eq!(
+            read_packet.properties.server_reference,
+            Some(Box::from("Server reference"))
+        );
+    }
+}
+
+
+    #[test]
+    fn test_write_and_read_disconnect_properties() {
+        let mut buf = bytes::BytesMut::new();
+        let properties = DisconnectProperties {
+            session_expiry_interval: Some(123),
+            reason_string: Some(Box::from("Some reason")),
+            user_properties: vec![
+                (Box::from("key1"), Box::from("value1")),
+                (Box::from("key2"), Box::from("value2")),
+            ],
+            server_reference: Some(Box::from("Server reference")),
+        };
+
+        properties.write(&mut buf).unwrap();
+
+        let read_properties = DisconnectProperties::read(&mut buf.into()).unwrap();
+
+        assert_eq!(read_properties.session_expiry_interval, Some(123));
+        assert_eq!(read_properties.reason_string, Some(Box::from("Some reason")));
+        assert_eq!(
+            read_properties.user_properties,
+            vec![
+                (Box::from("key1"), Box::from("value1")),
+                (Box::from("key2"), Box::from("value2")),
+            ]
+        );
+        assert_eq!(
+            read_properties.server_reference,
+            Some(Box::from("Server reference"))
+        );
     }
 }

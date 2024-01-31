@@ -1,3 +1,5 @@
+use std::default;
+
 use bytes::{Buf, BufMut};
 
 use super::error::DeserializeError;
@@ -134,8 +136,9 @@ impl MqttWrite for AuthReasonCode {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum DisconnectReasonCode {
+    #[default]
     NormalDisconnection,
     DisconnectWithWillMessage,
     UnspecifiedError,
