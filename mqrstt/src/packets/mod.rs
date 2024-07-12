@@ -2,6 +2,7 @@ pub mod error;
 pub mod mqtt_traits;
 pub mod reason_codes;
 
+mod macros;
 mod auth;
 mod connack;
 mod connect;
@@ -20,6 +21,8 @@ pub use auth::*;
 pub use connack::*;
 pub use connect::*;
 pub use disconnect::*;
+use error::ReadError;
+use mqtt_traits::MqttAsyncRead;
 pub use puback::*;
 pub use pubcomp::*;
 pub use publish::*;
@@ -65,6 +68,18 @@ impl MqttRead for ProtocolVersion {
     }
 }
 
+impl<T> MqttAsyncRead<T> for ProtocolVersion where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        match buf.read_u8().await {
+            Ok(5) => Ok(ProtocolVersion::V5),
+            Ok(4) => Err(ReadError::DeserializeError(DeserializeError::UnsupportedProtocolVersion)),
+            Ok(3) => Err(ReadError::DeserializeError(DeserializeError::UnsupportedProtocolVersion)),
+            Ok(_) => Err(ReadError::DeserializeError(DeserializeError::UnknownProtocolVersion)),
+            Err(e) => Err(ReadError::IoError(e)),
+        }
+    }
+}
+
 /// Quality of service
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum QoS {
@@ -95,7 +110,7 @@ impl MqttRead for QoS {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("QoS".to_string(), 0, 1));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
         }
 
         match buf.get_u8() {
@@ -103,6 +118,18 @@ impl MqttRead for QoS {
             1 => Ok(QoS::AtLeastOnce),
             2 => Ok(QoS::ExactlyOnce),
             q => Err(DeserializeError::UnknownQoS(q)),
+        }
+    }
+}
+
+impl<T> MqttAsyncRead<T> for QoS where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        match buf.read_u8().await {
+            Ok(0) => Ok(QoS::AtMostOnce),
+            Ok(1) => Ok(QoS::AtLeastOnce),
+            Ok(2) => Ok(QoS::ExactlyOnce),
+            Ok(q) => Err(ReadError::DeserializeError(DeserializeError::UnknownQoS(q))),
+            Err(e) => Err(ReadError::IoError(e)),
         }
     }
 }
@@ -128,6 +155,16 @@ impl MqttRead for Box<str> {
         match String::from_utf8(content.to_vec()) {
             Ok(s) => Ok(s.into()),
             Err(e) => Err(DeserializeError::Utf8Error(e)),
+        }
+    }
+}
+
+impl<T> MqttAsyncRead<T> for Box<str> where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        let content = Bytes::async_read(buf).await?;
+        match String::from_utf8(content.to_vec()) {
+            Ok(s) => Ok(s.into()),
+            Err(e) => Err(ReadError::DeserializeError(DeserializeError::Utf8Error(e))),
         }
     }
 }
@@ -174,6 +211,17 @@ impl MqttRead for String {
     }
 }
 
+impl<T> MqttAsyncRead<T> for String where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        let content = Bytes::async_read(buf).await?;
+        match String::from_utf8(content.to_vec()) {
+            Ok(s) => Ok(s),
+            Err(e) => Err(ReadError::DeserializeError(DeserializeError::Utf8Error(e))),
+        }
+    }
+}
+
+
 impl MqttWrite for String {
     #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
@@ -200,12 +248,22 @@ impl MqttRead for Bytes {
         let len = buf.get_u16() as usize;
 
         if len > buf.len() {
-            return Err(DeserializeError::InsufficientData("Bytes".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Bytes>(), buf.len(), len));
         }
 
         Ok(buf.split_to(len))
     }
 }
+
+impl<T> MqttAsyncRead<T> for Bytes where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        let size = buf.read_u16().await?;
+        let mut data = BytesMut::with_capacity(size as usize);
+        buf.read_exact(&mut data).await?;
+        Ok(data.into())
+    }
+}
+
 
 impl MqttWrite for Bytes {
     #[inline]
@@ -227,13 +285,23 @@ impl WireLength for Bytes {
 impl MqttRead for bool {
     fn read(buf: &mut Bytes) -> Result<Self, error::DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("bool".to_string(), 0, 1));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<bool>(), 0, 1));
         }
 
         match buf.get_u8() {
             0 => Ok(false),
             1 => Ok(true),
             _ => Err(error::DeserializeError::MalformedPacket),
+        }
+    }
+}
+
+impl<T> MqttAsyncRead<T> for bool where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        match buf.read_u8().await? {
+            0 => Ok(false),
+            1 => Ok(true),
+            _ => Err(ReadError::DeserializeError(DeserializeError::MalformedPacket)),
         }
     }
 }
@@ -255,9 +323,15 @@ impl MqttRead for u8 {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("u8".to_string(), 0, 1));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
         }
         Ok(buf.get_u8())
+    }
+}
+
+impl<T> MqttAsyncRead<T> for u8 where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        Ok(buf.read_u8().await?)
     }
 }
 
@@ -265,9 +339,15 @@ impl MqttRead for u16 {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 2 {
-            return Err(DeserializeError::InsufficientData("u16".to_string(), buf.len(), 2));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 2));
         }
         Ok(buf.get_u16())
+    }
+}
+
+impl<T> MqttAsyncRead<T> for u16 where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        Ok(buf.read_u16().await?)
     }
 }
 
@@ -283,9 +363,14 @@ impl MqttRead for u32 {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
         if buf.len() < 4 {
-            return Err(DeserializeError::InsufficientData("u32".to_string(), buf.len(), 4));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 4));
         }
         Ok(buf.get_u32())
+    }
+}
+impl<T> MqttAsyncRead<T> for u32 where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        Ok(buf.read_u32().await?)
     }
 }
 
@@ -399,13 +484,11 @@ pub enum PropertyType {
     SharedSubscriptionAvailable = 42,
 }
 
-impl MqttRead for PropertyType {
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("PropertyType".to_string(), 0, 1));
-        }
+impl TryFrom<u8> for PropertyType {
+    type Error = DeserializeError;
 
-        match buf.get_u8() {
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
             1 => Ok(Self::PayloadFormatIndicator),
             2 => Ok(Self::MessageExpiryInterval),
             3 => Ok(Self::ContentType),
@@ -438,106 +521,69 @@ impl MqttRead for PropertyType {
     }
 }
 
-impl MqttWrite for PropertyType {
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        let val = match self {
-            Self::PayloadFormatIndicator => 1,
-            Self::MessageExpiryInterval => 2,
-            Self::ContentType => 3,
-            Self::ResponseTopic => 8,
-            Self::CorrelationData => 9,
-            Self::SubscriptionIdentifier => 11,
-            Self::SessionExpiryInterval => 17,
-            Self::AssignedClientIdentifier => 18,
-            Self::ServerKeepAlive => 19,
-            Self::AuthenticationMethod => 21,
-            Self::AuthenticationData => 22,
-            Self::RequestProblemInformation => 23,
-            Self::WillDelayInterval => 24,
-            Self::RequestResponseInformation => 25,
-            Self::ResponseInformation => 26,
-            Self::ServerReference => 28,
-            Self::ReasonString => 31,
-            Self::ReceiveMaximum => 33,
-            Self::TopicAliasMaximum => 34,
-            Self::TopicAlias => 35,
-            Self::MaximumQos => 36,
-            Self::RetainAvailable => 37,
-            Self::UserProperty => 38,
-            Self::MaximumPacketSize => 39,
-            Self::WildcardSubscriptionAvailable => 40,
-            Self::SubscriptionIdentifierAvailable => 41,
-            Self::SharedSubscriptionAvailable => 42,
-        };
-
-        buf.put_u8(val);
-        Ok(())
+impl From<&PropertyType> for u8 {
+    fn from(value: &PropertyType) -> Self {
+        match value {
+            PropertyType::PayloadFormatIndicator => 1,
+            PropertyType::MessageExpiryInterval => 2,
+            PropertyType::ContentType => 3,
+            PropertyType::ResponseTopic => 8,
+            PropertyType::CorrelationData => 9,
+            PropertyType::SubscriptionIdentifier => 11,
+            PropertyType::SessionExpiryInterval => 17,
+            PropertyType::AssignedClientIdentifier => 18,
+            PropertyType::ServerKeepAlive => 19,
+            PropertyType::AuthenticationMethod => 21,
+            PropertyType::AuthenticationData => 22,
+            PropertyType::RequestProblemInformation => 23,
+            PropertyType::WillDelayInterval => 24,
+            PropertyType::RequestResponseInformation => 25,
+            PropertyType::ResponseInformation => 26,
+            PropertyType::ServerReference => 28,
+            PropertyType::ReasonString => 31,
+            PropertyType::ReceiveMaximum => 33,
+            PropertyType::TopicAliasMaximum => 34,
+            PropertyType::TopicAlias => 35,
+            PropertyType::MaximumQos => 36,
+            PropertyType::RetainAvailable => 37,
+            PropertyType::UserProperty => 38,
+            PropertyType::MaximumPacketSize => 39,
+            PropertyType::WildcardSubscriptionAvailable => 40,
+            PropertyType::SubscriptionIdentifierAvailable => 41,
+            PropertyType::SharedSubscriptionAvailable => 42,
+        }
     }
 }
 
-impl PropertyType {
-    pub fn from_u8(value: u8) -> Result<Self, String> {
-        match value {
-            1 => Ok(Self::PayloadFormatIndicator),
-            2 => Ok(Self::MessageExpiryInterval),
-            3 => Ok(Self::ContentType),
-            8 => Ok(Self::ResponseTopic),
-            9 => Ok(Self::CorrelationData),
-            11 => Ok(Self::SubscriptionIdentifier),
-            17 => Ok(Self::SessionExpiryInterval),
-            18 => Ok(Self::AssignedClientIdentifier),
-            19 => Ok(Self::ServerKeepAlive),
-            21 => Ok(Self::AuthenticationMethod),
-            22 => Ok(Self::AuthenticationData),
-            23 => Ok(Self::RequestProblemInformation),
-            24 => Ok(Self::WillDelayInterval),
-            25 => Ok(Self::RequestResponseInformation),
-            26 => Ok(Self::ResponseInformation),
-            28 => Ok(Self::ServerReference),
-            31 => Ok(Self::ReasonString),
-            33 => Ok(Self::ReceiveMaximum),
-            34 => Ok(Self::TopicAliasMaximum),
-            35 => Ok(Self::TopicAlias),
-            36 => Ok(Self::MaximumQos),
-            37 => Ok(Self::RetainAvailable),
-            38 => Ok(Self::UserProperty),
-            39 => Ok(Self::MaximumPacketSize),
-            40 => Ok(Self::WildcardSubscriptionAvailable),
-            41 => Ok(Self::SubscriptionIdentifierAvailable),
-            42 => Ok(Self::SharedSubscriptionAvailable),
-            _ => Err("Unkown property type".to_string()),
+impl From<PropertyType> for u8 {
+    fn from(value: PropertyType) -> Self {
+        value.into()
+    }
+}
+
+impl MqttRead for PropertyType {
+    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
+        if buf.is_empty() {
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
+        }
+
+        buf.get_u8().try_into()
+    }
+}
+
+impl<T> MqttAsyncRead<T> for PropertyType where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+    async fn async_read(buf: &mut T) -> Result<Self, ReadError> {
+        match buf.read_u8().await {
+            Ok(t) => Ok(t.try_into()?),
+            Err(e) => Err(ReadError::IoError(e)),
         }
     }
-    pub fn to_u8(self) -> u8 {
-        match self {
-            Self::PayloadFormatIndicator => 1,
-            Self::MessageExpiryInterval => 2,
-            Self::ContentType => 3,
-            Self::ResponseTopic => 8,
-            Self::CorrelationData => 9,
-            Self::SubscriptionIdentifier => 11,
-            Self::SessionExpiryInterval => 17,
-            Self::AssignedClientIdentifier => 18,
-            Self::ServerKeepAlive => 19,
-            Self::AuthenticationMethod => 21,
-            Self::AuthenticationData => 22,
-            Self::RequestProblemInformation => 23,
-            Self::WillDelayInterval => 24,
-            Self::RequestResponseInformation => 25,
-            Self::ResponseInformation => 26,
-            Self::ServerReference => 28,
-            Self::ReasonString => 31,
-            Self::ReceiveMaximum => 33,
-            Self::TopicAliasMaximum => 34,
-            Self::TopicAlias => 35,
-            Self::MaximumQos => 36,
-            Self::RetainAvailable => 37,
-            Self::UserProperty => 38,
-            Self::MaximumPacketSize => 39,
-            Self::WildcardSubscriptionAvailable => 40,
-            Self::SubscriptionIdentifierAvailable => 41,
-            Self::SharedSubscriptionAvailable => 42,
-        }
+}
+
+impl MqttWrite for PropertyType {
+    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+        buf.put_u8(self.into());
+        Ok(())
     }
 }
 

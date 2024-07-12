@@ -4,6 +4,14 @@ use thiserror::Error;
 
 use super::{PacketType, PropertyType};
 
+#[derive(Error, Debug)]
+pub enum ReadError{
+    #[error("{0}")]
+    DeserializeError(#[from] DeserializeError),
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
+}
+
 #[derive(Error, Clone, Debug)]
 pub enum DeserializeError {
     #[error("Malformed packet: {0}")]
@@ -22,7 +30,7 @@ pub enum DeserializeError {
     UnknownProtocolVersion,
 
     #[error("There is insufficient for {0} data ({1}) to take {2} bytes")]
-    InsufficientData(String, usize, usize),
+    InsufficientData(&'static str, usize, usize),
 
     #[error("There is insufficient to read the protocol version.")]
     InsufficientDataForProtocolVersion,

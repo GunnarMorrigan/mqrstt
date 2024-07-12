@@ -27,7 +27,7 @@ impl VariableHeaderRead for PubAck {
         }
         // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
         else if remaining_length < 4 {
-            return Err(DeserializeError::InsufficientData("PubAck".to_string(), buf.len(), 4));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 4));
         }
 
         let packet_identifier = u16::read(&mut buf)?;
@@ -94,7 +94,7 @@ impl MqttRead for PubAckProperties {
             return Ok(Self::default());
         }
         if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("PubAckProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut properties = PubAckProperties::default();

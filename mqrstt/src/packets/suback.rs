@@ -74,7 +74,7 @@ impl MqttRead for SubAckProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("SubAckProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut properties_data = buf.split_to(len);

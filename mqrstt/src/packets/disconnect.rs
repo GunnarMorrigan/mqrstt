@@ -66,13 +66,13 @@ impl MqttRead for DisconnectProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("DisconnectProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
 
         loop {
-            match PropertyType::from_u8(u8::read(&mut property_data)?)? {
+            match PropertyType::try_from(u8::read(&mut property_data)?)? {
                 PropertyType::SessionExpiryInterval => {
                     if properties.session_expiry_interval.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval));

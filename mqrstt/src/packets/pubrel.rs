@@ -98,7 +98,7 @@ impl MqttRead for PubRelProperties {
             return Ok(Self::default());
         }
         if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("PubRelProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut properties = PubRelProperties::default();

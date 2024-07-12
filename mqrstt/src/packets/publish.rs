@@ -164,7 +164,7 @@ impl MqttRead for PublishProperties {
         if len == 0 {
             return Ok(Self::default());
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("PublishProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -172,7 +172,7 @@ impl MqttRead for PublishProperties {
         let mut properties = Self::default();
 
         loop {
-            match PropertyType::from_u8(u8::read(&mut property_data)?)? {
+            match PropertyType::try_from(u8::read(&mut property_data)?)? {
                 PropertyType::PayloadFormatIndicator => {
                     if properties.payload_format_indicator.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator));
@@ -229,36 +229,36 @@ impl MqttWrite for PublishProperties {
         write_variable_integer(buf, self.wire_len())?;
 
         if let Some(payload_format_indicator) = self.payload_format_indicator {
-            buf.put_u8(PropertyType::PayloadFormatIndicator.to_u8());
+            buf.put_u8(PropertyType::PayloadFormatIndicator.into());
             buf.put_u8(payload_format_indicator);
         }
         if let Some(message_expiry_interval) = self.message_expiry_interval {
-            buf.put_u8(PropertyType::MessageExpiryInterval.to_u8());
+            buf.put_u8(PropertyType::MessageExpiryInterval.into());
             buf.put_u32(message_expiry_interval);
         }
         if let Some(topic_alias) = self.topic_alias {
-            buf.put_u8(PropertyType::TopicAlias.to_u8());
+            buf.put_u8(PropertyType::TopicAlias.into());
             buf.put_u16(topic_alias);
         }
         if let Some(response_topic) = &self.response_topic {
-            buf.put_u8(PropertyType::ResponseTopic.to_u8());
+            buf.put_u8(PropertyType::ResponseTopic.into());
             response_topic.as_ref().write(buf)?;
         }
         if let Some(correlation_data) = &self.correlation_data {
-            buf.put_u8(PropertyType::CorrelationData.to_u8());
+            buf.put_u8(PropertyType::CorrelationData.into());
             correlation_data.write(buf)?;
         }
         for sub_id in &self.subscription_identifier {
-            buf.put_u8(PropertyType::SubscriptionIdentifier.to_u8());
+            buf.put_u8(PropertyType::SubscriptionIdentifier.into());
             write_variable_integer(buf, *sub_id)?;
         }
         for (key, val) in &self.user_properties {
-            buf.put_u8(PropertyType::UserProperty.to_u8());
+            buf.put_u8(PropertyType::UserProperty.into());
             key.write(buf)?;
             val.write(buf)?;
         }
         if let Some(content_type) = &self.content_type {
-            buf.put_u8(PropertyType::ContentType.to_u8());
+            buf.put_u8(PropertyType::ContentType.into());
             content_type.write(buf)?;
         }
 

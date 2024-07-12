@@ -253,7 +253,7 @@ impl Default for ConnectFlags {
 impl MqttRead for ConnectFlags {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("ConnectFlags".to_string(), 0, 1));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
         }
 
         let byte = buf.get_u8();
@@ -373,7 +373,7 @@ impl MqttRead for ConnectProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("ConnectProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -566,7 +566,7 @@ impl MqttRead for LastWillProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("LastWillProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);

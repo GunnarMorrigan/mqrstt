@@ -36,7 +36,7 @@ impl VariableHeaderRead for PubRec {
         }
         // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
         else if remaining_length < 4 {
-            return Err(DeserializeError::InsufficientData("PubRec".to_string(), buf.len(), 4));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 4));
         }
 
         let packet_identifier = u16::read(&mut buf)?;
@@ -99,7 +99,7 @@ impl MqttRead for PubRecProperties {
             return Ok(Self::default());
         }
         if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("PubRecProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut properties = PubRecProperties::default();

@@ -23,7 +23,7 @@ pub struct ConnAck {
 impl VariableHeaderRead for ConnAck {
     fn read(_: u8, header_len: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         if header_len > buf.len() {
-            return Err(DeserializeError::InsufficientData("ConnAck".to_string(), buf.len(), header_len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), header_len));
         }
 
         let connack_flags = ConnAckFlags::read(&mut buf)?;
@@ -137,7 +137,7 @@ impl MqttRead for ConnAckProperties {
         if len == 0 {
             return Ok(properties);
         } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData("ConnAckProperties".to_string(), buf.len(), len));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
         let mut property_data = buf.split_to(len);
@@ -426,7 +426,7 @@ pub struct ConnAckFlags {
 impl MqttRead for ConnAckFlags {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
         if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("ConnAckFlags".to_string(), 0, 1));
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
         }
 
         let byte = buf.get_u8();
