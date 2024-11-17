@@ -2,7 +2,7 @@ use bytes::Bytes;
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
     read_variable_integer,
     reason_codes::AuthReasonCode,
     variable_integer_len, write_variable_integer, PacketType, PropertyType,
@@ -14,7 +14,7 @@ pub struct Auth {
     pub properties: AuthProperties,
 }
 
-impl VariableHeaderRead for Auth {
+impl PacketRead for Auth {
     fn read(_: u8, _: usize, mut buf: Bytes) -> Result<Self, super::error::DeserializeError> {
         let reason_code = AuthReasonCode::read(&mut buf)?;
         let properties = AuthProperties::read(&mut buf)?;
@@ -23,7 +23,7 @@ impl VariableHeaderRead for Auth {
     }
 }
 
-impl VariableHeaderWrite for Auth {
+impl PacketWrite for Auth {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         self.reason_code.write(buf)?;
         self.properties.write(buf)?;

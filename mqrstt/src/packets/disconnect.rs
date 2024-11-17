@@ -2,7 +2,7 @@ use bytes::BufMut;
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
     read_variable_integer,
     reason_codes::DisconnectReasonCode,
     variable_integer_len, write_variable_integer, PacketType, PropertyType,
@@ -14,7 +14,7 @@ pub struct Disconnect {
     pub properties: DisconnectProperties,
 }
 
-impl VariableHeaderRead for Disconnect {
+impl PacketRead for Disconnect {
     fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let reason_code;
         let properties;
@@ -29,7 +29,7 @@ impl VariableHeaderRead for Disconnect {
         Ok(Self { reason_code, properties })
     }
 }
-impl VariableHeaderWrite for Disconnect {
+impl PacketWrite for Disconnect {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
             self.reason_code.write(buf)?;

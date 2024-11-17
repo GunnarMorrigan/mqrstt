@@ -2,7 +2,7 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength},
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
 use bytes::{Buf, BufMut};
@@ -24,7 +24,7 @@ impl Subscribe {
     }
 }
 
-impl VariableHeaderRead for Subscribe {
+impl PacketRead for Subscribe {
     fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubscribeProperties::read(&mut buf)?;
@@ -48,7 +48,7 @@ impl VariableHeaderRead for Subscribe {
     }
 }
 
-impl VariableHeaderWrite for Subscribe {
+impl PacketWrite for Subscribe {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
 
@@ -390,7 +390,7 @@ mod tests {
     use bytes::{Bytes, BytesMut};
 
     use crate::packets::{
-        mqtt_traits::{MqttRead, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttRead, PacketRead, PacketWrite},
         Packet,
     };
 

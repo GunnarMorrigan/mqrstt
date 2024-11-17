@@ -2,7 +2,7 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength},
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
 };
 use bytes::BufMut;
@@ -24,7 +24,7 @@ impl Unsubscribe {
     }
 }
 
-impl VariableHeaderRead for Unsubscribe {
+impl PacketRead for Unsubscribe {
     fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubscribeProperties::read(&mut buf)?;
@@ -47,7 +47,7 @@ impl VariableHeaderRead for Unsubscribe {
     }
 }
 
-impl VariableHeaderWrite for Unsubscribe {
+impl PacketWrite for Unsubscribe {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
         self.properties.write(buf)?;
@@ -280,7 +280,7 @@ mod tests {
 
     use bytes::{Bytes, BytesMut};
 
-    use crate::packets::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite};
+    use crate::packets::mqtt_traits::{PacketRead, PacketWrite};
 
     use super::Unsubscribe;
 

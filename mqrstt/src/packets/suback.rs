@@ -2,7 +2,7 @@ use bytes::BufMut;
 
 use super::{
     error::{DeserializeError, SerializeError},
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
     read_variable_integer,
     reason_codes::SubAckReasonCode,
     variable_integer_len, write_variable_integer, PacketType, PropertyType,
@@ -18,7 +18,7 @@ pub struct SubAck {
     pub reason_codes: Vec<SubAckReasonCode>,
 }
 
-impl VariableHeaderRead for SubAck {
+impl PacketRead for SubAck {
     fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubAckProperties::read(&mut buf)?;
@@ -41,7 +41,7 @@ impl VariableHeaderRead for SubAck {
     }
 }
 
-impl VariableHeaderWrite for SubAck {
+impl PacketWrite for SubAck {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.packet_identifier);
 
@@ -138,7 +138,7 @@ mod test {
     use bytes::BytesMut;
 
     use super::SubAck;
-    use crate::packets::mqtt_traits::{VariableHeaderRead, VariableHeaderWrite};
+    use crate::packets::mqtt_traits::{PacketRead, PacketWrite};
 
     #[test]
     fn read_write_suback() {

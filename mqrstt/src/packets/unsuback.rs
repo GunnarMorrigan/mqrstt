@@ -1,7 +1,7 @@
 use bytes::BufMut;
 
 use super::error::{DeserializeError, SerializeError};
-use super::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
+use super::mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength};
 use super::{read_variable_integer, reason_codes::UnsubAckReasonCode, write_variable_integer, PacketType, PropertyType};
 
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
@@ -11,7 +11,7 @@ pub struct UnsubAck {
     pub reason_codes: Vec<UnsubAckReasonCode>,
 }
 
-impl VariableHeaderRead for UnsubAck {
+impl PacketRead for UnsubAck {
     fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubAckProperties::read(&mut buf)?;
@@ -34,7 +34,7 @@ impl VariableHeaderRead for UnsubAck {
     }
 }
 
-impl VariableHeaderWrite for UnsubAck {
+impl PacketWrite for UnsubAck {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.packet_identifier);
         self.properties.write(buf)?;
@@ -125,7 +125,7 @@ mod tests {
     use bytes::{Bytes, BytesMut};
 
     use crate::packets::{
-        mqtt_traits::{VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{PacketRead, PacketWrite},
         unsuback::UnsubAck,
     };
 

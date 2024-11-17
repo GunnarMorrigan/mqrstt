@@ -3,16 +3,15 @@ use std::default;
 use bytes::{Buf, BufMut};
 
 use super::error::DeserializeError;
-use super::mqtt_traits::{MqttRead, MqttWrite};
+use super::mqtt_traits::{MqttAsyncRead, MqttRead, MqttWrite};
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ConnAckReasonCode {
-    #[default]
+
+
+super::macros::reason_code!(ConnAckReasonCode,
     Success,
-
     UnspecifiedError,
     MalformedPacket,
-    ProtocolError,
+    ProtocolError, 
     ImplementationSpecificError,
     UnsupportedProtocolVersion,
     ClientIdentifierNotValid,
@@ -30,115 +29,173 @@ pub enum ConnAckReasonCode {
     QosNotSupported,
     UseAnotherServer,
     ServerMoved,
-    ConnectionRateExceeded,
-}
+    ConnectionRateExceeded
+);
 
-impl MqttRead for ConnAckReasonCode {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
-        }
 
-        match buf.get_u8() {
-            0x00 => Ok(ConnAckReasonCode::Success),
-            0x80 => Ok(ConnAckReasonCode::UnspecifiedError),
-            0x81 => Ok(ConnAckReasonCode::MalformedPacket),
-            0x82 => Ok(ConnAckReasonCode::ProtocolError),
-            0x83 => Ok(ConnAckReasonCode::ImplementationSpecificError),
-            0x84 => Ok(ConnAckReasonCode::UnsupportedProtocolVersion),
-            0x85 => Ok(ConnAckReasonCode::ClientIdentifierNotValid),
-            0x86 => Ok(ConnAckReasonCode::BadUsernameOrPassword),
-            0x87 => Ok(ConnAckReasonCode::NotAuthorized),
-            0x88 => Ok(ConnAckReasonCode::ServerUnavailable),
-            0x89 => Ok(ConnAckReasonCode::ServerBusy),
-            0x8A => Ok(ConnAckReasonCode::Banned),
-            0x8C => Ok(ConnAckReasonCode::BadAuthenticationMethod),
-            0x90 => Ok(ConnAckReasonCode::TopicNameInvalid),
-            0x95 => Ok(ConnAckReasonCode::PacketTooLarge),
-            0x97 => Ok(ConnAckReasonCode::QuotaExceeded),
-            0x99 => Ok(ConnAckReasonCode::PayloadFormatInvalid),
-            0x9A => Ok(ConnAckReasonCode::RetainNotSupported),
-            0x9B => Ok(ConnAckReasonCode::QosNotSupported),
-            0x9C => Ok(ConnAckReasonCode::UseAnotherServer),
-            0x9D => Ok(ConnAckReasonCode::ServerMoved),
-            0x9F => Ok(ConnAckReasonCode::ConnectionRateExceeded),
-            t => Err(DeserializeError::UnknownProperty(t)),
-        }
-    }
-}
+// #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub enum ConnAckReasonCode {
+//     #[default]
+//     Success,
 
-impl MqttWrite for ConnAckReasonCode {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        let val = match self {
-            ConnAckReasonCode::Success => 0x00,
-            ConnAckReasonCode::UnspecifiedError => 0x80,
-            ConnAckReasonCode::MalformedPacket => 0x81,
-            ConnAckReasonCode::ProtocolError => 0x82,
-            ConnAckReasonCode::ImplementationSpecificError => 0x83,
-            ConnAckReasonCode::UnsupportedProtocolVersion => 0x84,
-            ConnAckReasonCode::ClientIdentifierNotValid => 0x85,
-            ConnAckReasonCode::BadUsernameOrPassword => 0x86,
-            ConnAckReasonCode::NotAuthorized => 0x87,
-            ConnAckReasonCode::ServerUnavailable => 0x88,
-            ConnAckReasonCode::ServerBusy => 0x89,
-            ConnAckReasonCode::Banned => 0x8A,
-            ConnAckReasonCode::BadAuthenticationMethod => 0x8C,
-            ConnAckReasonCode::TopicNameInvalid => 0x90,
-            ConnAckReasonCode::PacketTooLarge => 0x95,
-            ConnAckReasonCode::QuotaExceeded => 0x97,
-            ConnAckReasonCode::PayloadFormatInvalid => 0x99,
-            ConnAckReasonCode::RetainNotSupported => 0x9A,
-            ConnAckReasonCode::QosNotSupported => 0x9B,
-            ConnAckReasonCode::UseAnotherServer => 0x9C,
-            ConnAckReasonCode::ServerMoved => 0x9D,
-            ConnAckReasonCode::ConnectionRateExceeded => 0x9F,
-        };
+//     UnspecifiedError,
+//     MalformedPacket,
+//     ProtocolError,
+//     ImplementationSpecificError,
+//     UnsupportedProtocolVersion,
+//     ClientIdentifierNotValid,
+//     BadUsernameOrPassword,
+//     NotAuthorized,
+//     ServerUnavailable,
+//     ServerBusy,
+//     Banned,
+//     BadAuthenticationMethod,
+//     TopicNameInvalid,
+//     PacketTooLarge,
+//     QuotaExceeded,
+//     PayloadFormatInvalid,
+//     RetainNotSupported,
+//     QosNotSupported,
+//     UseAnotherServer,
+//     ServerMoved,
+//     ConnectionRateExceeded,
+// }
 
-        buf.put_u8(val);
+// impl MqttRead for ConnAckReasonCode {
+//     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+//         if buf.is_empty() {
+//             return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
+//         }
+//         let res = buf.get_u8();
 
-        Ok(())
-    }
-}
+//         crate::packets::macros::reason_code_match!(@ ConnAckReasonCode, res, {
+//             Success,
+//             UnspecifiedError,
+//             MalformedPacket,
+//             ProtocolError,
+//             ImplementationSpecificError,
+//             UnsupportedProtocolVersion,
+//             ClientIdentifierNotValid,
+//             BadUsernameOrPassword,
+//             NotAuthorized,
+//             ServerUnavailable,
+//             ServerBusy,
+//             Banned,
+//             BadAuthenticationMethod,
+//             TopicNameInvalid,
+//             PacketTooLarge,
+//             QuotaExceeded,
+//             PayloadFormatInvalid,
+//             RetainNotSupported,
+//             QosNotSupported,
+//             UseAnotherServer,
+//             ServerMoved,
+//             ConnectionRateExceeded,
+//         } -> ())
+//         // match buf.get_u8() {
+//         //     0x00 => Ok(ConnAckReasonCode::Success),
+//         //     0x80 => Ok(ConnAckReasonCode::UnspecifiedError),
+//         //     0x81 => Ok(ConnAckReasonCode::MalformedPacket),
+//         //     0x82 => Ok(ConnAckReasonCode::ProtocolError),
+//         //     0x83 => Ok(ConnAckReasonCode::ImplementationSpecificError),
+//         //     0x84 => Ok(ConnAckReasonCode::UnsupportedProtocolVersion),
+//         //     0x85 => Ok(ConnAckReasonCode::ClientIdentifierNotValid),
+//         //     0x86 => Ok(ConnAckReasonCode::BadUsernameOrPassword),
+//         //     0x87 => Ok(ConnAckReasonCode::NotAuthorized),
+//         //     0x88 => Ok(ConnAckReasonCode::ServerUnavailable),
+//         //     0x89 => Ok(ConnAckReasonCode::ServerBusy),
+//         //     0x8A => Ok(ConnAckReasonCode::Banned),
+//         //     0x8C => Ok(ConnAckReasonCode::BadAuthenticationMethod),
+//         //     0x90 => Ok(ConnAckReasonCode::TopicNameInvalid),
+//         //     0x95 => Ok(ConnAckReasonCode::PacketTooLarge),
+//         //     0x97 => Ok(ConnAckReasonCode::QuotaExceeded),
+//         //     0x99 => Ok(ConnAckReasonCode::PayloadFormatInvalid),
+//         //     0x9A => Ok(ConnAckReasonCode::RetainNotSupported),
+//         //     0x9B => Ok(ConnAckReasonCode::QosNotSupported),
+//         //     0x9C => Ok(ConnAckReasonCode::UseAnotherServer),
+//         //     0x9D => Ok(ConnAckReasonCode::ServerMoved),
+//         //     0x9F => Ok(ConnAckReasonCode::ConnectionRateExceeded),
+//         //     t => Err(DeserializeError::UnknownProperty(t)),
+//         // }
+//     }
+// }
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum AuthReasonCode {
+// impl MqttWrite for ConnAckReasonCode {
+//     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+//         let val = match self {
+//             ConnAckReasonCode::Success => 0x00,
+//             ConnAckReasonCode::UnspecifiedError => 0x80,
+//             ConnAckReasonCode::MalformedPacket => 0x81,
+//             ConnAckReasonCode::ProtocolError => 0x82,
+//             ConnAckReasonCode::ImplementationSpecificError => 0x83,
+//             ConnAckReasonCode::UnsupportedProtocolVersion => 0x84,
+//             ConnAckReasonCode::ClientIdentifierNotValid => 0x85,
+//             ConnAckReasonCode::BadUsernameOrPassword => 0x86,
+//             ConnAckReasonCode::NotAuthorized => 0x87,
+//             ConnAckReasonCode::ServerUnavailable => 0x88,
+//             ConnAckReasonCode::ServerBusy => 0x89,
+//             ConnAckReasonCode::Banned => 0x8A,
+//             ConnAckReasonCode::BadAuthenticationMethod => 0x8C,
+//             ConnAckReasonCode::TopicNameInvalid => 0x90,
+//             ConnAckReasonCode::PacketTooLarge => 0x95,
+//             ConnAckReasonCode::QuotaExceeded => 0x97,
+//             ConnAckReasonCode::PayloadFormatInvalid => 0x99,
+//             ConnAckReasonCode::RetainNotSupported => 0x9A,
+//             ConnAckReasonCode::QosNotSupported => 0x9B,
+//             ConnAckReasonCode::UseAnotherServer => 0x9C,
+//             ConnAckReasonCode::ServerMoved => 0x9D,
+//             ConnAckReasonCode::ConnectionRateExceeded => 0x9F,
+//         };
+
+//         buf.put_u8(val);
+
+//         Ok(())
+//     }
+// }
+
+super::macros::reason_code!(AuthReasonCode,
     Success,
     ContinueAuthentication,
-    ReAuthenticate,
-}
+    ReAuthenticate
+);
 
-impl MqttRead for AuthReasonCode {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
-        }
+// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+// pub enum AuthReasonCode {
+//     Success,
+//     ContinueAuthentication,
+//     ReAuthenticate,
+// }
 
-        match buf.get_u8() {
-            0x00 => Ok(AuthReasonCode::Success),
-            0x18 => Ok(AuthReasonCode::ContinueAuthentication),
-            0x19 => Ok(AuthReasonCode::ReAuthenticate),
-            t => Err(DeserializeError::UnknownProperty(t)),
-        }
-    }
-}
+// impl MqttRead for AuthReasonCode {
+//     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+//         if buf.is_empty() {
+//             return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
+//         }
 
-impl MqttWrite for AuthReasonCode {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        let val = match self {
-            AuthReasonCode::Success => 0x00,
-            AuthReasonCode::ContinueAuthentication => 0x18,
-            AuthReasonCode::ReAuthenticate => 0x19,
-        };
+//         match buf.get_u8() {
+//             0x00 => Ok(AuthReasonCode::Success),
+//             0x18 => Ok(AuthReasonCode::ContinueAuthentication),
+//             0x19 => Ok(AuthReasonCode::ReAuthenticate),
+//             t => Err(DeserializeError::UnknownProperty(t)),
+//         }
+//     }
+// }
 
-        buf.put_u8(val);
+// impl MqttWrite for AuthReasonCode {
+//     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+//         let val = match self {
+//             AuthReasonCode::Success => 0x00,
+//             AuthReasonCode::ContinueAuthentication => 0x18,
+//             AuthReasonCode::ReAuthenticate => 0x19,
+//         };
 
-        Ok(())
-    }
-}
+//         buf.put_u8(val);
 
-#[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub enum DisconnectReasonCode {
-    #[default]
+//         Ok(())
+//     }
+// }
+
+super::macros::reason_code!(DisconnectReasonCode,
     NormalDisconnection,
     DisconnectWithWillMessage,
     UnspecifiedError,
@@ -167,89 +224,125 @@ pub enum DisconnectReasonCode {
     ConnectionRateExceeded,
     MaximumConnectTime,
     SubscriptionIdentifiersNotSupported,
-    WildcardSubscriptionsNotSupported,
-}
+    WildcardSubscriptionsNotSupported
+);
 
-impl MqttRead for DisconnectReasonCode {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
-        }
+// #[derive(Debug, Default, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+// pub enum DisconnectReasonCode {
+//     #[default]
+//     NormalDisconnection,
+//     DisconnectWithWillMessage,
+//     UnspecifiedError,
+//     MalformedPacket,
+//     ProtocolError,
+//     ImplementationSpecificError,
+//     NotAuthorized,
+//     ServerBusy,
+//     ServerShuttingDown,
+//     KeepAliveTimeout,
+//     SessionTakenOver,
+//     TopicFilterInvalid,
+//     TopicNameInvalid,
+//     ReceiveMaximumExceeded,
+//     TopicAliasInvalid,
+//     PacketTooLarge,
+//     MessageRateTooHigh,
+//     QuotaExceeded,
+//     AdministrativeAction,
+//     PayloadFormatInvalid,
+//     RetainNotSupported,
+//     QosNotSupported,
+//     UseAnotherServer,
+//     ServerMoved,
+//     SharedSubscriptionsNotSupported,
+//     ConnectionRateExceeded,
+//     MaximumConnectTime,
+//     SubscriptionIdentifiersNotSupported,
+//     WildcardSubscriptionsNotSupported,
+// }
 
-        match buf.get_u8() {
-            0x00 => Ok(DisconnectReasonCode::NormalDisconnection),
-            0x04 => Ok(DisconnectReasonCode::DisconnectWithWillMessage),
-            0x80 => Ok(DisconnectReasonCode::UnspecifiedError),
-            0x81 => Ok(DisconnectReasonCode::MalformedPacket),
-            0x82 => Ok(DisconnectReasonCode::ProtocolError),
-            0x83 => Ok(DisconnectReasonCode::ImplementationSpecificError),
-            0x87 => Ok(DisconnectReasonCode::NotAuthorized),
-            0x89 => Ok(DisconnectReasonCode::ServerBusy),
-            0x8B => Ok(DisconnectReasonCode::ServerShuttingDown),
-            0x8D => Ok(DisconnectReasonCode::KeepAliveTimeout),
-            0x8E => Ok(DisconnectReasonCode::SessionTakenOver),
-            0x8F => Ok(DisconnectReasonCode::TopicFilterInvalid),
-            0x90 => Ok(DisconnectReasonCode::TopicNameInvalid),
-            0x93 => Ok(DisconnectReasonCode::ReceiveMaximumExceeded),
-            0x94 => Ok(DisconnectReasonCode::TopicAliasInvalid),
-            0x95 => Ok(DisconnectReasonCode::PacketTooLarge),
-            0x96 => Ok(DisconnectReasonCode::MessageRateTooHigh),
-            0x97 => Ok(DisconnectReasonCode::QuotaExceeded),
-            0x98 => Ok(DisconnectReasonCode::AdministrativeAction),
-            0x99 => Ok(DisconnectReasonCode::PayloadFormatInvalid),
-            0x9A => Ok(DisconnectReasonCode::RetainNotSupported),
-            0x9B => Ok(DisconnectReasonCode::QosNotSupported),
-            0x9C => Ok(DisconnectReasonCode::UseAnotherServer),
-            0x9D => Ok(DisconnectReasonCode::ServerMoved),
-            0x9E => Ok(DisconnectReasonCode::SharedSubscriptionsNotSupported),
-            0x9F => Ok(DisconnectReasonCode::ConnectionRateExceeded),
-            0xA0 => Ok(DisconnectReasonCode::MaximumConnectTime),
-            0xA1 => Ok(DisconnectReasonCode::SubscriptionIdentifiersNotSupported),
-            0xA2 => Ok(DisconnectReasonCode::WildcardSubscriptionsNotSupported),
-            t => Err(DeserializeError::UnknownProperty(t)),
-        }
-    }
-}
+// impl MqttRead for DisconnectReasonCode {
+//     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
+//         if buf.is_empty() {
+//             return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
+//         }
 
-impl MqttWrite for DisconnectReasonCode {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        let val = match self {
-            DisconnectReasonCode::NormalDisconnection => 0x00,
-            DisconnectReasonCode::DisconnectWithWillMessage => 0x04,
-            DisconnectReasonCode::UnspecifiedError => 0x80,
-            DisconnectReasonCode::MalformedPacket => 0x81,
-            DisconnectReasonCode::ProtocolError => 0x82,
-            DisconnectReasonCode::ImplementationSpecificError => 0x83,
-            DisconnectReasonCode::NotAuthorized => 0x87,
-            DisconnectReasonCode::ServerBusy => 0x89,
-            DisconnectReasonCode::ServerShuttingDown => 0x8B,
-            DisconnectReasonCode::KeepAliveTimeout => 0x8D,
-            DisconnectReasonCode::SessionTakenOver => 0x8E,
-            DisconnectReasonCode::TopicFilterInvalid => 0x8F,
-            DisconnectReasonCode::TopicNameInvalid => 0x90,
-            DisconnectReasonCode::ReceiveMaximumExceeded => 0x93,
-            DisconnectReasonCode::TopicAliasInvalid => 0x94,
-            DisconnectReasonCode::PacketTooLarge => 0x95,
-            DisconnectReasonCode::MessageRateTooHigh => 0x96,
-            DisconnectReasonCode::QuotaExceeded => 0x97,
-            DisconnectReasonCode::AdministrativeAction => 0x98,
-            DisconnectReasonCode::PayloadFormatInvalid => 0x99,
-            DisconnectReasonCode::RetainNotSupported => 0x9A,
-            DisconnectReasonCode::QosNotSupported => 0x9B,
-            DisconnectReasonCode::UseAnotherServer => 0x9C,
-            DisconnectReasonCode::ServerMoved => 0x9D,
-            DisconnectReasonCode::SharedSubscriptionsNotSupported => 0x9E,
-            DisconnectReasonCode::ConnectionRateExceeded => 0x9F,
-            DisconnectReasonCode::MaximumConnectTime => 0xA0,
-            DisconnectReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
-            DisconnectReasonCode::WildcardSubscriptionsNotSupported => 0xA2,
-        };
+//         match buf.get_u8() {
+//             0x00 => Ok(DisconnectReasonCode::NormalDisconnection),
+//             0x04 => Ok(DisconnectReasonCode::DisconnectWithWillMessage),
+//             0x80 => Ok(DisconnectReasonCode::UnspecifiedError),
+//             0x81 => Ok(DisconnectReasonCode::MalformedPacket),
+//             0x82 => Ok(DisconnectReasonCode::ProtocolError),
+//             0x83 => Ok(DisconnectReasonCode::ImplementationSpecificError),
+//             0x87 => Ok(DisconnectReasonCode::NotAuthorized),
+//             0x89 => Ok(DisconnectReasonCode::ServerBusy),
+//             0x8B => Ok(DisconnectReasonCode::ServerShuttingDown),
+//             0x8D => Ok(DisconnectReasonCode::KeepAliveTimeout),
+//             0x8E => Ok(DisconnectReasonCode::SessionTakenOver),
+//             0x8F => Ok(DisconnectReasonCode::TopicFilterInvalid),
+//             0x90 => Ok(DisconnectReasonCode::TopicNameInvalid),
+//             0x93 => Ok(DisconnectReasonCode::ReceiveMaximumExceeded),
+//             0x94 => Ok(DisconnectReasonCode::TopicAliasInvalid),
+//             0x95 => Ok(DisconnectReasonCode::PacketTooLarge),
+//             0x96 => Ok(DisconnectReasonCode::MessageRateTooHigh),
+//             0x97 => Ok(DisconnectReasonCode::QuotaExceeded),
+//             0x98 => Ok(DisconnectReasonCode::AdministrativeAction),
+//             0x99 => Ok(DisconnectReasonCode::PayloadFormatInvalid),
+//             0x9A => Ok(DisconnectReasonCode::RetainNotSupported),
+//             0x9B => Ok(DisconnectReasonCode::QosNotSupported),
+//             0x9C => Ok(DisconnectReasonCode::UseAnotherServer),
+//             0x9D => Ok(DisconnectReasonCode::ServerMoved),
+//             0x9E => Ok(DisconnectReasonCode::SharedSubscriptionsNotSupported),
+//             0x9F => Ok(DisconnectReasonCode::ConnectionRateExceeded),
+//             0xA0 => Ok(DisconnectReasonCode::MaximumConnectTime),
+//             0xA1 => Ok(DisconnectReasonCode::SubscriptionIdentifiersNotSupported),
+//             0xA2 => Ok(DisconnectReasonCode::WildcardSubscriptionsNotSupported),
+//             t => Err(DeserializeError::UnknownProperty(t)),
+//         }
+//     }
+// }
 
-        buf.put_u8(val);
+// impl MqttWrite for DisconnectReasonCode {
+//     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
+//         let val = match self {
+//             DisconnectReasonCode::NormalDisconnection => 0x00,
+//             DisconnectReasonCode::DisconnectWithWillMessage => 0x04,
+//             DisconnectReasonCode::UnspecifiedError => 0x80,
+//             DisconnectReasonCode::MalformedPacket => 0x81,
+//             DisconnectReasonCode::ProtocolError => 0x82,
+//             DisconnectReasonCode::ImplementationSpecificError => 0x83,
+//             DisconnectReasonCode::NotAuthorized => 0x87,
+//             DisconnectReasonCode::ServerBusy => 0x89,
+//             DisconnectReasonCode::ServerShuttingDown => 0x8B,
 
-        Ok(())
-    }
-}
+//             DisconnectReasonCode::KeepAliveTimeout => 0x8D,
+//             DisconnectReasonCode::SessionTakenOver => 0x8E,
+//             DisconnectReasonCode::TopicFilterInvalid => 0x8F,
+
+//             DisconnectReasonCode::TopicNameInvalid => 0x90,
+//             DisconnectReasonCode::ReceiveMaximumExceeded => 0x93,
+//             DisconnectReasonCode::TopicAliasInvalid => 0x94,
+//             DisconnectReasonCode::PacketTooLarge => 0x95,
+//             DisconnectReasonCode::MessageRateTooHigh => 0x96,
+//             DisconnectReasonCode::QuotaExceeded => 0x97,
+//             DisconnectReasonCode::AdministrativeAction => 0x98,
+//             DisconnectReasonCode::PayloadFormatInvalid => 0x99,
+//             DisconnectReasonCode::RetainNotSupported => 0x9A,
+//             DisconnectReasonCode::QosNotSupported => 0x9B,
+//             DisconnectReasonCode::UseAnotherServer => 0x9C,
+//             DisconnectReasonCode::ServerMoved => 0x9D,
+//             DisconnectReasonCode::SharedSubscriptionsNotSupported => 0x9E,
+//             DisconnectReasonCode::ConnectionRateExceeded => 0x9F,
+//             DisconnectReasonCode::MaximumConnectTime => 0xA0,
+//             DisconnectReasonCode::SubscriptionIdentifiersNotSupported => 0xA1,
+//             DisconnectReasonCode::WildcardSubscriptionsNotSupported => 0xA2,
+//         };
+
+//         buf.put_u8(val);
+
+//         Ok(())
+//     }
+// }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub enum PubAckReasonCode {
@@ -407,6 +500,17 @@ impl MqttRead for PubRelReasonCode {
             0x92 => Ok(PubRelReasonCode::PacketIdentifierNotFound),
             t => Err(DeserializeError::UnknownProperty(t)),
         }
+    }
+}
+
+impl<S> MqttAsyncRead<S> for PubRelReasonCode where S: tokio::io::AsyncReadExt + Unpin {
+    async fn async_read(stream: &mut S) -> Result<(Self, usize), super::error::ReadError> {
+        let code = match stream.read_u8().await? {
+            0x00 => PubRelReasonCode::Success,
+            0x92 => PubRelReasonCode::PacketIdentifierNotFound,
+            t => return Err(super::error::ReadError::DeserializeError(DeserializeError::UnknownProperty(t))),
+        };
+        Ok((code, 1))
     }
 }
 

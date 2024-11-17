@@ -1,11 +1,11 @@
 use super::{
     error::{DeserializeError, SerializeError},
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
     read_variable_integer,
     reason_codes::ConnAckReasonCode,
     variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
 };
-use bytes::{Buf, BufMut, Bytes};
+use bytes::{Buf, BufMut};
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ConnAck {
@@ -20,7 +20,7 @@ pub struct ConnAck {
     pub connack_properties: ConnAckProperties,
 }
 
-impl VariableHeaderRead for ConnAck {
+impl PacketRead for ConnAck {
     fn read(_: u8, header_len: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         if header_len > buf.len() {
             return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), header_len));
@@ -38,7 +38,27 @@ impl VariableHeaderRead for ConnAck {
     }
 }
 
-impl VariableHeaderWrite for ConnAck {
+impl<S> PacketAsyncRead<S> for ConnAck where S: tokio::io::AsyncReadExt + Unpin {
+    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
+        async move {
+            let (connack_flags, read_bytes) = ConnAckFlags::async_read(stream).await?;
+            let (reason_code, reason_code_read_bytes) = ConnAckReasonCode::async_read(stream).await?;
+            let (connack_properties, connack_properties_read_bytes) = ConnAckProperties::async_read(stream).await?;
+    
+            Ok((
+                Self {
+                    connack_flags,
+                    reason_code,
+                    connack_properties,
+                },
+                read_bytes + reason_code_read_bytes + connack_properties_read_bytes
+            ))
+    
+        }
+    }
+}
+
+impl PacketWrite for ConnAck {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), SerializeError> {
         self.connack_flags.write(buf)?;
         self.reason_code.write(buf)?;
@@ -56,78 +76,98 @@ impl WireLength for ConnAck {
     }
 }
 
-#[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ConnAckProperties {
-    /// 3.2.2.3.2 Session Expiry Interval
-    /// 17 (0x11) Byte Identifier of the Session Expiry Interval
-    pub session_expiry_interval: Option<u32>,
+super::macros::define_properties!(ConnAckProperties,
+    SessionExpiryInterval,
+    ReceiveMaximum,
+    MaximumQos,
+    RetainAvailable,
+    MaximumPacketSize,
+    AssignedClientIdentifier,
+    TopicAliasMaximum,
+    ReasonString,
+    UserProperty,
+    WildcardSubscriptionAvailable,
+    SubscriptionIdentifierAvailable,
+    SharedSubscriptionAvailable,
+    ServerKeepAlive,
+    ResponseInformation,
+    ServerReference,
+    AuthenticationMethod,
+    AuthenticationData
+);
 
-    /// 3.2.2.3.3 Receive Maximum
-    /// 33 (0x21) Byte, Identifier of the Receive Maximum
-    pub receive_maximum: Option<u16>,
+// #[derive(Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub struct ConnAckProperties {
+//     /// 3.2.2.3.2 Session Expiry Interval
+//     /// 17 (0x11) Byte Identifier of the Session Expiry Interval
+//     pub session_expiry_interval: Option<u32>,
 
-    /// 3.2.2.3.4 Maximum QoS
-    /// 36 (0x24) Byte, Identifier of the Maximum QoS.
-    pub maximum_qos: Option<QoS>,
+//     /// 3.2.2.3.3 Receive Maximum
+//     /// 33 (0x21) Byte, Identifier of the Receive Maximum
+//     pub receive_maximum: Option<u16>,
 
-    /// 3.2.2.3.5 Retain Available
-    /// 37 (0x25) Byte, Identifier of Retain Available.
-    pub retain_available: Option<bool>,
+//     /// 3.2.2.3.4 Maximum QoS
+//     /// 36 (0x24) Byte, Identifier of the Maximum QoS.
+//     pub maximum_qos: Option<QoS>,
 
-    /// 3.2.2.3.6 Maximum Packet Size
-    /// 39 (0x27) Byte, Identifier of the Maximum Packet Size.
-    pub maximum_packet_size: Option<u32>,
+//     /// 3.2.2.3.5 Retain Available
+//     /// 37 (0x25) Byte, Identifier of Retain Available.
+//     pub retain_available: Option<bool>,
 
-    /// 3.2.2.3.7 Assigned Client Identifier
-    /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier.
-    pub assigned_client_id: Option<Box<str>>,
+//     /// 3.2.2.3.6 Maximum Packet Size
+//     /// 39 (0x27) Byte, Identifier of the Maximum Packet Size.
+//     pub maximum_packet_size: Option<u32>,
 
-    /// 3.2.2.3.8 Topic Alias Maximum
-    /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum.
-    pub topic_alias_maximum: Option<u16>,
+//     /// 3.2.2.3.7 Assigned Client Identifier
+//     /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier.
+//     pub assigned_client_id: Option<Box<str>>,
 
-    /// 3.2.2.3.9 Reason String
-    /// 31 (0x1F) Byte Identifier of the Reason String.
-    pub reason_string: Option<Box<str>>,
+//     /// 3.2.2.3.8 Topic Alias Maximum
+//     /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum.
+//     pub topic_alias_maximum: Option<u16>,
 
-    /// 3.2.2.3.10 User Property
-    /// 38 (0x26) Byte, Identifier of User Property.
-    pub user_properties: Vec<(Box<str>, Box<str>)>,
+//     /// 3.2.2.3.9 Reason String
+//     /// 31 (0x1F) Byte Identifier of the Reason String.
+//     pub reason_string: Option<Box<str>>,
 
-    /// 3.2.2.3.11 Wildcard Subscription Available
-    /// 40 (0x28) Byte, Identifier of Wildcard Subscription Available.
-    pub wildcards_available: Option<bool>,
+//     /// 3.2.2.3.10 User Property
+//     /// 38 (0x26) Byte, Identifier of User Property.
+//     pub user_properties: Vec<(Box<str>, Box<str>)>,
 
-    /// 3.2.2.3.12 Subscription Identifiers Available
-    /// 41 (0x29) Byte, Identifier of Subscription Identifier Available.
-    pub subscription_ids_available: Option<bool>,
+//     /// 3.2.2.3.11 Wildcard Subscription Available
+//     /// 40 (0x28) Byte, Identifier of Wildcard Subscription Available.
+//     pub wildcards_available: Option<bool>,
 
-    /// 3.2.2.3.13 Shared Subscription Available
-    /// 42 (0x2A) Byte, Identifier of Shared Subscription Available.
-    pub shared_subscription_available: Option<bool>,
+//     /// 3.2.2.3.12 Subscription Identifiers Available
+//     /// 41 (0x29) Byte, Identifier of Subscription Identifier Available.
+//     pub subscription_ids_available: Option<bool>,
 
-    /// 3.2.2.3.14 Server Keep Alive
-    /// 19 (0x13) Byte, Identifier of the Server Keep Alive
-    pub server_keep_alive: Option<u16>,
+//     /// 3.2.2.3.13 Shared Subscription Available
+//     /// 42 (0x2A) Byte, Identifier of Shared Subscription Available.
+//     pub shared_subscription_available: Option<bool>,
 
-    /// 3.2.2.3.15 Response Information
-    /// 26 (0x1A) Byte, Identifier of the Response Information.
-    pub response_info: Option<Box<str>>,
+//     /// 3.2.2.3.14 Server Keep Alive
+//     /// 19 (0x13) Byte, Identifier of the Server Keep Alive
+//     pub server_keep_alive: Option<u16>,
 
-    /// 3.2.2.3.16 Server Reference
-    /// 28 (0x1C) Byte, Identifier of the Server Reference
-    pub server_reference: Option<Box<str>>,
+//     /// 3.2.2.3.15 Response Information
+//     /// 26 (0x1A) Byte, Identifier of the Response Information.
+//     pub response_info: Option<Box<str>>,
 
-    /// 3.2.2.3.17 Authentication Method
-    /// 21 (0x15) Byte, Identifier of the Authentication Method
-    pub authentication_method: Option<Box<str>>,
+//     /// 3.2.2.3.16 Server Reference
+//     /// 28 (0x1C) Byte, Identifier of the Server Reference
+//     pub server_reference: Option<Box<str>>,
 
-    /// 3.2.2.3.18 Authentication Data
-    /// 22 (0x16) Byte, Identifier of the Authentication Data
-    // There is a small inconsistency here with authentication_data in the connect packet.
-    // This is Option<Bytes> while that type uses just Bytes.
-    pub authentication_data: Option<Bytes>,
-}
+//     /// 3.2.2.3.17 Authentication Method
+//     /// 21 (0x15) Byte, Identifier of the Authentication Method
+//     pub authentication_method: Option<Box<str>>,
+
+//     /// 3.2.2.3.18 Authentication Data
+//     /// 22 (0x16) Byte, Identifier of the Authentication Data
+//     // There is a small inconsistency here with authentication_data in the connect packet.
+//     // This is Option<Bytes> while that type uses just Bytes.
+//     pub authentication_data: Option<Vec<u8>>,
+// }
 
 impl MqttRead for ConnAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
@@ -240,7 +280,7 @@ impl MqttRead for ConnAckProperties {
                     if properties.authentication_data.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData));
                     }
-                    properties.authentication_data = Some(Bytes::read(&mut property_data)?);
+                    properties.authentication_data = Some(Vec::<u8>::read(&mut property_data)?);
                 }
 
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::ConnAck)),
@@ -356,71 +396,82 @@ impl MqttWrite for ConnAckProperties {
     }
 }
 
-impl WireLength for ConnAckProperties {
-    fn wire_len(&self) -> usize {
-        let mut len: usize = 0;
+// impl WireLength for ConnAckProperties {
+//     fn wire_len(&self) -> usize {
+//         let mut len: usize = 0;
 
-        if self.session_expiry_interval.is_some() {
-            len += 1 + 4;
-        }
-        if self.receive_maximum.is_some() {
-            len += 1 + 2;
-        }
-        if self.maximum_qos.is_some() {
-            len += 1 + 1;
-        }
-        if self.retain_available.is_some() {
-            len += 1 + 1;
-        }
-        if self.maximum_packet_size.is_some() {
-            len += 1 + 4;
-        }
-        if let Some(client_id) = &self.assigned_client_id {
-            len += 1 + client_id.wire_len();
-        }
-        if self.topic_alias_maximum.is_some() {
-            len += 1 + 2;
-        }
-        if let Some(reason_string) = &self.reason_string {
-            len += 1 + reason_string.wire_len();
-        }
-        for (key, value) in &self.user_properties {
-            len += 1;
-            len += key.wire_len();
-            len += value.wire_len();
-        }
-        if self.wildcards_available.is_some() {
-            len += 1 + 1;
-        }
-        if self.subscription_ids_available.is_some() {
-            len += 1 + 1;
-        }
-        if self.shared_subscription_available.is_some() {
-            len += 1 + 1;
-        }
-        if self.server_keep_alive.is_some() {
-            len += 1 + 2;
-        }
-        if let Some(response_info) = &self.response_info {
-            len += 1 + response_info.wire_len();
-        }
-        if let Some(server_reference) = &self.server_reference {
-            len += 1 + server_reference.wire_len();
-        }
-        if let Some(authentication_method) = &self.authentication_method {
-            len += 1 + authentication_method.wire_len();
-        }
-        if self.authentication_data.is_some() && self.authentication_method.is_some() {
-            len += 1 + self.authentication_data.as_ref().map(WireLength::wire_len).unwrap_or(0);
-        }
+//         if self.session_expiry_interval.is_some() {
+//             len += 1 + 4;
+//         }
+//         if self.receive_maximum.is_some() {
+//             len += 1 + 2;
+//         }
+//         if self.maximum_qos.is_some() {
+//             len += 1 + 1;
+//         }
+//         if self.retain_available.is_some() {
+//             len += 1 + 1;
+//         }
+//         if self.maximum_packet_size.is_some() {
+//             len += 1 + 4;
+//         }
+//         if let Some(client_id) = &self.assigned_client_id {
+//             len += 1 + client_id.wire_len();
+//         }
+//         if self.topic_alias_maximum.is_some() {
+//             len += 1 + 2;
+//         }
+//         if let Some(reason_string) = &self.reason_string {
+//             len += 1 + reason_string.wire_len();
+//         }
+//         for (key, value) in &self.user_properties {
+//             len += 1;
+//             len += key.wire_len();
+//             len += value.wire_len();
+//         }
+//         if self.wildcards_available.is_some() {
+//             len += 1 + 1;
+//         }
+//         if self.subscription_ids_available.is_some() {
+//             len += 1 + 1;
+//         }
+//         if self.shared_subscription_available.is_some() {
+//             len += 1 + 1;
+//         }
+//         if self.server_keep_alive.is_some() {
+//             len += 1 + 2;
+//         }
+//         if let Some(response_info) = &self.response_info {
+//             len += 1 + response_info.wire_len();
+//         }
+//         if let Some(server_reference) = &self.server_reference {
+//             len += 1 + server_reference.wire_len();
+//         }
+//         if let Some(authentication_method) = &self.authentication_method {
+//             len += 1 + authentication_method.wire_len();
+//         }
+//         if self.authentication_data.is_some() && self.authentication_method.is_some() {
+//             len += 1 + self.authentication_data.as_ref().map(WireLength::wire_len).unwrap_or(0);
+//         }
 
-        len
-    }
-}
+//         len
+//     }
+// }
 
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub struct ConnAckFlags {
     pub session_present: bool,
+}
+
+impl<S> MqttAsyncRead<S> for ConnAckFlags where S: tokio::io::AsyncReadExt + Unpin {
+    fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
+        async move {
+            let byte = stream.read_u8().await?;
+            Ok((Self {
+                session_present: (byte & 0b00000001) == 0b00000001,
+            }, 1))
+        }
+    }
 }
 
 impl MqttRead for ConnAckFlags {
@@ -451,10 +502,45 @@ mod tests {
 
     use crate::packets::{
         connack::{ConnAck, ConnAckProperties},
-        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
         reason_codes::ConnAckReasonCode,
         Packet,
     };
+
+    #[test]
+    fn test_wire_len() {
+        let mut buf = bytes::BytesMut::new();
+
+        let connack_properties = ConnAckProperties {
+            session_expiry_interval: Some(60),  // Session expiry interval in seconds
+            receive_maximum: Some(20),  // Maximum number of QoS 1 and QoS 2 publications that the client is willing to process concurrently
+            maximum_qos: Some(crate::packets::QoS::AtMostOnce),  // Maximum QoS level supported by the server
+            retain_available: Some(true),  // Whether the server supports retained messages
+            maximum_packet_size: Some(1024),  // Maximum packet size the server is willing to accept
+            assigned_client_id: Some(Box::from("client-12345")),  // Client identifier assigned by the server
+            topic_alias_maximum: Some(10),  // Maximum number of topic aliases supported by the server
+            reason_string: Some(Box::from("Connection accepted")),  // Reason string for the connection acknowledgment
+            user_properties: vec![(Box::from("key1"), Box::from("value1"))],  // User property key-value pair
+            wildcards_available: Some(true),  // Whether wildcard subscriptions are available
+            subscription_ids_available: Some(true),  // Whether subscription identifiers are available
+            shared_subscription_available: Some(true),  // Whether shared subscriptions are available
+            server_keep_alive: Some(120),  // Server keep alive time in seconds
+            response_info: Some(Box::from("Response info")),  // Response information
+            server_reference: Some(Box::from("server-reference")),  // Server reference
+            authentication_method: Some(Box::from("auth-method")),  // Authentication method
+            authentication_data: Some(vec![1, 2, 3, 4]),  // Authentication data
+        };
+
+        let len = connack_properties.wire_len();
+        // determine length of variable integer
+        let len_of_wire_len = crate::packets::write_variable_integer(&mut buf, len).unwrap();
+        // clear buffer before writing actual properties
+        buf.clear();
+        connack_properties.write(&mut buf).unwrap();
+
+        assert_eq!(len + len_of_wire_len, buf.len());
+    
+    }
 
     #[test]
     fn read_write_connack_packet() {
@@ -515,6 +601,9 @@ mod tests {
         let c1 = ConnAckProperties::read(&mut buf.into()).unwrap();
 
         let mut buf = bytes::BytesMut::new();
+
+        let variable_length = c1.wire_len();
+        assert_eq!(variable_length, 56);
 
         c1.write(&mut buf).unwrap();
 

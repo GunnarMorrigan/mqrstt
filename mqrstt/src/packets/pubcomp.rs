@@ -2,7 +2,7 @@ use bytes::BufMut;
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
     read_variable_integer,
     reason_codes::PubCompReasonCode,
     write_variable_integer, PacketType, PropertyType,
@@ -25,7 +25,7 @@ impl PubComp {
     }
 }
 
-impl VariableHeaderRead for PubComp {
+impl PacketRead for PubComp {
     fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2 {
@@ -52,7 +52,7 @@ impl VariableHeaderRead for PubComp {
     }
 }
 
-impl VariableHeaderWrite for PubComp {
+impl PacketWrite for PubComp {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
 
@@ -106,7 +106,7 @@ impl MqttRead for PubCompProperties {
         let mut properties = PubCompProperties::default();
 
         loop {
-            match PropertyType::from_u8(u8::read(buf)?)? {
+            match PropertyType::try_from(u8::read(buf)?)? {
                 PropertyType::ReasonString => {
                     if properties.reason_string.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
@@ -161,7 +161,7 @@ impl WireLength for PubCompProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength},
+        mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
         pubcomp::{PubComp, PubCompProperties},
         reason_codes::PubCompReasonCode,
         write_variable_integer, PropertyType,

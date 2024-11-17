@@ -2,7 +2,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use super::{
     error::{DeserializeError, SerializeError},
-    mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite},
     read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, ProtocolVersion, QoS, WireLength,
 };
 
@@ -95,7 +95,7 @@ impl Default for Connect {
     }
 }
 
-impl VariableHeaderRead for Connect {
+impl PacketRead for Connect {
     fn read(_: u8, _: usize, mut buf: Bytes) -> Result<Self, DeserializeError> {
         if String::read(&mut buf)? != "MQTT" {
             return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_string()));
@@ -136,7 +136,7 @@ impl VariableHeaderRead for Connect {
     }
 }
 
-impl VariableHeaderWrite for Connect {
+impl PacketWrite for Connect {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         "MQTT".write(buf)?;
 
@@ -689,7 +689,7 @@ impl WireLength for LastWillProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttWrite, VariableHeaderRead, VariableHeaderWrite},
+        mqtt_traits::{MqttWrite, PacketRead, PacketWrite},
         QoS,
     };
 
