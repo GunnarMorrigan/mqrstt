@@ -122,52 +122,53 @@ impl PacketValidation for Publish {
     }
 }
 
-// super::macros::define_properties!(PublishProperties,
-//     PayloadFormatIndicator,
-//     MessageExpiryInterval,
-//     ContentType,
-//     ResponseTopic,
-//     CorrelationData,
-//     SubscriptionIdentifier,
-//     TopicAlias,
-//     UserProperty
-// );
+super::macros::define_properties!(PublishProperties,
+    PayloadFormatIndicator,
+    MessageExpiryInterval,
+    ContentType,
+    ResponseTopic,
+    CorrelationData,
+    SubscriptionIdentifier,
+    TopicAlias,
+    UserProperty
+);
 
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-pub struct PublishProperties {
-    /// 3.3.2.3.2 Payload Format Indicator
-    /// 1 (0x01) Byte, Identifier of the Payload Format Indicator.
-    pub payload_format_indicator: Option<u8>,
 
-    /// 3.3.2.3.3 Message Expiry Interval
-    /// 2 (0x02) Byte, Identifier of the Message Expiry Interval.
-    pub message_expiry_interval: Option<u32>,
+// #[derive(Debug, Clone, PartialEq, Eq, Default)]
+// pub struct PublishProperties {
+//     /// 3.3.2.3.2 Payload Format Indicator
+//     /// 1 (0x01) Byte, Identifier of the Payload Format Indicator.
+//     pub payload_format_indicator: Option<u8>,
 
-    /// 3.3.2.3.9 Content Type
-    /// 3 (0x03) Identifier of the Content Type
-    pub content_type: Option<Box<str>>,
+//     /// 3.3.2.3.3 Message Expiry Interval
+//     /// 2 (0x02) Byte, Identifier of the Message Expiry Interval.
+//     pub message_expiry_interval: Option<u32>,
 
-    /// 3.3.2.3.5 Response Topic
-    /// 8 (0x08) Byte, Identifier of the Response Topic.
-    pub response_topic: Option<Box<str>>,
+//     /// 3.3.2.3.9 Content Type
+//     /// 3 (0x03) Identifier of the Content Type
+//     pub content_type: Option<Box<str>>,
 
-    /// 3.3.2.3.6 Correlation Data
-    /// 9 (0x09) Byte, Identifier of the Correlation Data.
-    pub correlation_data: Option<Bytes>,
+//     /// 3.3.2.3.5 Response Topic
+//     /// 8 (0x08) Byte, Identifier of the Response Topic.
+//     pub response_topic: Option<Box<str>>,
 
-    /// 3.3.2.3.8 Subscription Identifier
-    /// 11 (0x0B), Identifier of the Subscription Identifier.
-    pub subscription_identifier: Vec<usize>,
+//     /// 3.3.2.3.6 Correlation Data
+//     /// 9 (0x09) Byte, Identifier of the Correlation Data.
+//     pub correlation_data: Option<Bytes>,
 
-    /// 3.3.2.3.4 Topic Alias
-    /// 35 (0x23) Byte, Identifier of the Topic Alias.
-    pub topic_alias: Option<u16>,
+//     /// 3.3.2.3.8 Subscription Identifier
+//     /// 11 (0x0B), Identifier of the Subscription Identifier.
+//     pub subscription_identifier: Vec<usize>,
 
-    /// 3.3.2.3.7 User Property
-    /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(Box<str>, Box<str>)>,
+//     /// 3.3.2.3.4 Topic Alias
+//     /// 35 (0x23) Byte, Identifier of the Topic Alias.
+//     pub topic_alias: Option<u16>,
 
-}
+//     /// 3.3.2.3.7 User Property
+//     /// 38 (0x26) Byte, Identifier of the User Property.
+//     pub user_properties: Vec<(Box<str>, Box<str>)>,
+
+// }
 
 impl MqttRead for PublishProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
@@ -213,7 +214,7 @@ impl MqttRead for PublishProperties {
                     if properties.correlation_data.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::CorrelationData));
                     }
-                    properties.correlation_data = Some(Bytes::read(&mut property_data)?);
+                    properties.correlation_data = Some(Vec::<u8>::read(&mut property_data)?);
                 }
                 PropertyType::SubscriptionIdentifier => {
                     properties.subscription_identifier.push(read_variable_integer(&mut property_data)?.0);
@@ -278,38 +279,38 @@ impl MqttWrite for PublishProperties {
     }
 }
 
-impl WireLength for PublishProperties {
-    fn wire_len(&self) -> usize {
-        let mut len = 0;
+// impl WireLength for PublishProperties {
+//     fn wire_len(&self) -> usize {
+//         let mut len = 0;
 
-        if self.payload_format_indicator.is_some() {
-            len += 2;
-        }
-        if self.message_expiry_interval.is_some() {
-            len += 5;
-        }
-        if self.topic_alias.is_some() {
-            len += 3;
-        }
-        if let Some(response_topic) = &self.response_topic {
-            len += 1 + response_topic.wire_len();
-        }
-        if let Some(correlation_data) = &self.correlation_data {
-            len += 1 + correlation_data.wire_len();
-        }
-        for sub_id in &self.subscription_identifier {
-            len += 1 + variable_integer_len(*sub_id);
-        }
-        for (key, val) in &self.user_properties {
-            len += 1 + key.wire_len() + val.wire_len();
-        }
-        if let Some(content_type) = &self.content_type {
-            len += 1 + content_type.wire_len();
-        }
+//         if self.payload_format_indicator.is_some() {
+//             len += 2;
+//         }
+//         if self.message_expiry_interval.is_some() {
+//             len += 5;
+//         }
+//         if self.topic_alias.is_some() {
+//             len += 3;
+//         }
+//         if let Some(response_topic) = &self.response_topic {
+//             len += 1 + response_topic.wire_len();
+//         }
+//         if let Some(correlation_data) = &self.correlation_data {
+//             len += 1 + correlation_data.wire_len();
+//         }
+//         for sub_id in &self.subscription_identifier {
+//             len += 1 + variable_integer_len(*sub_id);
+//         }
+//         for (key, val) in &self.user_properties {
+//             len += 1 + key.wire_len() + val.wire_len();
+//         }
+//         if let Some(content_type) = &self.content_type {
+//             len += 1 + content_type.wire_len();
+//         }
 
-        len
-    }
-}
+//         len
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
@@ -325,7 +326,6 @@ mod tests {
     #[test]
     fn test_read_write_properties() {
         let first_byte = 0b0011_0100;
-        dbg!("1");
 
         let mut properties = [1, 0, 2].to_vec();
         properties.extend(4_294_967_295u32.to_be_bytes());
@@ -351,23 +351,17 @@ mod tests {
             ]
             .to_vec(),
         );
-        dbg!("a");
 
         let rem_len = buf_one.len();
 
-        let buf = BytesMut::from(&buf_one[..]);
+        let buf = buf_one.clone();
 
         let p = Publish::read(first_byte & 0b0000_1111, rem_len, buf.into()).unwrap();
 
-        dbg!("b");
-
-        let mut result_buf = BytesMut::new();
-        dbg!(p.wire_len());
+        let mut result_buf = BytesMut::with_capacity(1000);
         p.write(&mut result_buf).unwrap();
 
-        // dbg!(p.clone());
-
-        // assert_eq!(buf_one.to_vec(), result_buf.to_vec())
+        assert_eq!(buf_one.to_vec(), result_buf.to_vec())
     }
 
     #[test]

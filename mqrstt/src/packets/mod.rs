@@ -618,7 +618,7 @@ impl From<&PropertyType> for u8 {
 
 impl From<PropertyType> for u8 {
     fn from(value: PropertyType) -> Self {
-        value.into()
+        value as u8
     }
 }
 
@@ -1059,7 +1059,7 @@ mod tests {
                 message_expiry_interval: None,
                 topic_alias: None,
                 response_topic: None,
-                correlation_data: Some(Bytes::from_static(b"1212")),
+                correlation_data: Some(b"1212".to_vec()),
                 subscription_identifier: vec![1],
                 user_properties: vec![],
                 content_type: None,
