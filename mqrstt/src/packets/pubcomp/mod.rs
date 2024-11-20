@@ -12,7 +12,6 @@ use bytes::BufMut;
 use super::{
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    PacketType, PropertyType,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

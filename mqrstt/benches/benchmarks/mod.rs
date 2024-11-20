@@ -1,5 +1,5 @@
 use bytes::{BufMut, Bytes, BytesMut};
-use mqrstt::packets::{Disconnect, Packet, Publish};
+use mqrstt::packets::{Packet, Publish};
 
 pub mod tokio;
 

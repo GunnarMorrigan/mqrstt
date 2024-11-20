@@ -10,8 +10,7 @@ use crate::util::constants::MAXIMUM_TOPIC_SIZE;
 use super::mqtt_trait::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength};
 use super::VariableInteger;
 use super::{
-    error::{DeserializeError, SerializeError},
-    PacketType, PropertyType, QoS,
+    error::{DeserializeError, SerializeError}, QoS,
 };
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -134,7 +133,7 @@ mod tests {
     use bytes::{BufMut, BytesMut};
 
     use crate::packets::{
-        mqtt_trait::{PacketRead, PacketWrite, WireLength}, VariableInteger,
+        mqtt_trait::{PacketRead, PacketWrite}, VariableInteger,
     };
 
     use super::Publish;

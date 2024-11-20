@@ -5,8 +5,7 @@ mod reason_code;
 pub use reason_code::DisconnectReasonCode;
 
 use super::{
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    PacketType, PropertyType, VariableInteger,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, VariableInteger,
 };
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]

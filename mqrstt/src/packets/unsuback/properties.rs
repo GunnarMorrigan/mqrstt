@@ -1,4 +1,3 @@
-use bytes::BufMut;
 
 use crate::packets::error::{DeserializeError};
 use crate::packets::mqtt_trait::{MqttRead, MqttWrite, WireLength};

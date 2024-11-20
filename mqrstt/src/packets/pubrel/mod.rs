@@ -9,8 +9,7 @@ use bytes::BufMut;
 
 use super::{
     error::{DeserializeError, ReadError}, 
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    PacketType, PropertyType
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -122,8 +121,8 @@ mod tests {
     use crate::packets::{
         mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, pubrel::{PubRel, PubRelProperties}, PropertyType, PubRelReasonCode, VariableInteger
     };
-    use bytes::{Buf, BufMut, Bytes, BytesMut};
-    use tokio::{io::ReadBuf, stream};
+    use bytes::{BufMut, Bytes, BytesMut};
+    
 
     #[test]
     fn test_wire_len() {

@@ -1,12 +1,10 @@
 use crate::packets::VariableInteger;
-use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use crate::packets::{
     error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength},
+    mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
     PacketType, PropertyType,
 };
-use bytes::BufMut;
 
 
 crate::packets::macros::define_properties!(UnsubscribeProperties, UserProperty);

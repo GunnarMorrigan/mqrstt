@@ -8,7 +8,7 @@ use bytes::BufMut;
 
 use super::{
     error::{SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
 
 };
 

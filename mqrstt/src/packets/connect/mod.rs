@@ -15,7 +15,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use crate::packets::error::ReadError;
 
 use super::{
-    error::{DeserializeError, SerializeError}, mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite}, protocol_version::ProtocolVersion, PacketType, PropertyType, QoS, VariableInteger, WireLength
+    error::{DeserializeError, SerializeError}, mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite}, protocol_version::ProtocolVersion, VariableInteger, WireLength
 };
 
 /// Connect packet send by the client to the server to initialize a connection.

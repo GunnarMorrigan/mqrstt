@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-use bytes::Bytes;
 
 use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
 use crate::{

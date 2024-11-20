@@ -907,7 +907,7 @@ mod tests {
 
     use crate::{
         error::{ClientError, PacketValidationError},
-        packets::{DisconnectProperties, DisconnectReasonCode, Packet, PacketType, Publish, QoS, Subscribe, SubscribeProperties, UnsubscribeProperties},
+        packets::{DisconnectProperties, DisconnectReasonCode, Packet, PacketType, Publish, QoS, SubscribeProperties, UnsubscribeProperties},
     };
 
     use super::MqttClient;

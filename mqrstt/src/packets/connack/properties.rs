@@ -3,7 +3,7 @@ use crate::packets::{
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
     PacketType, PropertyType, QoS, VariableInteger,
 };
-use bytes::{Buf, BufMut};
+use bytes::BufMut;
 
 crate::packets::macros::define_properties!(ConnAckProperties,
     SessionExpiryInterval,

@@ -9,7 +9,7 @@ use bytes::BufMut;
 
 use super::{
     error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength}, PacketType, PropertyType,
+    mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

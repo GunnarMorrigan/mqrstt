@@ -7,8 +7,7 @@ pub use reason_code::ConnAckReasonCode;
 
 use super::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    PacketType, PropertyType, QoS, VariableInteger,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, VariableInteger,
 };
 use bytes::{Buf, BufMut};
 

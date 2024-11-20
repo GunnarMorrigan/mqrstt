@@ -1,11 +1,9 @@
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{Bytes, BytesMut};
 
-use crate::packets::error::ReadError;
 
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
-    PacketType, PropertyType, protocol_version::ProtocolVersion, QoS, WireLength,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite}, QoS, WireLength,
 };
 
 use super::{LastWillProperties, VariableInteger};

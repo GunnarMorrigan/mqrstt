@@ -6,11 +6,7 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 use crate::packets::mqtt_trait::MqttAsyncRead;
 
 use super::VariableInteger;
-use super::{
-    error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
-    PacketType, PropertyType,
-};
+use super::mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use bytes::BufMut;
 
 #[derive(Debug, Clone, PartialEq, Eq)]

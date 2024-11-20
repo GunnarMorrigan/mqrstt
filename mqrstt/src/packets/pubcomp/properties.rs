@@ -1,5 +1,4 @@
 
-use bytes::BufMut;
 
 use crate::packets::{
     error::DeserializeError,
