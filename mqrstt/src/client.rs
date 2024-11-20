@@ -7,9 +7,18 @@ use tracing::info;
 use crate::{
     error::ClientError,
     packets::{
-        mqtt_traits::PacketValidation,
-        reason_codes::DisconnectReasonCode,
-        Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, Subscription}, {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
+        mqtt_trait::PacketValidation,
+        DisconnectReasonCode,
+        Packet, QoS, 
+        // disconnect::{Disconnect, DisconnectProperties}, 
+        // publish::{Publish, PublishProperties}, 
+        // subscribe::{Subscribe, SubscribeProperties, Subscription}, 
+        // unsubscribe::{Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
+
+        {Disconnect, DisconnectProperties}, 
+        {Publish, PublishProperties}, 
+        {Subscribe, SubscribeProperties, Subscription}, 
+        {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
     },
 };
 
@@ -379,7 +388,7 @@ impl MqttClient {
     /// use mqrstt::packets::UnsubscribeProperties;
     ///
     /// let properties = UnsubscribeProperties{
-    ///     user_properties: vec![("property".to_string(), "value".to_string())],
+    ///     user_properties: vec![("property".into(), "value".into())],
     /// };
     ///
     /// // Unsubscribe from a single topic specified as a string:
@@ -387,7 +396,7 @@ impl MqttClient {
     /// mqtt_client.unsubscribe_with_properties(topic, properties).await;
     ///
     /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
+    /// #     user_properties: vec![("property".into(), "value".into())],
     /// # };
     ///
     /// // Unsubscribe from multiple topics specified as an array of string slices:
@@ -395,7 +404,7 @@ impl MqttClient {
     /// mqtt_client.unsubscribe_with_properties(topics.as_slice(), properties).await;
     ///
     /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
+    /// #     user_properties: vec![("property".into(), "value".into())],
     /// # };
     ///  
     /// // Unsubscribe from a single topic specified as a String:
@@ -403,7 +412,7 @@ impl MqttClient {
     /// mqtt_client.unsubscribe_with_properties(topic, properties).await;
     ///
     /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
+    /// #     user_properties: vec![("property".into(), "value".into())],
     /// # };
     ///  
     /// // Unsubscribe from multiple topics specified as a Vec<String>:
@@ -411,7 +420,7 @@ impl MqttClient {
     /// mqtt_client.unsubscribe_with_properties(topics, properties).await;
     ///
     /// # let properties = UnsubscribeProperties{
-    /// #     user_properties: vec![("property".to_string(), "value".to_string())],
+    /// #     user_properties: vec![("property".into(), "value".into())],
     /// # };
     ///  
     /// // Unsubscribe from multiple topics specified as an array of String:
@@ -472,7 +481,7 @@ impl MqttClient {
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::DisconnectProperties;
-    /// use mqrstt::packets::reason_codes::DisconnectReasonCode;
+    /// use mqrstt::packets::DisconnectReasonCode;
     ///
     /// let properties = DisconnectProperties {
     ///     reason_string: Some("Reason here".into()),
@@ -788,7 +797,7 @@ impl MqttClient {
     /// use mqrstt::packets::UnsubscribeProperties;
     ///
     /// let properties = UnsubscribeProperties{
-    ///     user_properties: vec![("property".to_string(), "value".to_string())],
+    ///     user_properties: vec![("property".into(), "value".into())],
     /// };
     /// # let properties_clone = properties.clone();
     ///
@@ -873,7 +882,7 @@ impl MqttClient {
     /// # smol::block_on(async {
     /// 
     /// use mqrstt::packets::DisconnectProperties;
-    /// use mqrstt::packets::reason_codes::DisconnectReasonCode;
+    /// use mqrstt::packets::DisconnectReasonCode;
     ///
     /// let properties = DisconnectProperties {
     ///     reason_string: Some("Reason here".into()),
@@ -898,7 +907,7 @@ mod tests {
 
     use crate::{
         error::{ClientError, PacketValidationError},
-        packets::{reason_codes::DisconnectReasonCode, DisconnectProperties, Packet, PacketType, Publish, QoS, Subscribe, SubscribeProperties, UnsubscribeProperties},
+        packets::{DisconnectProperties, DisconnectReasonCode, Packet, PacketType, Publish, QoS, Subscribe, SubscribeProperties, UnsubscribeProperties},
     };
 
     use super::MqttClient;
@@ -1047,7 +1056,7 @@ mod tests {
         let (client, client_to_handler_r, to_network_r) = create_new_test_client();
 
         let properties = UnsubscribeProperties{
-            user_properties: vec![("property".to_string(), "value".to_string())],
+            user_properties: vec![("property".into(), "value".into())],
         };
 
         // Unsubscribe from a single topic specified as a string:
@@ -1193,7 +1202,7 @@ mod tests {
         let (client, client_to_handler_r, _) = create_new_test_client();
 
         let prop = UnsubscribeProperties {
-            user_properties: vec![("A".to_string(), "B".to_string())],
+            user_properties: vec![("A".into(), "B".into())],
         };
 
         client.unsubscribe_with_properties("Topic", prop.clone()).await.unwrap();

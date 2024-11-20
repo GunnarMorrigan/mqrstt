@@ -1,13 +1,23 @@
+mod properties;
+pub use properties::UnsubscribeProperties;
+
 use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
+use crate::packets::mqtt_trait::MqttAsyncRead;
+
+use super::VariableInteger;
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType,
+    mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
+    PacketType, PropertyType,
 };
 use bytes::BufMut;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+/// Used to unsubscribe from topics.
+/// 
+/// Multiple topics can be unsubscribed from at once.
+/// For convenience [`UnsubscribeTopics`] is provided.
 pub struct Unsubscribe {
     pub packet_identifier: u16,
     pub properties: UnsubscribeProperties,
@@ -47,6 +57,35 @@ impl PacketRead for Unsubscribe {
     }
 }
 
+impl<S> PacketAsyncRead<S> for Unsubscribe where S: tokio::io::AsyncReadExt + Unpin{
+    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
+        async move {
+            let mut total_read_bytes = 0;
+            let (packet_identifier, id_read_bytes) = u16::async_read(stream).await?;
+            let (properties, properties_read_bytes) = UnsubscribeProperties::async_read(stream).await?;
+            total_read_bytes += id_read_bytes + properties_read_bytes;
+
+            let mut topics = vec![];
+            loop {
+                let (topic, topic_read_size) = Box::<str>::async_read(stream).await?;
+                total_read_bytes += topic_read_size;
+
+                topics.push(topic);
+
+                if total_read_bytes >= remaining_length {
+                    break;
+                }
+            }
+
+            Ok((Self {
+                packet_identifier,
+                properties,
+                topics,
+            }, total_read_bytes))
+        }
+    }
+}
+
 impl PacketWrite for Unsubscribe {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
@@ -62,7 +101,7 @@ impl PacketWrite for Unsubscribe {
 
 impl WireLength for Unsubscribe {
     fn wire_len(&self) -> usize {
-        let mut len = 2 + variable_integer_len(self.properties.wire_len()) + self.properties.wire_len();
+        let mut len = 2 + self.properties.wire_len().variable_integer_len() + self.properties.wire_len();
         for topic in &self.topics {
             len += topic.wire_len();
         }
@@ -81,63 +120,6 @@ impl PacketValidation for Unsubscribe {
             }
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct UnsubscribeProperties {
-    pub user_properties: Vec<(String, String)>,
-}
-
-impl MqttRead for UnsubscribeProperties {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = read_variable_integer(buf)?;
-
-        let mut properties = UnsubscribeProperties::default();
-
-        if len == 0 {
-            return Ok(properties);
-        } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
-        }
-
-        let mut properties_data = buf.split_to(len);
-
-        loop {
-            match PropertyType::read(&mut properties_data)? {
-                PropertyType::UserProperty => {
-                    properties.user_properties.push((String::read(&mut properties_data)?, String::read(&mut properties_data)?));
-                }
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Unsubscribe)),
-            }
-
-            if properties_data.is_empty() {
-                break;
-            }
-        }
-        Ok(properties)
-    }
-}
-
-impl MqttWrite for UnsubscribeProperties {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        write_variable_integer(buf, self.wire_len())?;
-        for (key, value) in &self.user_properties {
-            PropertyType::UserProperty.write(buf)?;
-            key.write(buf)?;
-            value.write(buf)?;
-        }
-        Ok(())
-    }
-}
-
-impl WireLength for UnsubscribeProperties {
-    fn wire_len(&self) -> usize {
-        let mut len = 0;
-        for (key, value) in &self.user_properties {
-            len += 1 + key.wire_len() + value.wire_len();
-        }
-        len
     }
 }
 
@@ -280,7 +262,7 @@ mod tests {
 
     use bytes::{Bytes, BytesMut};
 
-    use crate::packets::mqtt_traits::{PacketRead, PacketWrite};
+    use crate::packets::mqtt_trait::{PacketRead, PacketWrite};
 
     use super::Unsubscribe;
 

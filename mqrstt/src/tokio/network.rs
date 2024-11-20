@@ -10,7 +10,7 @@ use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
-use crate::packets::reason_codes::DisconnectReasonCode;
+use crate::packets::DisconnectReasonCode;
 use crate::packets::{Disconnect, Packet, PacketType};
 
 use crate::{AsyncEventHandlerMut, NetworkStatus, StateHandler};

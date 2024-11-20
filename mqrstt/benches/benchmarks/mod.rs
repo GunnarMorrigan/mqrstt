@@ -4,20 +4,21 @@ use mqrstt::packets::{Disconnect, Packet, Publish};
 pub mod tokio;
 
 fn fill_stuff(buffer: &mut BytesMut, publ_count: usize, publ_size: usize) {
-    empty_connect(buffer);
-    for i in 0..publ_count {
-        very_large_publish(i as u16, publ_size / 5).write(buffer).unwrap();
-    }
-    empty_disconnect().write(buffer).unwrap();
+    // empty_connect(buffer);
+    // for i in 0..publ_count {
+    //     very_large_publish(i as u16, publ_size / 5).write(buffer).unwrap();
+    // }
+    // empty_disconnect().write(buffer).unwrap();
 }
 
 fn empty_disconnect() -> Packet {
-    let discon = Disconnect {
-        reason_code: mqrstt::packets::reason_codes::DisconnectReasonCode::ServerBusy,
-        properties: Default::default(),
-    };
+    // let discon = Disconnect {
+    //     reason_code: mqrstt::packets::reason_codes::DisconnectReasonCode::ServerBusy,
+    //     properties: Default::default(),
+    // };
 
-    Packet::Disconnect(discon)
+    // Packet::Disconnect(discon)
+    todo!()
 }
 
 fn empty_connect(buffer: &mut BytesMut) {

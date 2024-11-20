@@ -1,37 +1,54 @@
+mod reason_code;
+pub use reason_code::PubAckReasonCode;
+
 use bytes::BufMut;
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-    read_variable_integer,
-    reason_codes::PubRecReasonCode,
-    write_variable_integer, PacketType, PropertyType,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    PacketType, PropertyType, VariableInteger,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct PubRec {
+pub struct PubAck {
     pub packet_identifier: u16,
-    pub reason_code: PubRecReasonCode,
-    pub properties: PubRecProperties,
+    pub reason_code: PubAckReasonCode,
+    pub properties: PubAckProperties,
 }
-impl PubRec {
-    pub(crate) fn new(packet_identifier: u16) -> Self {
-        Self {
-            packet_identifier,
-            reason_code: PubRecReasonCode::Success,
-            properties: PubRecProperties::default(),
+
+impl<S> PacketAsyncRead<S> for PubAck where S: tokio::io::AsyncReadExt + Unpin {
+    async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let packet_identifier = stream.read_u16().await?;
+        if remaining_length == 2 {
+            Ok((Self {
+                packet_identifier,
+                reason_code: PubAckReasonCode::Success,
+                properties: PubAckProperties::default(),
+            }, 2))
+        } else if remaining_length < 4 {
+            return Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(std::any::type_name::<Self>(), remaining_length, 4)));
+        } else {
+            let (reason_code, reason_code_read_bytes) = PubAckReasonCode::async_read(stream).await?;
+            let (properties, properties_read_bytes) = PubAckProperties::async_read(stream).await?;
+    
+            Ok((Self {
+                packet_identifier,
+                reason_code,
+                properties,
+            }, 2 + reason_code_read_bytes + properties_read_bytes))
         }
+
     }
 }
 
-impl PacketRead for PubRec {
+impl PacketRead for PubAck {
     fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2 {
             return Ok(Self {
                 packet_identifier: u16::read(&mut buf)?,
-                reason_code: PubRecReasonCode::Success,
-                properties: PubRecProperties::default(),
+                reason_code: PubAckReasonCode::Success,
+                properties: PubAckProperties::default(),
             });
         }
         // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
@@ -40,8 +57,8 @@ impl PacketRead for PubRec {
         }
 
         let packet_identifier = u16::read(&mut buf)?;
-        let reason_code = PubRecReasonCode::read(&mut buf)?;
-        let properties = PubRecProperties::read(&mut buf)?;
+        let reason_code = PubAckReasonCode::read(&mut buf)?;
+        let properties = PubAckProperties::read(&mut buf)?;
 
         Ok(Self {
             packet_identifier,
@@ -51,11 +68,11 @@ impl PacketRead for PubRec {
     }
 }
 
-impl PacketWrite for PubRec {
+impl PacketWrite for PubAck {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
 
-        if self.reason_code == PubRecReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+        if self.reason_code == PubAckReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             // nothing here
         } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             self.reason_code.write(buf)?;
@@ -67,33 +84,42 @@ impl PacketWrite for PubRec {
     }
 }
 
-impl WireLength for PubRec {
+impl WireLength for PubAck {
     fn wire_len(&self) -> usize {
-        if self.reason_code == PubRecReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+        if self.reason_code == PubAckReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+            // Only pkid
             2
         } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+            // pkid and reason code
             3
         } else {
-            2 + 1 + self.properties.wire_len()
+            let prop_len = self.properties.wire_len();
+            // pkid, reason code, length of the length of properties and lenght of properties
+            3 + prop_len.variable_integer_len() + prop_len
         }
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
-pub struct PubRecProperties {
-    pub reason_string: Option<Box<str>>,
-    pub user_properties: Vec<(Box<str>, Box<str>)>,
-}
+crate::packets::macros::define_properties!(PubAckProperties,
+    ReasonString,
+    UserProperty
+);
 
-impl PubRecProperties {
-    pub fn is_empty(&self) -> bool {
-        self.reason_string.is_none() && self.user_properties.is_empty()
-    }
-}
+// #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
+// pub struct PubAckProperties {
+//     pub reason_string: Option<Box<str>>,
+//     pub user_properties: Vec<(Box<str>, Box<str>)>,
+// }
 
-impl MqttRead for PubRecProperties {
+// impl PubAckProperties {
+//     pub fn is_empty(&self) -> bool {
+//         self.reason_string.is_none() && self.user_properties.is_empty()
+//     }
+// }
+
+impl MqttRead for PubAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = read_variable_integer(buf)?;
+        let (len, _) = VariableInteger::read_variable_integer(buf)?;
 
         if len == 0 {
             return Ok(Self::default());
@@ -102,7 +128,7 @@ impl MqttRead for PubRecProperties {
             return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
-        let mut properties = PubRecProperties::default();
+        let mut properties = PubAckProperties::default();
 
         loop {
             match PropertyType::try_from(u8::read(buf)?)? {
@@ -113,7 +139,7 @@ impl MqttRead for PubRecProperties {
                     properties.reason_string = Some(Box::<str>::read(buf)?);
                 }
                 PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(buf)?, Box::<str>::read(buf)?)),
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubRec)),
+                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubAck)),
             }
             if buf.is_empty() {
                 break;
@@ -123,11 +149,11 @@ impl MqttRead for PubRecProperties {
     }
 }
 
-impl MqttWrite for PubRecProperties {
+impl MqttWrite for PubAckProperties {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         let len = self.wire_len();
 
-        write_variable_integer(buf, len)?;
+        len.write_variable_integer(buf)?;
 
         if let Some(reason_string) = &self.reason_string {
             PropertyType::ReasonString.write(buf)?;
@@ -143,74 +169,73 @@ impl MqttWrite for PubRecProperties {
     }
 }
 
-impl WireLength for PubRecProperties {
-    fn wire_len(&self) -> usize {
-        let mut len = 0;
-        if let Some(reason_string) = &self.reason_string {
-            len += reason_string.wire_len() + 1;
-        }
-        for (key, value) in &self.user_properties {
-            len += 1 + key.wire_len() + value.wire_len();
-        }
+// impl WireLength for PubAckProperties {
+//     fn wire_len(&self) -> usize {
+//         let mut len = 0;
+//         if let Some(reason_string) = &self.reason_string {
+//             len += reason_string.wire_len() + 1;
+//         }
+//         for (key, value) in &self.user_properties {
+//             len += 1 + key.wire_len() + value.wire_len();
+//         }
 
-        len
-    }
-}
+//         len
+//     }
+// }
 
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-        pubrec::{PubRec, PubRecProperties},
-        reason_codes::PubRecReasonCode,
-        write_variable_integer, PropertyType,
+        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
+        puback::{PubAck, PubAckProperties},
+        PropertyType, PubAckReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 
     #[test]
     fn test_wire_len() {
-        let mut pubrec = PubRec {
+        let mut puback = PubAck {
             packet_identifier: 12,
-            reason_code: PubRecReasonCode::Success,
-            properties: PubRecProperties::default(),
+            reason_code: PubAckReasonCode::Success,
+            properties: PubAckProperties::default(),
         };
 
         let mut buf = BytesMut::new();
 
-        pubrec.write(&mut buf).unwrap();
+        puback.write(&mut buf).unwrap();
 
-        assert_eq!(2, pubrec.wire_len());
+        assert_eq!(2, puback.wire_len());
         assert_eq!(2, buf.len());
 
-        pubrec.reason_code = PubRecReasonCode::ImplementationSpecificError;
+        puback.reason_code = PubAckReasonCode::NotAuthorized;
         buf.clear();
-        pubrec.write(&mut buf).unwrap();
+        puback.write(&mut buf).unwrap();
 
-        assert_eq!(3, pubrec.wire_len());
+        assert_eq!(3, puback.wire_len());
         assert_eq!(3, buf.len());
     }
 
     #[test]
-    fn test_read_simple_pub_rec() {
+    fn test_read_simple_puback() {
         let stream = &[
             0x00, 0x0C, // Packet identifier = 12
             0x00, // Reason code success
             0x00, // no properties
         ];
         let buf = Bytes::from(&stream[..]);
-        let p_ack = PubRec::read(0, 4, buf).unwrap();
+        let p_ack = PubAck::read(0, 4, buf).unwrap();
 
-        let expected = PubRec {
+        let expected = PubAck {
             packet_identifier: 12,
-            reason_code: PubRecReasonCode::Success,
-            properties: PubRecProperties::default(),
+            reason_code: PubAckReasonCode::Success,
+            properties: PubAckProperties::default(),
         };
 
         assert_eq!(expected, p_ack);
     }
 
     #[test]
-    fn test_read_write_pub_rec_with_properties() {
+    fn test_read_write_puback_with_properties() {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);
@@ -226,13 +251,13 @@ mod tests {
         "Another thingy".write(&mut properties).unwrap();
         "The thingy".write(&mut properties).unwrap();
 
-        write_variable_integer(&mut buf, properties.len()).unwrap();
+        properties.len().write_variable_integer(&mut buf).unwrap();
 
         buf.extend(properties);
 
         // flags can be 0 because not used.
         // remaining_length must be at least 4
-        let p_ack = PubRec::read(0, buf.len(), buf.clone().into()).unwrap();
+        let p_ack = PubAck::read(0, buf.len(), buf.clone().into()).unwrap();
 
         let mut result = BytesMut::new();
         p_ack.write(&mut result).unwrap();
@@ -253,10 +278,10 @@ mod tests {
         "The thingy".write(&mut properties_data).unwrap();
 
         let mut buf = BytesMut::new();
-        write_variable_integer(&mut buf, properties_data.len()).unwrap();
+        properties_data.len().write_variable_integer(&mut buf).unwrap();
         buf.extend(properties_data);
 
-        let properties = PubRecProperties::read(&mut buf.clone().into()).unwrap();
+        let properties = PubAckProperties::read(&mut buf.clone().into()).unwrap();
         let mut result = BytesMut::new();
         properties.write(&mut result).unwrap();
 
@@ -268,15 +293,15 @@ mod tests {
         let mut buf = BytesMut::new();
 
         buf.put_u16(65_535u16);
-        let p_ack = PubRec::read(0, buf.len(), buf.clone().into()).unwrap();
+        let p_ack = PubAck::read(0, buf.len(), buf.clone().into()).unwrap();
 
         let mut result = BytesMut::new();
         p_ack.write(&mut result).unwrap();
 
-        let expected = PubRec {
+        let expected = PubAck {
             packet_identifier: 65535,
-            reason_code: PubRecReasonCode::Success,
-            properties: PubRecProperties::default(),
+            reason_code: PubAckReasonCode::Success,
+            properties: PubAckProperties::default(),
         };
         let mut result = BytesMut::new();
         expected.write(&mut result).unwrap();

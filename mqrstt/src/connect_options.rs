@@ -41,7 +41,7 @@ pub struct ConnectOptions {
     request_problem_information: Option<u8>,
     user_properties: Vec<(Box<str>, Box<str>)>,
     authentication_method: Option<Box<str>>,
-    authentication_data: Bytes,
+    authentication_data: Option<Vec<u8>>,
 
     /// Last will that will be issued on unexpected disconnect
     last_will: Option<LastWill>,
@@ -62,9 +62,9 @@ impl Default for ConnectOptions {
             topic_alias_maximum: None,
             request_response_information: None,
             request_problem_information: None,
-            user_properties: vec![],
+            user_properties: Vec::new(),
             authentication_method: None,
-            authentication_data: Bytes::new(),
+            authentication_data: None,
             last_will: None,
         }
     }
@@ -72,8 +72,11 @@ impl Default for ConnectOptions {
 
 impl ConnectOptions {
     /// Create a new [`ConnectOptions`]
-    /// ClientId recommendation:
-    ///     - 1 to 23 bytes UTF-8 bytes
+    /// 
+    /// Be aware:
+    /// This client does not restrict the client identifier in any way. However, the MQTT v5.0 specification does.
+    /// It is thus recommended to use a client id that is compatible with the MQTT v5.0 specification.
+    ///     - 1 to 23 bytes UTF-8 bytes.
     ///     - Contains [a-zA-Z0-9] characters only.
     ///
     /// Some brokers accept longer client ids with different characters
@@ -94,7 +97,7 @@ impl ConnectOptions {
             request_problem_information: None,
             user_properties: vec![],
             authentication_method: None,
-            authentication_data: Bytes::new(),
+            authentication_data: None,
             last_will: None,
         }
     }
@@ -119,7 +122,7 @@ impl ConnectOptions {
             username: self.username.clone(),
             password: self.password.clone(),
             connect_properties,
-            protocol_version: crate::packets::ProtocolVersion::V5,
+            protocol_version: crate::packets::protocol_version::ProtocolVersion::V5,
             last_will: self.last_will.clone(),
         };
 

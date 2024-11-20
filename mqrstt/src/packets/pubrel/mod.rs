@@ -1,7 +1,16 @@
+
+mod reason_code;
+pub use reason_code::PubRelReasonCode;
+
+mod properties;
+pub use properties::PubRelProperties;
+
 use bytes::BufMut;
 
 use super::{
-    error::{DeserializeError, ReadError}, mqtt_traits::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, read_async_variable_integer, read_variable_integer, reason_codes::PubRelReasonCode, write_variable_integer, PacketType, PropertyType
+    error::{DeserializeError, ReadError}, 
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    PacketType, PropertyType
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -108,134 +117,10 @@ impl WireLength for PubRel {
     }
 }
 
-// #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
-// pub struct PubRelProperties {
-//     pub reason_string: Option<Box<str>>,
-//     pub user_properties: Vec<(Box<str>, Box<str>)>,
-// }
-
-super::macros::define_properties!(PubRelProperties, ReasonString, UserProperty);
-
-impl PubRelProperties {
-    pub fn is_empty(&self) -> bool {
-        self.reason_string.is_none() && self.user_properties.is_empty()
-    }
-}
-
-impl MqttRead for PubRelProperties {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = read_variable_integer(buf)?;
-
-        if len == 0 {
-            return Ok(Self::default());
-        }
-        if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
-        }
-
-        let mut properties = PubRelProperties::default();
-
-        loop {
-            match PropertyType::try_from(u8::read(buf)?)? {
-                PropertyType::ReasonString => {
-                    if properties.reason_string.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
-                    }
-                    properties.reason_string = Some(Box::<str>::read(buf)?);
-                }
-                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(buf)?, Box::<str>::read(buf)?)),
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubRel)),
-            }
-            if buf.is_empty() {
-                break;
-            }
-        }
-        Ok(properties)
-    }
-}
-
-// impl<S> MqttAsyncRead<S> for PubRelProperties where S: tokio::io::AsyncReadExt + Unpin {
-//     async fn async_read(stream: &mut S) -> Result<(Self, usize), super::error::ReadError> {
-//         let (len, length_variable_integer) = read_async_variable_integer(stream).await?;
-//         if len == 0 {
-//             return Ok((Self::default(), length_variable_integer));
-//         }
-
-//         let mut properties = PubRelProperties::default();
-
-//         let mut read_property_bytes = 0;
-//         loop {
-//             let (prop, read_bytes) = PropertyType::async_read(stream).await?;
-//             read_property_bytes += read_bytes;
-//             match prop {
-//                 PropertyType::ReasonString => {
-//                     if properties.reason_string.is_some() {
-//                         return Err(super::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ReasonString)));
-//                     }
-//                     let (prop_body, read_bytes) = Box::<str>::async_read(stream).await?;
-//                     read_property_bytes += read_bytes;
-//                     properties.reason_string = Some(prop_body);
-//                 }
-//                 PropertyType::UserProperty => {
-//                     let (prop_body_key, read_bytes) = Box::<str>::async_read(stream).await?;
-//                     read_property_bytes += read_bytes;
-//                     let (prop_body_value, read_bytes) = Box::<str>::async_read(stream).await?;
-//                     read_property_bytes += read_bytes;
-                
-//                     properties.user_properties.push((prop_body_key, prop_body_value))
-//                 },
-//                 e => return Err(super::error::ReadError::DeserializeError(DeserializeError::UnexpectedProperty(e, PacketType::PubRel))),
-//             }
-//             if read_property_bytes == len {
-//                 break;
-//             }
-//         }
-
-//         Ok((properties, length_variable_integer + read_property_bytes))
-//     }
-// }
-
-impl MqttWrite for PubRelProperties {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        let len = self.wire_len();
-
-        write_variable_integer(buf, len)?;
-
-        if let Some(reason_string) = &self.reason_string {
-            PropertyType::ReasonString.write(buf)?;
-            reason_string.write(buf)?;
-        }
-        for (key, value) in &self.user_properties {
-            PropertyType::UserProperty.write(buf)?;
-            key.write(buf)?;
-            value.write(buf)?
-        }
-
-        Ok(())
-    }
-}
-
-// impl WireLength for PubRelProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len = 0;
-//         if let Some(reason_string) = &self.reason_string {
-//             len += reason_string.wire_len() + 1;
-//         }
-//         for (key, value) in &self.user_properties {
-//             len += 1 + key.wire_len() + value.wire_len();
-//         }
-
-//         len
-//     }
-// }
-
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-        pubrel::{PubRel, PubRelProperties},
-        reason_codes::PubRelReasonCode,
-        write_variable_integer, PropertyType,
+        mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, pubrel::{PubRel, PubRelProperties}, PropertyType, PubRelReasonCode, VariableInteger
     };
     use bytes::{Buf, BufMut, Bytes, BytesMut};
     use tokio::{io::ReadBuf, stream};
@@ -278,7 +163,7 @@ mod tests {
 
         let len = prop.wire_len();
         // determine length of variable integer
-        let len_of_wire_len = write_variable_integer(&mut buf, len).unwrap();
+        let len_of_wire_len = len.write_variable_integer(&mut buf).unwrap();
         // clear buffer before writing actual properties
         buf.clear();
         prop.write(&mut buf).unwrap();
@@ -404,7 +289,7 @@ mod tests {
         "Another thingy".write(&mut properties).unwrap();
         "The thingy".write(&mut properties).unwrap();
 
-        write_variable_integer(&mut buf, properties.len()).unwrap();
+        properties.len().write_variable_integer(&mut buf).unwrap();
 
         buf.extend(properties);
 
@@ -435,7 +320,7 @@ mod tests {
         "Another thingy".write(&mut properties).unwrap();
         "The thingy".write(&mut properties).unwrap();
 
-        write_variable_integer(&mut buf, properties.len()).unwrap();
+        properties.len().write_variable_integer(&mut buf).unwrap();
 
         buf.extend(properties);
 
@@ -464,7 +349,7 @@ mod tests {
         "The thingy".write(&mut properties_data).unwrap();
 
         let mut buf = BytesMut::new();
-        write_variable_integer(&mut buf, properties_data.len()).unwrap();
+        properties_data.len().write_variable_integer(&mut buf).unwrap();
         buf.extend(properties_data);
 
         let properties = PubRelProperties::read(&mut buf.clone().into()).unwrap();
@@ -487,7 +372,7 @@ mod tests {
         "The thingy".write(&mut properties_data).unwrap();
 
         let mut buf = BytesMut::new();
-        write_variable_integer(&mut buf, properties_data.len()).unwrap();
+        properties_data.len().write_variable_integer(&mut buf).unwrap();
         buf.extend(properties_data);
 
         let (properties, read_bytes) = PubRelProperties::async_read(&mut &*buf).await.unwrap();

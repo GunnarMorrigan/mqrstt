@@ -10,7 +10,7 @@ use tracing::trace;
 use crate::packets::ConnAck;
 use crate::packets::{
     error::ReadBytes,
-    reason_codes::ConnAckReasonCode,
+    ConnAckReasonCode,
     {FixedHeader, Packet},
 };
 use crate::{connect_options::ConnectOptions, error::ConnectionError};

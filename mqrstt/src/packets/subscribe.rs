@@ -2,8 +2,8 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength},
-    read_variable_integer, variable_integer_len, write_variable_integer, PacketType, PropertyType, QoS,
+    mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketValidation, PacketWrite, WireLength},
+    PacketType, PropertyType, QoS, VariableInteger,
 };
 use bytes::{Buf, BufMut};
 
@@ -66,7 +66,7 @@ impl WireLength for Subscribe {
     fn wire_len(&self) -> usize {
         let mut len = 2;
         let properties_len = self.properties.wire_len();
-        len += properties_len + variable_integer_len(properties_len);
+        len += properties_len + properties_len.variable_integer_len();
         for topic in &self.topics {
             len += topic.0.wire_len() + 1;
         }
@@ -101,7 +101,7 @@ pub struct SubscribeProperties {
 
 impl MqttRead for SubscribeProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = read_variable_integer(buf)?;
+        let (len, _) = VariableInteger::read_variable_integer(buf)?;
 
         let mut properties = SubscribeProperties::default();
 
@@ -117,7 +117,7 @@ impl MqttRead for SubscribeProperties {
             match PropertyType::read(&mut properties_data)? {
                 PropertyType::SubscriptionIdentifier => {
                     if properties.subscription_id.is_none() {
-                        let (subscription_id, _) = read_variable_integer(&mut properties_data)?;
+                        let (subscription_id, _) = VariableInteger::read_variable_integer(&mut properties_data)?;
 
                         properties.subscription_id = Some(subscription_id);
                     } else {
@@ -140,10 +140,10 @@ impl MqttRead for SubscribeProperties {
 
 impl MqttWrite for SubscribeProperties {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        write_variable_integer(buf, self.wire_len())?;
+        self.wire_len().write_variable_integer(buf)?;
         if let Some(sub_id) = self.subscription_id {
             PropertyType::SubscriptionIdentifier.write(buf)?;
-            write_variable_integer(buf, sub_id)?;
+            sub_id.write_variable_integer(buf)?;
         }
         for (key, value) in &self.user_properties {
             PropertyType::UserProperty.write(buf)?;
@@ -158,7 +158,7 @@ impl WireLength for SubscribeProperties {
     fn wire_len(&self) -> usize {
         let mut len = 0;
         if let Some(sub_id) = self.subscription_id {
-            len += 1 + variable_integer_len(sub_id);
+            len += 1 + sub_id.variable_integer_len();
         }
         for (key, value) in &self.user_properties {
             len += 1 + key.wire_len() + value.wire_len();
@@ -390,7 +390,7 @@ mod tests {
     use bytes::{Bytes, BytesMut};
 
     use crate::packets::{
-        mqtt_traits::{MqttRead, PacketRead, PacketWrite},
+        mqtt_trait::{MqttRead, PacketRead, PacketWrite},
         Packet,
     };
 

@@ -1,11 +1,18 @@
+mod reason_code;
+pub use reason_code::PubCompReasonCode;
+
+
+mod properties;
+pub use properties::PubCompProperties;
+
+
+
 use bytes::BufMut;
 
 use super::{
     error::DeserializeError,
-    mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-    read_variable_integer,
-    reason_codes::PubCompReasonCode,
-    write_variable_integer, PacketType, PropertyType,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    PacketType, PropertyType,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -52,6 +59,36 @@ impl PacketRead for PubComp {
     }
 }
 
+impl<S> PacketAsyncRead<S> for PubComp where S: tokio::io::AsyncReadExt + Unpin {
+    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
+        async move {
+            let (packet_identifier, id_read_bytes) = u16::async_read(stream).await?;
+            if remaining_length == 2 {
+                return Ok((Self {
+                    packet_identifier,
+                    reason_code: PubCompReasonCode::Success,
+                    properties: PubCompProperties::default(),
+                }, 2));
+            }
+            // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
+            else if remaining_length < 4 {
+                return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 4).into());
+            }
+
+            let (reason_code, reason_code_read_bytes) = PubCompReasonCode::async_read(stream).await?;
+            let (properties, properties_read_bytes) = PubCompProperties::async_read(stream).await?;
+
+            assert_eq!(id_read_bytes + reason_code_read_bytes + properties_read_bytes, remaining_length);
+
+            Ok((Self {
+                packet_identifier,
+                reason_code,
+                properties,
+            }, id_read_bytes + reason_code_read_bytes + properties_read_bytes))
+        }
+    }
+}
+
 impl PacketWrite for PubComp {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
@@ -80,91 +117,11 @@ impl WireLength for PubComp {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Clone, Hash)]
-pub struct PubCompProperties {
-    pub reason_string: Option<Box<str>>,
-    pub user_properties: Vec<(Box<str>, Box<str>)>,
-}
-
-impl PubCompProperties {
-    pub fn is_empty(&self) -> bool {
-        self.reason_string.is_none() && self.user_properties.is_empty()
-    }
-}
-
-impl MqttRead for PubCompProperties {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = read_variable_integer(buf)?;
-
-        if len == 0 {
-            return Ok(Self::default());
-        }
-        if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
-        }
-
-        let mut properties = PubCompProperties::default();
-
-        loop {
-            match PropertyType::try_from(u8::read(buf)?)? {
-                PropertyType::ReasonString => {
-                    if properties.reason_string.is_some() {
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::ReasonString));
-                    }
-                    properties.reason_string = Some(Box::<str>::read(buf)?);
-                }
-                PropertyType::UserProperty => properties.user_properties.push((Box::<str>::read(buf)?, Box::<str>::read(buf)?)),
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::PubComp)),
-            }
-            if buf.is_empty() {
-                break;
-            }
-        }
-        Ok(properties)
-    }
-}
-
-impl MqttWrite for PubCompProperties {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        let len = self.wire_len();
-
-        write_variable_integer(buf, len)?;
-
-        if let Some(reason_string) = &self.reason_string {
-            PropertyType::ReasonString.write(buf)?;
-            reason_string.write(buf)?;
-        }
-        for (key, value) in &self.user_properties {
-            PropertyType::UserProperty.write(buf)?;
-            key.write(buf)?;
-            value.write(buf)?
-        }
-
-        Ok(())
-    }
-}
-
-impl WireLength for PubCompProperties {
-    fn wire_len(&self) -> usize {
-        let mut len = 0;
-        if let Some(reason_string) = &self.reason_string {
-            len += reason_string.wire_len() + 1;
-        }
-        for (key, value) in &self.user_properties {
-            len += 1 + key.wire_len() + value.wire_len();
-        }
-
-        len
-    }
-}
 
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_traits::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-        pubcomp::{PubComp, PubCompProperties},
-        reason_codes::PubCompReasonCode,
-        write_variable_integer, PropertyType,
+        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength}, pubcomp::{PubComp, PubCompProperties}, PropertyType, PubCompReasonCode, VariableInteger
     };
     use bytes::{BufMut, Bytes, BytesMut};
 
@@ -227,7 +184,7 @@ mod tests {
         "Another thingy".write(&mut properties).unwrap();
         "The thingy".write(&mut properties).unwrap();
 
-        write_variable_integer(&mut buf, properties.len()).unwrap();
+        properties.len().write_variable_integer(&mut buf).unwrap();
 
         buf.extend(properties);
 
@@ -252,7 +209,7 @@ mod tests {
         "The thingy".write(&mut properties_data).unwrap();
 
         let mut buf = BytesMut::new();
-        write_variable_integer(&mut buf, properties_data.len()).unwrap();
+        properties_data.len().write_variable_integer(&mut buf).unwrap();
         buf.extend(properties_data);
 
         let properties = PubCompProperties::read(&mut buf.clone().into()).unwrap();

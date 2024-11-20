@@ -3,8 +3,7 @@ use bytes::Bytes;
 use rstest::*;
 
 use crate::packets::{
-    reason_codes::{DisconnectReasonCode, PubAckReasonCode},
-    ConnAck, Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, Publish, PublishProperties, QoS, Subscribe, Subscription, Unsubscribe,
+    DisconnectReasonCode, ConnAck, Disconnect, DisconnectProperties, Packet, PubAck, PubAckProperties, PubAckReasonCode, Publish, PublishProperties, QoS, Subscribe, Subscription, Unsubscribe
 };
 
 fn publish_packet_1() -> Packet {
@@ -20,7 +19,7 @@ fn publish_packet_1() -> Packet {
             topic_alias: None,
             response_topic: None,
             correlation_data: Some(b"1212".to_vec()),
-            subscription_identifier: vec![1],
+            subscription_identifiers: vec![1],
             user_properties: vec![],
             content_type: None,
         },
@@ -40,7 +39,7 @@ fn publish_packet_2() -> Packet {
             topic_alias: Some(1),
             response_topic: None,
             correlation_data: Some(b"1212".to_vec()),
-            subscription_identifier: vec![1],
+            subscription_identifiers: vec![1],
             user_properties: vec![],
             content_type: None,
         },
@@ -60,7 +59,7 @@ fn publish_packet_3() -> Packet {
             topic_alias: None,
             response_topic: Some("Please respond here thank you".into()),
             correlation_data: Some(b"5420874".to_vec()),
-            subscription_identifier: vec![],
+            subscription_identifiers: vec![],
             user_properties: vec![("blabla".into(), "another blabla".into())],
             content_type: None,
         },
@@ -80,7 +79,7 @@ fn publish_packet_4() -> Packet {
             topic_alias: Some(1),
             response_topic: None,
             correlation_data: Some(b"1212".to_vec()),
-            subscription_identifier: vec![1],
+            subscription_identifiers: vec![1],
             user_properties: vec![],
             content_type: Some("Garbage".into()),
         },
@@ -113,7 +112,7 @@ pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifie
             topic_alias: Some(1),
             response_topic: None,
             correlation_data: Some(b"1212".to_vec()),
-            subscription_identifier: vec![1],
+            subscription_identifiers: vec![1],
             user_properties: vec![],
             content_type: Some("Garbage".into()),
         },

@@ -2,9 +2,9 @@ macro_rules! define_properties {
     ($name:ident, $($prop_variant:ident),*) => {
         $crate::packets::macros::properties_struct!(@ $name { $($prop_variant,)* } -> ());
 
-        impl<S> $crate::packets::mqtt_traits::MqttAsyncRead<S> for $name where S: tokio::io::AsyncReadExt + Unpin {
-            async fn async_read(stream: &mut S) -> Result<(Self, usize), super::error::ReadError> {
-                let (len, length_variable_integer) = $crate::packets::read_async_variable_integer(stream).await?;
+        impl<S> $crate::packets::mqtt_trait::MqttAsyncRead<S> for $name where S: tokio::io::AsyncReadExt + Unpin {
+            async fn async_read(stream: &mut S) -> Result<(Self, usize), $crate::packets::error::ReadError> {
+                let (len, length_variable_integer) = <usize as crate::packets::primitive::VariableInteger>::read_async_variable_integer(stream).await?;
                 if len == 0 {
                     return Ok((Self::default(), length_variable_integer));
                 }
@@ -13,7 +13,7 @@ macro_rules! define_properties {
 
                 let mut read_property_bytes = 0;
                 loop {
-                    let (prop, read_bytes) = PropertyType::async_read(stream).await?;
+                    let (prop, read_bytes) = crate::packets::PropertyType::async_read(stream).await?;
                     read_property_bytes += read_bytes;
                     match prop {
                         $(
@@ -30,12 +30,12 @@ macro_rules! define_properties {
             }
         }
 
-        impl $crate::packets::mqtt_traits::WireLength for $name {
+        impl $crate::packets::mqtt_trait::WireLength for $name {
             fn wire_len(&self) -> usize {
                 let mut len: usize = 0;
                 $(
                     $crate::packets::macros::properties_wire_length!(self, len , PropertyType::$prop_variant);
-                )*;
+                )*
                 len
             }
         }
@@ -89,12 +89,21 @@ macro_rules! properties_struct {
             pub correlation_data: Option<Vec<u8>>,
         ));
     );
+    ( @ $name:ident { ListSubscriptionIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+            $($result)*
+            /// 3.3.2.3.8 Subscription Identifier
+            /// 11 (0x0B), Identifier of the Subscription Identifier.
+            /// Multiple Subscription Identifiers used in the Publish packet.
+            pub subscription_identifiers: Vec<u32>,
+        ));
+    );
     ( @ $name:ident { SubscriptionIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
         $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.8 Subscription Identifier
             /// 11 (0x0B), Identifier of the Subscription Identifier.
-            pub subscription_identifier: Vec<usize>,
+            pub subscription_identifier: Option<u32>,
         ));
     );
     ( @ $name:ident { SessionExpiryInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
@@ -137,15 +146,30 @@ macro_rules! properties_struct {
             pub authentication_data: Option<Vec<u8>>,
         ));
     );
-    // ( @ $name:ident { RequestProblemInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
-    //     // Missing
-    // );
-    // ( @ $name:ident { WillDelayInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
-    //     // Missing
-    // );
-    // ( @ $name:ident { RequestResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
-    //     // Missing
-    // );
+    ( @ $name:ident { RequestProblemInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+            $($result)*
+            /// 3.1.2.11.7 Request Problem Information
+            /// 23 (0x17) Byte, Identifier of the Request Problem Information
+            pub request_problem_information: Option<u8>,
+        ));
+    );
+    ( @ $name:ident { WillDelayInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+            $($result)*
+            /// 3.1.3.2.2 Request Problem Information
+            /// 24 (0x18) Byte, Identifier of the Will Delay Interval.
+            pub will_delay_interval: Option<u32>,
+        ));
+    );
+    ( @ $name:ident { RequestResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+            $($result)*
+            /// 3.1.2.11.6 Request Response Information
+            /// 25 (0x19) Byte, Identifier of the Request Response Information
+            pub request_response_information: Option<u8>,
+        ));
+    );
     ( @ $name:ident { ResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
         $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
             $($result)*
@@ -309,9 +333,16 @@ macro_rules! properties_read_matches {
     };
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SubscriptionIdentifier) => {
         {
-            let (prop_body, read_bytes) = $crate::packets::read_async_variable_integer($stream).await?;
+            let (prop_body, read_bytes) = <u32 as $crate::packets::primitive::VariableInteger>::read_async_variable_integer($stream).await?;
             $read_property_bytes += read_bytes;
-            $properties.subscription_identifier.push(prop_body);
+            $properties.subscription_identifier = Some(prop_body as u32);
+        } 
+    };
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ListSubscriptionIdentifier) => {
+        {
+            let (prop_body, read_bytes) = <u32 as $crate::packets::primitive::VariableInteger>::read_async_variable_integer($stream).await?;
+            $read_property_bytes += read_bytes;
+            $properties.subscription_identifiers.push(prop_body as u32);
         } 
     };
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SessionExpiryInterval) => {
@@ -364,16 +395,36 @@ macro_rules! properties_read_matches {
             $properties.authentication_data = Some(prop_body);
         } 
     };
-    // ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestResponseInformation) => {
-    //     {
-    //         if $properties.authentication_data.is_some() {
-    //             return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RequestResponseInformation)));
-    //         }
-    //         let (prop_body, read_bytes) = Vec::<u8>::async_read($stream).await?;
-    //         $read_property_bytes += read_bytes;
-    //         $properties.authentication_data = Some(prop_body);
-    //     } 
-    // };
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestResponseInformation) => {
+        {
+            if $properties.authentication_data.is_some() {
+                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RequestResponseInformation)));
+            }
+            let (prop_body, read_bytes) = u8::async_read($stream).await?;
+            $read_property_bytes += read_bytes;
+            $properties.request_problem_information = Some(prop_body);
+        } 
+    };
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestProblemInformation) => {
+        {
+            if $properties.authentication_data.is_some() {
+                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RequestProblemInformation)));
+            }
+            let (prop_body, read_bytes) = u8::async_read($stream).await?;
+            $read_property_bytes += read_bytes;
+            $properties.request_problem_information = Some(prop_body);
+        } 
+    };
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::WillDelayInterval) => {
+        {
+            if $properties.will_delay_interval.is_some() {
+                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::WillDelayInterval)));
+            }
+            let (prop_body, read_bytes) = u32::async_read($stream).await?;
+            $read_property_bytes += read_bytes;
+            $properties.will_delay_interval = Some(prop_body);
+        } 
+    };
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ResponseInformation) => {
         {
             if $properties.response_info.is_some() {
@@ -534,8 +585,13 @@ macro_rules! properties_wire_length{
         }
     };
     ($self:ident, $len:ident, PropertyType::SubscriptionIdentifier) => {
-        for sub_id in  &($self.subscription_identifier) {
-            $len += 1 + $crate::packets::variable_integer_len(*sub_id);
+        if let Some(sub_id) = &($self.subscription_identifier) {
+            $len += 1 + crate::packets::primitive::VariableInteger::variable_integer_len(sub_id);
+        }
+    };
+    ($self:ident, $len:ident, PropertyType::ListSubscriptionIdentifier) => {
+        for sub_id in  &($self.subscription_identifiers) {
+            $len += 1 + crate::packets::primitive::VariableInteger::variable_integer_len(sub_id);
         }
     };
     ($self:ident, $len:ident, PropertyType::SessionExpiryInterval) => {
@@ -559,13 +615,27 @@ macro_rules! properties_wire_length{
         }
     };
     ($self:ident, $len:ident, PropertyType::AuthenticationData) => {
-        if $self.authentication_data.is_some() && $self.authentication_method.is_some() {
-            $len += 1 + $self.authentication_data.as_ref().map(WireLength::wire_len).unwrap_or(0);
+        if let Some(authentication_data) = &($self).authentication_data {
+            if !authentication_data.is_empty() && $self.authentication_method.is_some() {
+                $len += 1 + authentication_data.wire_len();
+            }
         }
     };
-    // ($self:ident, $len:ident, PropertyType::RequestResponseInformation) => {
-    //Will Delay Interval 
-    // ($self:ident, $len:ident, PropertyType::RequestResponseInformation) => {
+    ($self:ident, $len:ident, PropertyType::RequestProblemInformation) => {
+        if $self.request_problem_information.is_some() {
+            $len += 2;
+        }
+    };
+    ($self:ident, $len:ident, PropertyType::WillDelayInterval) => {
+        if $self.will_delay_interval.is_some() {
+            $len += 5;
+        }
+    };
+    ($self:ident, $len:ident, PropertyType::RequestResponseInformation) => {
+        if $self.request_response_information.is_some() {
+            $len += 2;
+        }
+    };
     ($self:ident, $len:ident, PropertyType::ResponseInformation) => {
         if let Some(response_info) = &($self.response_info) {
             $len += 1 + response_info.wire_len();

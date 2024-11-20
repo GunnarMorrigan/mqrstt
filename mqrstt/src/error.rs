@@ -4,7 +4,7 @@ use async_channel::{RecvError, SendError};
 
 use crate::packets::{
     error::{DeserializeError, ReadBytes, SerializeError},
-    reason_codes::ConnAckReasonCode,
+    ConnAckReasonCode,
     {Packet, PacketType},
 };
 

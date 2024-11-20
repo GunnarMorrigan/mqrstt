@@ -6,7 +6,7 @@ use tracing::{debug, error};
 use crate::error::HandlerError;
 
 #[derive(Debug, Clone)]
-pub struct AvailablePacketIds {
+pub(crate) struct AvailablePacketIds {
     sender: Sender<u16>,
 }
 
@@ -22,7 +22,7 @@ impl AvailablePacketIds {
         (apkid, r)
     }
 
-    pub fn mark_available(&self, pkid: u16) -> Result<(), HandlerError> {
+    pub(crate) fn mark_available(&self, pkid: u16) -> Result<(), HandlerError> {
         match self.sender.try_send(pkid) {
             Ok(_) => {
                 #[cfg(feature = "logs")]

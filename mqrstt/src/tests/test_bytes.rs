@@ -2,7 +2,7 @@ use rstest::*;
 
 use bytes::BytesMut;
 
-use crate::packets::{mqtt_traits::WireLength, Packet};
+use crate::packets::{mqtt_trait::WireLength, Packet};
 
 fn publish_packet() -> Vec<u8> {
     const PUBLISH_BYTES: [u8; 79] = [
