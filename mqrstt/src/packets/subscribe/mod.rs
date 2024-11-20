@@ -1,5 +1,4 @@
 mod properties;
-use std::ops::Sub;
 
 pub use properties::SubscribeProperties;
 use tokio::io::AsyncReadExt;
@@ -9,7 +8,7 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 use super::{
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
-    PacketType, PropertyType, QoS, VariableInteger,
+    QoS, VariableInteger,
 };
 use bytes::{Buf, BufMut};
 
@@ -54,14 +53,17 @@ impl PacketRead for Subscribe {
     }
 }
 
-impl<S> PacketAsyncRead<S> for Subscribe where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for Subscribe
+where
+    S: tokio::io::AsyncReadExt + Unpin,
+{
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let mut total_read_bytes = 0;
             let packet_identifier = stream.read_u16().await?;
             let (properties, proproperties_read_bytes) = SubscribeProperties::async_read(stream).await?;
             total_read_bytes += 2 + proproperties_read_bytes;
-            
+
             let mut topics = vec![];
             loop {
                 let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
@@ -74,15 +76,17 @@ impl<S> PacketAsyncRead<S> for Subscribe where S: tokio::io::AsyncReadExt + Unpi
                 }
             }
 
-            Ok((Self {
-                packet_identifier,
-                properties,
-                topics,
-            }, total_read_bytes))
+            Ok((
+                Self {
+                    packet_identifier,
+                    properties,
+                    topics,
+                },
+                total_read_bytes,
+            ))
         }
     }
 }
-
 
 impl PacketWrite for Subscribe {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
@@ -167,7 +171,10 @@ impl MqttRead for SubscriptionOptions {
     }
 }
 
-impl<S> MqttAsyncRead<S> for SubscriptionOptions where S: tokio::io::AsyncRead + Unpin {
+impl<S> MqttAsyncRead<S> for SubscriptionOptions
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let byte = stream.read_u8().await?;
@@ -188,7 +195,6 @@ impl<S> MqttAsyncRead<S> for SubscriptionOptions where S: tokio::io::AsyncRead +
         }
     }
 }
-
 
 impl MqttWrite for SubscriptionOptions {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {

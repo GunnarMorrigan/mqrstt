@@ -1,26 +1,12 @@
 use crate::packets::{
     error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite,  WireLength},
+    mqtt_trait::{MqttRead, MqttWrite, WireLength},
     PacketType, PropertyType,
 };
 
 use crate::packets::primitive::VariableInteger;
 
-crate::packets::macros::define_properties!(SubAckProperties,
-    SubscriptionIdentifier,
-    UserProperty
-);
-
-// #[derive(Debug, Default, PartialEq, Eq, Clone)]
-// pub struct SubAckProperties {
-//     /// 3.8.2.1.2 Subscription Identifier
-//     /// 11 (0x0B) Byte, Identifier of the Subscription Identifier.
-//     pub subscription_id: Option<usize>,
-
-//     /// 3.8.2.1.3 User Property
-//     /// 38 (0x26) Byte, Identifier of the User Property.
-//     pub user_properties: Vec<(Box<str>, Box<str>)>,
-// }
+crate::packets::macros::define_properties!(SubAckProperties, SubscriptionIdentifier, UserProperty);
 
 impl MqttRead for SubAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {
@@ -30,7 +16,7 @@ impl MqttRead for SubAckProperties {
 
         if len == 0 {
             return Ok(properties);
-        } else if buf.len() < len  {
+        } else if buf.len() < len {
             return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
         }
 
@@ -77,16 +63,3 @@ impl MqttWrite for SubAckProperties {
         Ok(())
     }
 }
-
-// impl WireLength for SubAckProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len = 0;
-//         if let Some(sub_id) = self.subscription_id {
-//             len += 1 + sub_id.variable_integer_len();
-//         }
-//         for (key, value) in &self.user_properties {
-//             len += 1 + key.wire_len() + value.wire_len();
-//         }
-//         len
-//     }
-// }

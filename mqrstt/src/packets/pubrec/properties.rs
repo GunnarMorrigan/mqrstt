@@ -1,21 +1,10 @@
 use crate::packets::{
     error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite, WireLength}, PacketType, PropertyType, VariableInteger,
+    mqtt_trait::{MqttRead, MqttWrite, WireLength},
+    PacketType, PropertyType, VariableInteger,
 };
 
 crate::packets::macros::define_properties!(PubRecProperties, ReasonString, UserProperty);
-
-// #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
-// pub struct PubRecProperties {
-//     pub reason_string: Option<Box<str>>,
-//     pub user_properties: Vec<(Box<str>, Box<str>)>,
-// }
-
-// impl PubRecProperties {
-//     pub fn is_empty(&self) -> bool {
-//         self.reason_string.is_none() && self.user_properties.is_empty()
-//     }
-// }
 
 impl MqttRead for PubRecProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {
@@ -68,17 +57,3 @@ impl MqttWrite for PubRecProperties {
         Ok(())
     }
 }
-
-// impl WireLength for PubRecProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len = 0;
-//         if let Some(reason_string) = &self.reason_string {
-//             len += reason_string.wire_len() + 1;
-//         }
-//         for (key, value) in &self.user_properties {
-//             len += 1 + key.wire_len() + value.wire_len();
-//         }
-
-//         len
-//     }
-// }

@@ -36,10 +36,10 @@ pub use subscribe::*;
 pub use unsuback::*;
 pub use unsubscribe::*;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::Display;
 
-use self::error::{DeserializeError, ReadBytes, SerializeError};
+use self::error::{DeserializeError, SerializeError};
 use self::mqtt_trait::{PacketRead, PacketWrite, WireLength};
 
 // ==================== Packets ====================
@@ -226,7 +226,10 @@ impl Packet {
     }
 
     #[cfg(test)]
-    pub(crate) fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
+    pub(crate) fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {
+        use bytes::Buf;
+        use error::ReadBytes;
+
         let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
         if header.remaining_length + header_length > buffer.len() {
             return Err(ReadBytes::InsufficientBytes(header.remaining_length + header_length - buffer.len()));
@@ -322,15 +325,6 @@ impl std::fmt::Display for PacketType {
 mod tests {
     use bytes::BytesMut;
 
-    use crate::packets::connack::{ConnAck, ConnAckFlags, ConnAckProperties};
-    use crate::packets::disconnect::{Disconnect, DisconnectProperties};
-    use crate::packets::QoS;
-
-    use crate::packets::connack::ConnAckReasonCode;
-    use crate::packets::disconnect::DisconnectReasonCode;
-    use crate::packets::publish::{Publish, PublishProperties};
-    use crate::packets::pubrel::PubRelReasonCode;
-    use crate::packets::pubrel::{PubRel, PubRelProperties};
     use crate::packets::Packet;
 
     use crate::tests::test_packets::{disconnect_case, ping_req_case, ping_resp_case, publish_case, pubrel_case, pubrel_smallest_case};

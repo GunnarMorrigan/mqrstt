@@ -1,6 +1,5 @@
 use bytes::{BufMut, Bytes, BytesMut};
 
-
 use crate::packets::VariableInteger;
 use crate::packets::{
     error::{DeserializeError, SerializeError},
@@ -8,7 +7,8 @@ use crate::packets::{
     PacketType, PropertyType, WireLength,
 };
 
-crate::packets::macros::define_properties!(LastWillProperties,
+crate::packets::macros::define_properties!(
+    LastWillProperties,
     WillDelayInterval,
     PayloadFormatIndicator,
     MessageExpiryInterval,
@@ -17,25 +17,6 @@ crate::packets::macros::define_properties!(LastWillProperties,
     CorrelationData,
     UserProperty
 );
-
-
-// #[derive(Debug, Default, Clone, PartialEq, Eq)]
-// pub struct LastWillProperties {
-//     /// 3.1.3.2.2 Will Delay Interval
-//     will_delay_interval: Option<u32>,
-//     /// 3.1.3.2.3 Payload Format Indicator
-//     payload_format_indicator: Option<u8>,
-//     /// 3.1.3.2.4 Message Expiry Interval
-//     message_expiry_interval: Option<u32>,
-//     /// 3.1.3.2.5 Content Type
-//     content_type: Option<Box<str>>,
-//     /// 3.1.3.2.6 Response Topic
-//     response_topic: Option<Box<str>>,
-//     /// 3.1.3.2.7 Correlation Data
-//     correlation_data: Option<Bytes>,
-//     /// 3.1.3.2.8 User Property
-//     user_properties: Vec<(Box<str>, Box<str>)>,
-// }
 
 impl MqttRead for LastWillProperties {
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
@@ -139,28 +120,3 @@ impl MqttWrite for LastWillProperties {
         Ok(())
     }
 }
-
-// impl WireLength for LastWillProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len: usize = 0;
-
-//         if self.will_delay_interval.is_some() {
-//             len += 5;
-//         }
-//         if self.payload_format_indicator.is_some() {
-//             len += 2;
-//         }
-//         if self.message_expiry_interval.is_some() {
-//             len += 5;
-//         }
-//         // +1 for the property type
-//         len += self.content_type.as_ref().map_or_else(|| 0, |s| s.wire_len() + 1);
-//         len += self.response_topic.as_ref().map_or_else(|| 0, |s| s.wire_len() + 1);
-//         len += self.correlation_data.as_ref().map_or_else(|| 0, |b| b.wire_len() + 1);
-//         for (key, value) in &self.user_properties {
-//             len += key.wire_len() + value.wire_len() + 1;
-//         }
-
-//         len
-//     }
-// }

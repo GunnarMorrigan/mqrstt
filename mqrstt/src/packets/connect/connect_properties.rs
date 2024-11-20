@@ -1,13 +1,11 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-
 use crate::packets::VariableInteger;
 use crate::packets::{
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttRead, MqttWrite},
     PacketType, PropertyType, WireLength,
 };
-
 
 // /// Connect Properties
 // ///
@@ -17,7 +15,8 @@ use crate::packets::{
 // /// 3.1.2.11.1 Property Length
 // /// The length of the Properties in the CONNECT packet Variable Header encoded as a Variable Byte Integer.
 // /// Followed by all possible connect properties:
-crate::packets::macros::define_properties!(ConnectProperties,
+crate::packets::macros::define_properties!(
+    ConnectProperties,
     SessionExpiryInterval,
     ReceiveMaximum,
     MaximumPacketSize,
@@ -28,45 +27,6 @@ crate::packets::macros::define_properties!(ConnectProperties,
     AuthenticationMethod,
     AuthenticationData
 );
-
-// #[derive(Debug, Default, Clone, PartialEq, Eq)]
-// pub struct ConnectProperties {
-//     /// 3.1.2.11.2 Session Expiry Interval
-//     /// 17 (0x11) Byte Identifier of the Session Expiry Interval
-//     pub session_expiry_interval: Option<u32>,
-
-//     /// 3.1.2.11.3 Receive Maximum
-//     /// 33 (0x21) Byte, Identifier of the Receive Maximum
-//     pub receive_maximum: Option<u16>,
-
-//     /// 3.1.2.11.4 Maximum Packet Size
-//     /// 39 (0x27) Byte, Identifier of the Maximum Packet Size
-//     pub maximum_packet_size: Option<u32>,
-
-//     /// 3.1.2.11.5 Topic Alias Maximum
-//     /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum
-//     pub topic_alias_maximum: Option<u16>,
-
-//     /// 3.1.2.11.6 Request Response Information
-//     /// 25 (0x19) Byte, Identifier of the Request Response Information
-//     pub request_response_information: Option<u8>,
-
-//     /// 3.1.2.11.7 Request Problem Information
-//     /// 23 (0x17) Byte, Identifier of the Request Problem Information
-//     pub request_problem_information: Option<u8>,
-
-//     /// 3.1.2.11.8 User Property
-//     /// 38 (0x26) Byte, Identifier of the User Property
-//     pub user_properties: Vec<(Box<str>, Box<str>)>,
-
-//     /// 3.1.2.11.9 Authentication Method
-//     /// 21 (0x15) Byte, Identifier of the Authentication Method
-//     pub authentication_method: Option<Box<str>>,
-
-//     /// 3.1.2.11.10 Authentication Data
-//     /// 22 (0x16) Byte, Identifier of the Authentication Data
-//     pub authentication_data: Bytes,
-// }
 
 impl MqttWrite for ConnectProperties {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {

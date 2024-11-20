@@ -9,17 +9,17 @@ use crate::packets::{
 
 use super::read_fixed_header_rem_len;
 
-// 2.1.1 Fixed Header
-// ```
-//          7                          3                          0
-//          +--------------------------+--------------------------+
-// byte 1   | MQTT Control Packet Type | Flags for Packet type    |
-//          +--------------------------+--------------------------+
-//          |                   Remaining Length                  |
-//          +-----------------------------------------------------+
-//
-// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901021
-// ```
+/// 2.1.1 Fixed Header
+/// ```
+///          7                          3                          0
+///          +--------------------------+--------------------------+
+/// byte 1   | MQTT Control Packet Type | Flags for Packet type    |
+///          +--------------------------+--------------------------+
+///          |                   Remaining Length                  |
+///          +-----------------------------------------------------+
+///
+/// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901021
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub(crate) struct FixedHeader {
     pub packet_type: PacketType,

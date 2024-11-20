@@ -16,28 +16,40 @@ pub struct PubAck {
     pub properties: PubAckProperties,
 }
 
-impl<S> PacketAsyncRead<S> for PubAck where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for PubAck
+where
+    S: tokio::io::AsyncReadExt + Unpin,
+{
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
         let packet_identifier = stream.read_u16().await?;
         if remaining_length == 2 {
-            Ok((Self {
-                packet_identifier,
-                reason_code: PubAckReasonCode::Success,
-                properties: PubAckProperties::default(),
-            }, 2))
+            Ok((
+                Self {
+                    packet_identifier,
+                    reason_code: PubAckReasonCode::Success,
+                    properties: PubAckProperties::default(),
+                },
+                2,
+            ))
         } else if remaining_length < 4 {
-            return Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(std::any::type_name::<Self>(), remaining_length, 4)));
+            return Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(
+                std::any::type_name::<Self>(),
+                remaining_length,
+                4,
+            )));
         } else {
             let (reason_code, reason_code_read_bytes) = PubAckReasonCode::async_read(stream).await?;
             let (properties, properties_read_bytes) = PubAckProperties::async_read(stream).await?;
-    
-            Ok((Self {
-                packet_identifier,
-                reason_code,
-                properties,
-            }, 2 + reason_code_read_bytes + properties_read_bytes))
-        }
 
+            Ok((
+                Self {
+                    packet_identifier,
+                    reason_code,
+                    properties,
+                },
+                2 + reason_code_read_bytes + properties_read_bytes,
+            ))
+        }
     }
 }
 
@@ -100,22 +112,7 @@ impl WireLength for PubAck {
     }
 }
 
-crate::packets::macros::define_properties!(PubAckProperties,
-    ReasonString,
-    UserProperty
-);
-
-// #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
-// pub struct PubAckProperties {
-//     pub reason_string: Option<Box<str>>,
-//     pub user_properties: Vec<(Box<str>, Box<str>)>,
-// }
-
-// impl PubAckProperties {
-//     pub fn is_empty(&self) -> bool {
-//         self.reason_string.is_none() && self.user_properties.is_empty()
-//     }
-// }
+crate::packets::macros::define_properties!(PubAckProperties, ReasonString, UserProperty);
 
 impl MqttRead for PubAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
@@ -168,20 +165,6 @@ impl MqttWrite for PubAckProperties {
         Ok(())
     }
 }
-
-// impl WireLength for PubAckProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len = 0;
-//         if let Some(reason_string) = &self.reason_string {
-//             len += reason_string.wire_len() + 1;
-//         }
-//         for (key, value) in &self.user_properties {
-//             len += 1 + key.wire_len() + value.wire_len();
-//         }
-
-//         len
-//     }
-// }
 
 #[cfg(test)]
 mod tests {

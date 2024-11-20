@@ -8,7 +8,8 @@ use crate::packets::{
     PacketType, PropertyType,
 };
 
-crate::packets::macros::define_properties!(PublishProperties,
+crate::packets::macros::define_properties!(
+    PublishProperties,
     PayloadFormatIndicator,
     MessageExpiryInterval,
     ContentType,
@@ -18,43 +19,6 @@ crate::packets::macros::define_properties!(PublishProperties,
     TopicAlias,
     UserProperty
 );
-
-
-// #[derive(Debug, Clone, PartialEq, Eq, Default)]
-// pub struct PublishProperties {
-//     /// 3.3.2.3.2 Payload Format Indicator
-//     /// 1 (0x01) Byte, Identifier of the Payload Format Indicator.
-//     pub payload_format_indicator: Option<u8>,
-
-//     /// 3.3.2.3.3 Message Expiry Interval
-//     /// 2 (0x02) Byte, Identifier of the Message Expiry Interval.
-//     pub message_expiry_interval: Option<u32>,
-
-//     /// 3.3.2.3.9 Content Type
-//     /// 3 (0x03) Identifier of the Content Type
-//     pub content_type: Option<Box<str>>,
-
-//     /// 3.3.2.3.5 Response Topic
-//     /// 8 (0x08) Byte, Identifier of the Response Topic.
-//     pub response_topic: Option<Box<str>>,
-
-//     /// 3.3.2.3.6 Correlation Data
-//     /// 9 (0x09) Byte, Identifier of the Correlation Data.
-//     pub correlation_data: Option<Bytes>,
-
-//     /// 3.3.2.3.8 Subscription Identifier
-//     /// 11 (0x0B), Identifier of the Subscription Identifier.
-//     pub subscription_identifier: Vec<usize>,
-
-//     /// 3.3.2.3.4 Topic Alias
-//     /// 35 (0x23) Byte, Identifier of the Topic Alias.
-//     pub topic_alias: Option<u16>,
-
-//     /// 3.3.2.3.7 User Property
-//     /// 38 (0x26) Byte, Identifier of the User Property.
-//     pub user_properties: Vec<(Box<str>, Box<str>)>,
-
-// }
 
 impl MqttRead for PublishProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {
@@ -164,36 +128,3 @@ impl MqttWrite for PublishProperties {
         Ok(())
     }
 }
-
-// impl WireLength for PublishProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len = 0;
-
-//         if self.payload_format_indicator.is_some() {
-//             len += 2;
-//         }
-//         if self.message_expiry_interval.is_some() {
-//             len += 5;
-//         }
-//         if self.topic_alias.is_some() {
-//             len += 3;
-//         }
-//         if let Some(response_topic) = &self.response_topic {
-//             len += 1 + response_topic.wire_len();
-//         }
-//         if let Some(correlation_data) = &self.correlation_data {
-//             len += 1 + correlation_data.wire_len();
-//         }
-//         for sub_id in &self.subscription_identifier {
-//             len += 1 + *sub_id.variable_integer_len();
-//         }
-//         for (key, val) in &self.user_properties {
-//             len += 1 + key.wire_len() + val.wire_len();
-//         }
-//         if let Some(content_type) = &self.content_type {
-//             len += 1 + content_type.wire_len();
-//         }
-
-//         len
-//     }
-// }

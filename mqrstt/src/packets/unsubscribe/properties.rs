@@ -6,13 +6,7 @@ use crate::packets::{
     PacketType, PropertyType,
 };
 
-
 crate::packets::macros::define_properties!(UnsubscribeProperties, UserProperty);
-
-// #[derive(Debug, Default, PartialEq, Eq, Clone)]
-// pub struct UnsubscribeProperties {
-//     pub user_properties: Vec<(String, String)>,
-// }
 
 impl MqttRead for UnsubscribeProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {
@@ -55,13 +49,3 @@ impl MqttWrite for UnsubscribeProperties {
         Ok(())
     }
 }
-
-// impl WireLength for UnsubscribeProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len = 0;
-//         for (key, value) in &self.user_properties {
-//             len += 1 + key.wire_len() + value.wire_len();
-//         }
-//         len
-//     }
-// }

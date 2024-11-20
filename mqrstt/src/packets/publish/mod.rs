@@ -2,10 +2,8 @@ mod properties;
 pub use properties::PublishProperties;
 
 use tokio::io::AsyncReadExt;
-use tokio::io::AsyncBufRead;
 
-
-use bytes::{BufMut, Bytes};
+use bytes::BufMut;
 
 use crate::error::PacketValidationError;
 use crate::util::constants::MAXIMUM_TOPIC_SIZE;
@@ -13,7 +11,8 @@ use crate::util::constants::MAXIMUM_TOPIC_SIZE;
 use super::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use super::VariableInteger;
 use super::{
-    error::{DeserializeError, SerializeError}, QoS,
+    error::{DeserializeError, SerializeError},
+    QoS,
 };
 
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
@@ -84,7 +83,10 @@ impl PacketRead for Publish {
     }
 }
 
-impl<S> PacketAsyncRead<S> for Publish where S: tokio::io::AsyncRead + Unpin {
+impl<S> PacketAsyncRead<S> for Publish
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(flags: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let mut total_read_bytes = 0;
@@ -94,7 +96,9 @@ impl<S> PacketAsyncRead<S> for Publish where S: tokio::io::AsyncRead + Unpin {
 
             let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
             total_read_bytes += topic_read_bytes;
-            let packet_identifier = if qos == QoS::AtMostOnce { None } else {
+            let packet_identifier = if qos == QoS::AtMostOnce {
+                None
+            } else {
                 total_read_bytes += 2;
                 Some(stream.read_u16().await?)
             };
@@ -107,21 +111,18 @@ impl<S> PacketAsyncRead<S> for Publish where S: tokio::io::AsyncRead + Unpin {
 
             assert_eq!(payload_read_bytes, payload_len);
 
-
-            Ok(
-                (
-                    Self {
-                        dup,
-                        qos,
-                        retain,
-                        topic,
-                        packet_identifier,
-                        publish_properties,
-                        payload,
-                    }, 
-                    total_read_bytes + payload_read_bytes
-                )
-            )
+            Ok((
+                Self {
+                    dup,
+                    qos,
+                    retain,
+                    topic,
+                    packet_identifier,
+                    publish_properties,
+                    payload,
+                },
+                total_read_bytes + payload_read_bytes,
+            ))
         }
     }
 }
@@ -171,14 +172,13 @@ impl PacketValidation for Publish {
     }
 }
 
-
-
 #[cfg(test)]
 mod tests {
     use bytes::{BufMut, BytesMut};
 
     use crate::packets::{
-        mqtt_trait::{PacketRead, PacketWrite}, VariableInteger,
+        mqtt_trait::{PacketRead, PacketWrite},
+        VariableInteger,
     };
 
     use super::Publish;
