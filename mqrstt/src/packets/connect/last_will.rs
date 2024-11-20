@@ -3,7 +3,7 @@ use bytes::{Bytes, BytesMut};
 
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite}, QoS, WireLength,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite}, QoS, WireLength,
 };
 
 use super::{LastWillProperties, VariableInteger};

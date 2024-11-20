@@ -145,7 +145,7 @@ impl Packet {
             }
             Packet::UnsubAck(_) => {
                 unreachable!();
-                buf.put_u8(0b1011_0000);
+                // buf.put_u8(0b1011_0000);
             }
             Packet::PingReq => {
                 buf.put_u8(0b1100_0000);

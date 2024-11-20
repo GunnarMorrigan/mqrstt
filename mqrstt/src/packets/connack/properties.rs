@@ -1,6 +1,6 @@
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    mqtt_trait::{MqttRead, MqttWrite, WireLength},
     PacketType, PropertyType, QoS, VariableInteger,
 };
 use bytes::BufMut;

@@ -900,7 +900,7 @@ impl MqttClient {
     }
 }
 
-#[cfg(any(feature = "tokio", feature = "smol", feature = "quic"))]
+#[cfg(any(feature = "tokio", feature = "smol"))]
 #[cfg(test)]
 mod tests {
     use async_channel::Receiver;

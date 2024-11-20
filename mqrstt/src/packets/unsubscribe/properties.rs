@@ -2,7 +2,7 @@ use crate::packets::VariableInteger;
 
 use crate::packets::{
     error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
+    mqtt_trait::{MqttRead, MqttWrite, WireLength},
     PacketType, PropertyType,
 };
 

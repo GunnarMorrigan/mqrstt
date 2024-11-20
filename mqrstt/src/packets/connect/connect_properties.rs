@@ -4,7 +4,7 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use crate::packets::VariableInteger;
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
+    mqtt_trait::{MqttRead, MqttWrite},
     PacketType, PropertyType, WireLength,
 };
 

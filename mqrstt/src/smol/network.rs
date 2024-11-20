@@ -38,7 +38,7 @@ pub struct Network<H, S> {
 }
 
 impl<H, S> Network<H, S> {
-    pub fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
+    pub(crate) fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
         let state_handler = StateHandler::new(&options, apkids);
         Self {
             handler: PhantomData,

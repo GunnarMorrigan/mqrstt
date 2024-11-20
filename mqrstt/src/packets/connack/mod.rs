@@ -44,7 +44,7 @@ impl PacketRead for ConnAck {
 }
 
 impl<S> PacketAsyncRead<S> for ConnAck where S: tokio::io::AsyncReadExt + Unpin {
-    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
+    fn async_read(_: u8, _: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
         async move {
             let (connack_flags, read_bytes) = ConnAckFlags::async_read(stream).await?;
             let (reason_code, reason_code_read_bytes) = ConnAckReasonCode::async_read(stream).await?;
