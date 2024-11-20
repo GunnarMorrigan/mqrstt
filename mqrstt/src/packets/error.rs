@@ -5,6 +5,14 @@ use thiserror::Error;
 use super::{PacketType, PropertyType};
 
 #[derive(Error, Debug)]
+pub enum WriteError {
+    #[error("{0}")]
+    SerializeError(#[from] SerializeError),
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
+}
+
+#[derive(Error, Debug)]
 pub enum ReadError{
     #[error("{0}")]
     DeserializeError(#[from] DeserializeError),

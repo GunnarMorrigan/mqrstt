@@ -1,8 +1,14 @@
+mod properties;
+use std::ops::Sub;
+
+pub use properties::SubscribeProperties;
+use tokio::io::AsyncReadExt;
+
 use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
     error::DeserializeError,
-    mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketValidation, PacketWrite, WireLength},
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
     PacketType, PropertyType, QoS, VariableInteger,
 };
 use bytes::{Buf, BufMut};
@@ -48,6 +54,36 @@ impl PacketRead for Subscribe {
     }
 }
 
+impl<S> PacketAsyncRead<S> for Subscribe where S: tokio::io::AsyncReadExt + Unpin {
+    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
+        async move {
+            let mut total_read_bytes = 0;
+            let packet_identifier = stream.read_u16().await?;
+            let (properties, proproperties_read_bytes) = SubscribeProperties::async_read(stream).await?;
+            total_read_bytes += 2 + proproperties_read_bytes;
+            
+            let mut topics = vec![];
+            loop {
+                let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
+                let (options, options_read_bytes) = SubscriptionOptions::async_read(stream).await?;
+                total_read_bytes += topic_read_bytes + options_read_bytes;
+                topics.push((topic, options));
+
+                if remaining_length >= total_read_bytes {
+                    break;
+                }
+            }
+
+            Ok((Self {
+                packet_identifier,
+                properties,
+                topics,
+            }, total_read_bytes))
+        }
+    }
+}
+
+
 impl PacketWrite for Subscribe {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
         buf.put_u16(self.packet_identifier);
@@ -85,85 +121,6 @@ impl PacketValidation for Subscribe {
             }
         }
         Ok(())
-    }
-}
-
-#[derive(Debug, Default, PartialEq, Eq, Clone)]
-pub struct SubscribeProperties {
-    /// 3.8.2.1.2 Subscription Identifier
-    /// 11 (0x0B) Byte, Identifier of the Subscription Identifier.
-    pub subscription_id: Option<usize>,
-
-    /// 3.8.2.1.3 User Property
-    /// 38 (0x26) Byte, Identifier of the User Property.
-    pub user_properties: Vec<(Box<str>, Box<str>)>,
-}
-
-impl MqttRead for SubscribeProperties {
-    fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
-        let (len, _) = VariableInteger::read_variable_integer(buf)?;
-
-        let mut properties = SubscribeProperties::default();
-
-        if len == 0 {
-            return Ok(properties);
-        } else if buf.len() < len {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), len));
-        }
-
-        let mut properties_data = buf.split_to(len);
-
-        loop {
-            match PropertyType::read(&mut properties_data)? {
-                PropertyType::SubscriptionIdentifier => {
-                    if properties.subscription_id.is_none() {
-                        let (subscription_id, _) = VariableInteger::read_variable_integer(&mut properties_data)?;
-
-                        properties.subscription_id = Some(subscription_id);
-                    } else {
-                        return Err(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifier));
-                    }
-                }
-                PropertyType::UserProperty => {
-                    properties.user_properties.push((Box::<str>::read(&mut properties_data)?, Box::<str>::read(&mut properties_data)?));
-                }
-                e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::Subscribe)),
-            }
-
-            if properties_data.is_empty() {
-                break;
-            }
-        }
-        Ok(properties)
-    }
-}
-
-impl MqttWrite for SubscribeProperties {
-    fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {
-        self.wire_len().write_variable_integer(buf)?;
-        if let Some(sub_id) = self.subscription_id {
-            PropertyType::SubscriptionIdentifier.write(buf)?;
-            sub_id.write_variable_integer(buf)?;
-        }
-        for (key, value) in &self.user_properties {
-            PropertyType::UserProperty.write(buf)?;
-            key.write(buf)?;
-            value.write(buf)?;
-        }
-        Ok(())
-    }
-}
-
-impl WireLength for SubscribeProperties {
-    fn wire_len(&self) -> usize {
-        let mut len = 0;
-        if let Some(sub_id) = self.subscription_id {
-            len += 1 + sub_id.variable_integer_len();
-        }
-        for (key, value) in &self.user_properties {
-            len += 1 + key.wire_len() + value.wire_len();
-        }
-        len
     }
 }
 
@@ -209,6 +166,29 @@ impl MqttRead for SubscriptionOptions {
         Ok(options)
     }
 }
+
+impl<S> MqttAsyncRead<S> for SubscriptionOptions where S: tokio::io::AsyncRead + Unpin {
+    fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
+        async move {
+            let byte = stream.read_u8().await?;
+
+            let retain_handling_part = (byte & 0b00110000) >> 4;
+            let retain_as_publish_part = (byte & 0b00001000) >> 3;
+            let no_local_part = (byte & 0b00000100) >> 2;
+            let qos_part = byte & 0b00000011;
+
+            let options = Self {
+                retain_handling: RetainHandling::from_u8(retain_handling_part)?,
+                retain_as_publish: retain_as_publish_part != 0,
+                no_local: no_local_part != 0,
+                qos: QoS::from_u8(qos_part)?,
+            };
+
+            Ok((options, 1))
+        }
+    }
+}
+
 
 impl MqttWrite for SubscriptionOptions {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), super::error::SerializeError> {

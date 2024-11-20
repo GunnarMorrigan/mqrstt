@@ -66,7 +66,7 @@ fn very_large_publish(id: u16, repeat: usize) -> Packet {
         topic: "BlaBla".into(),
         packet_identifier: Some(id),
         publish_properties: Default::default(),
-        payload: Bytes::from_iter("ping".repeat(repeat).into_bytes()),
+        payload: b"ping".repeat(repeat).to_vec(),
     };
 
     Packet::Publish(publ)

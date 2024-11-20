@@ -1,5 +1,4 @@
 use async_channel::{Receiver, Sender};
-use bytes::Bytes;
 
 #[cfg(feature = "logs")]
 use tracing::info;
@@ -158,7 +157,7 @@ impl MqttClient {
     /// use mqrstt::packets::{SubscribeProperties, SubscriptionOptions, RetainHandling};
     ///
     /// let sub_properties = SubscribeProperties{
-    ///   subscription_id: Some(1),
+    ///   subscription_identifier: Some(1),
     ///   user_properties: vec![],
     /// };
     /// 
@@ -236,7 +235,7 @@ impl MqttClient {
     ///
     /// # });
     /// ```
-    pub async fn publish<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
+    pub async fn publish<T: AsRef<str>, P: Into<Vec<u8>>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
@@ -308,7 +307,7 @@ impl MqttClient {
     /// # });
     /// # let _network = std::hint::black_box(network);
     /// ```
-    pub async fn publish_with_properties<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
+    pub async fn publish_with_properties<T: AsRef<str>, P: Into<Vec<u8>>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?),
@@ -563,7 +562,7 @@ impl MqttClient {
     /// use mqrstt::packets::{SubscribeProperties, SubscriptionOptions, RetainHandling};
     ///
     /// let sub_properties = SubscribeProperties{
-    ///   subscription_id: Some(1),
+    ///   subscription_identifier: Some(1),
     ///   user_properties: vec![],
     /// };
     /// # let sub_properties_clone = sub_properties.clone();
@@ -642,7 +641,7 @@ impl MqttClient {
     ///
     /// # });
     /// ```
-    pub fn publish_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
+    pub fn publish_blocking<T: AsRef<str>, P: Into<Vec<u8>>>(&self, topic: T, qos: QoS, retain: bool, payload: P) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
@@ -715,7 +714,7 @@ impl MqttClient {
     ///
     /// # });
     /// ```
-    pub fn publish_with_properties_blocking<T: AsRef<str>, P: Into<Bytes>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
+    pub fn publish_with_properties_blocking<T: AsRef<str>, P: Into<Vec<u8>>>(&self, topic: T, qos: QoS, retain: bool, payload: P, properties: PublishProperties) -> Result<(), ClientError> {
         let pkid = match qos {
             QoS::AtMostOnce => None,
             _ => Some(self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?),
@@ -957,7 +956,7 @@ mod tests {
         let (mqtt_client, client_to_handler_r, to_network_r) = create_new_test_client();
         
         let sub_properties = SubscribeProperties{
-            subscription_id: Some(1),
+            subscription_identifier: Some(1),
             user_properties: vec![],
         };
 

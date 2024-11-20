@@ -61,7 +61,7 @@ impl PacketRead for PubComp {
 impl<S> PacketAsyncRead<S> for PubComp where S: tokio::io::AsyncReadExt + Unpin {
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
-            let (packet_identifier, id_read_bytes) = u16::async_read(stream).await?;
+            let packet_identifier = stream.read_u16().await?;
             if remaining_length == 2 {
                 return Ok((Self {
                     packet_identifier,
@@ -77,13 +77,13 @@ impl<S> PacketAsyncRead<S> for PubComp where S: tokio::io::AsyncReadExt + Unpin 
             let (reason_code, reason_code_read_bytes) = PubCompReasonCode::async_read(stream).await?;
             let (properties, properties_read_bytes) = PubCompProperties::async_read(stream).await?;
 
-            assert_eq!(id_read_bytes + reason_code_read_bytes + properties_read_bytes, remaining_length);
+            assert_eq!(2 + reason_code_read_bytes + properties_read_bytes, remaining_length);
 
             Ok((Self {
                 packet_identifier,
                 reason_code,
                 properties,
-            }, id_read_bytes + reason_code_read_bytes + properties_read_bytes))
+            }, 2 + reason_code_read_bytes + properties_read_bytes))
         }
     }
 }

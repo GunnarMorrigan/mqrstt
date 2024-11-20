@@ -57,9 +57,9 @@ impl<S> PacketAsyncRead<S> for Unsubscribe where S: tokio::io::AsyncReadExt + Un
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let mut total_read_bytes = 0;
-            let (packet_identifier, id_read_bytes) = u16::async_read(stream).await?;
+            let packet_identifier = stream.read_u16().await?;
             let (properties, properties_read_bytes) = UnsubscribeProperties::async_read(stream).await?;
-            total_read_bytes += id_read_bytes + properties_read_bytes;
+            total_read_bytes += 2 + properties_read_bytes;
 
             let mut topics = vec![];
             loop {

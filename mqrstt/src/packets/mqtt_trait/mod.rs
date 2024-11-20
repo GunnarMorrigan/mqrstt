@@ -68,6 +68,10 @@ pub(crate) trait PacketAsyncRead<S>: Sized  where S: tokio::io::AsyncReadExt + U
     fn async_read(flags: u8, remaining_length: usize, stream: &mut S) -> impl Future<Output = Result<(Self, usize), crate::packets::error::ReadError>>;
 }
 
+pub(crate) trait PacketAsyncWrite<S>: Sized  where S: tokio::io::AsyncWriteExt + Unpin {
+    fn async_write(&self, stream: &mut S) -> impl Future<Output = Result<usize, crate::packets::error::WriteError>>;
+}
+
 pub(crate) trait PacketWrite: Sized  {
     fn write(&self, buf: &mut BytesMut) -> Result<(), crate::packets::error::SerializeError>;
 }

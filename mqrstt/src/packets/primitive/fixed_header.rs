@@ -1,5 +1,11 @@
 use core::slice::Iter;
-use crate::packets::{error::{DeserializeError, ReadBytes}, PacketType};
+
+use tokio::io::AsyncReadExt;
+
+use crate::packets::{
+    error::{DeserializeError, ReadBytes},
+    PacketType,
+};
 
 use super::read_fixed_header_rem_len;
 
@@ -36,5 +42,17 @@ impl FixedHeader {
         header_length += length;
 
         Ok((Self { packet_type, flags, remaining_length }, header_length))
+    }
+
+    pub async fn async_read<S>(stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError>
+    where
+        S: tokio::io::AsyncRead + Unpin,
+    {
+        let first_byte = stream.read_u8().await?;
+
+        let (packet_type, flags) = PacketType::from_first_byte(first_byte)?;
+
+        let (remaining_length, length) = super::async_read_fixed_header_rem_len(stream).await?;
+        Ok((Self { packet_type, flags, remaining_length }, 1 + length))
     }
 }

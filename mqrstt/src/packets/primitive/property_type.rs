@@ -1,6 +1,9 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::packets::{error::{DeserializeError, ReadError, SerializeError}, mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite}};
+use crate::packets::{
+    error::{DeserializeError, ReadError, SerializeError},
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PropertyType {
@@ -10,8 +13,6 @@ pub enum PropertyType {
     ResponseTopic = 8,
     CorrelationData = 9,
     SubscriptionIdentifier = 11,
-    /// Alternative to SubscriptionIdentifier, dummy property to encode multiple subscription identifiers
-    ListSubscriptionIdentifier,
     SessionExpiryInterval = 17,
     AssignedClientIdentifier = 18,
     ServerKeepAlive = 19,
@@ -81,7 +82,6 @@ impl From<&PropertyType> for u8 {
             PropertyType::ResponseTopic => 8,
             PropertyType::CorrelationData => 9,
             PropertyType::SubscriptionIdentifier => 11,
-            PropertyType::ListSubscriptionIdentifier => 11,
             PropertyType::SessionExpiryInterval => 17,
             PropertyType::AssignedClientIdentifier => 18,
             PropertyType::ServerKeepAlive => 19,
@@ -123,7 +123,10 @@ impl MqttRead for PropertyType {
     }
 }
 
-impl<T> MqttAsyncRead<T> for PropertyType where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for PropertyType
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         match buf.read_u8().await {
             Ok(t) => Ok((t.try_into()?, 1)),

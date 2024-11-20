@@ -1,13 +1,16 @@
 mod properties;
 pub use properties::PublishProperties;
 
+use tokio::io::AsyncReadExt;
+use tokio::io::AsyncBufRead;
+
 
 use bytes::{BufMut, Bytes};
 
 use crate::error::PacketValidationError;
 use crate::util::constants::MAXIMUM_TOPIC_SIZE;
 
-use super::mqtt_trait::{MqttRead, MqttWrite, PacketValidation, PacketRead, PacketWrite, WireLength};
+use super::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use super::VariableInteger;
 use super::{
     error::{DeserializeError, SerializeError}, QoS,
@@ -34,11 +37,11 @@ pub struct Publish {
     pub publish_properties: PublishProperties,
 
     /// 3.3.3 PUBLISH Payload
-    pub payload: Bytes,
+    pub payload: Vec<u8>,
 }
 
 impl Publish {
-    pub fn new<S: AsRef<str>>(qos: QoS, retain: bool, topic: S, packet_identifier: Option<u16>, publish_properties: PublishProperties, payload: Bytes) -> Self {
+    pub fn new<S: AsRef<str>, P: Into<Vec<u8>>>(qos: QoS, retain: bool, topic: S, packet_identifier: Option<u16>, publish_properties: PublishProperties, payload: P) -> Self {
         Self {
             dup: false,
             qos,
@@ -46,12 +49,12 @@ impl Publish {
             topic: topic.as_ref().into(),
             packet_identifier,
             publish_properties,
-            payload,
+            payload: payload.into(),
         }
     }
 
-    pub fn payload_to_vec(&self) -> Vec<u8> {
-        self.payload.to_vec()
+    pub fn payload(&self) -> &Vec<u8> {
+        &self.payload
     }
 }
 
@@ -76,8 +79,50 @@ impl PacketRead for Publish {
             topic,
             packet_identifier,
             publish_properties,
-            payload: buf,
+            payload: buf.to_vec(),
         })
+    }
+}
+
+impl<S> PacketAsyncRead<S> for Publish where S: tokio::io::AsyncRead + Unpin {
+    fn async_read(flags: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
+        async move {
+            let mut total_read_bytes = 0;
+            let dup = flags & 0b1000 != 0;
+            let qos = QoS::from_u8((flags & 0b110) >> 1)?;
+            let retain = flags & 0b1 != 0;
+
+            let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
+            total_read_bytes += topic_read_bytes;
+            let packet_identifier = if qos == QoS::AtMostOnce { None } else {
+                total_read_bytes += 2;
+                Some(stream.read_u16().await?)
+            };
+            let (publish_properties, properties_read_bytes) = PublishProperties::async_read(stream).await?;
+            total_read_bytes += properties_read_bytes;
+
+            let payload_len = remaining_length - total_read_bytes;
+            let mut payload = vec![0u8; payload_len];
+            let payload_read_bytes = stream.read_exact(&mut payload).await?;
+
+            assert_eq!(payload_read_bytes, payload_len);
+
+
+            Ok(
+                (
+                    Self {
+                        dup,
+                        qos,
+                        retain,
+                        topic,
+                        packet_identifier,
+                        publish_properties,
+                        payload,
+                    }, 
+                    total_read_bytes + payload_read_bytes
+                )
+            )
+        }
     }
 }
 

@@ -17,7 +17,7 @@ macro_rules! define_properties {
                     read_property_bytes += read_bytes;
                     match prop {
                         $(
-                            PropertyType::$prop_variant => $crate::packets::macros::properties_read_matches!(stream, properties, read_property_bytes, PropertyType::$prop_variant),
+                            $crate::packets::macros::properties_read_match_branch_name!($prop_variant) => $crate::packets::macros::properties_read_match_branch_body!(stream, properties, read_property_bytes, PropertyType::$prop_variant),
                         )*
                         e => return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::UnexpectedProperty(e, PacketType::PubRel))),
                     }
@@ -279,286 +279,267 @@ macro_rules! properties_struct {
     );
 }
 
-macro_rules! properties_read_matches {
+macro_rules! properties_read_match_branch_body {
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::PayloadFormatIndicator) => {{
+        if $properties.payload_format_indicator.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::PayloadFormatIndicator,
+            )));
+        }
+        let (prop_body, read_bytes) = u8::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.payload_format_indicator = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::MessageExpiryInterval) => {{
+        if $properties.message_expiry_interval.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::MessageExpiryInterval,
+            )));
+        }
+        let (prop_body, read_bytes) = u32::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.message_expiry_interval = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ContentType) => {{
+        if $properties.content_type.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ContentType)));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.content_type = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ResponseTopic) => {{
+        if $properties.response_topic.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic)));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.response_topic = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::CorrelationData) => {{
+        if $properties.correlation_data.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::CorrelationData)));
+        }
+        let (prop_body, read_bytes) = Vec::<u8>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.correlation_data = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SubscriptionIdentifier) => {{
+        let (prop_body, read_bytes) = <u32 as $crate::packets::primitive::VariableInteger>::read_async_variable_integer($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.subscription_identifier = Some(prop_body as u32);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ListSubscriptionIdentifier) => {{
+        let (prop_body, read_bytes) = <u32 as $crate::packets::primitive::VariableInteger>::read_async_variable_integer($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.subscription_identifiers.push(prop_body as u32);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SessionExpiryInterval) => {{
+        if $properties.session_expiry_interval.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::SessionExpiryInterval,
+            )));
+        }
+        let (prop_body, read_bytes) = u32::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.session_expiry_interval = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AssignedClientIdentifier) => {{
+        if $properties.assigned_client_id.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::AssignedClientIdentifier,
+            )));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.assigned_client_id = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ServerKeepAlive) => {{
+        if $properties.server_keep_alive.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ServerKeepAlive)));
+        }
+        let (prop_body, read_bytes) = u16::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.server_keep_alive = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AuthenticationMethod) => {{
+        if $properties.authentication_method.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::AuthenticationMethod,
+            )));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.authentication_method = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AuthenticationData) => {{
+        if $properties.authentication_data.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::AuthenticationData,
+            )));
+        }
+        let (prop_body, read_bytes) = Vec::<u8>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.authentication_data = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestResponseInformation) => {{
+        if $properties.authentication_data.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::RequestResponseInformation,
+            )));
+        }
+        let (prop_body, read_bytes) = u8::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.request_problem_information = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestProblemInformation) => {{
+        if $properties.authentication_data.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::RequestProblemInformation,
+            )));
+        }
+        let (prop_body, read_bytes) = u8::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.request_problem_information = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::WillDelayInterval) => {{
+        if $properties.will_delay_interval.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::WillDelayInterval,
+            )));
+        }
+        let (prop_body, read_bytes) = u32::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.will_delay_interval = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ResponseInformation) => {{
+        if $properties.response_info.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::ResponseInformation,
+            )));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.response_info = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ServerReference) => {{
+        if $properties.server_reference.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ServerReference)));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.server_reference = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ReasonString) => {{
+        if $properties.reason_string.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ReasonString)));
+        }
+        let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.reason_string = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ReceiveMaximum) => {{
+        if $properties.receive_maximum.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ReceiveMaximum)));
+        }
+        let (prop_body, read_bytes) = u16::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.receive_maximum = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::TopicAliasMaximum) => {{
+        if $properties.topic_alias_maximum.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::TopicAliasMaximum,
+            )));
+        }
+        let (prop_body, read_bytes) = u16::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.topic_alias_maximum = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::TopicAlias) => {{
+        if $properties.topic_alias.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::MessageExpiryInterval,
+            )));
+        }
+        let (prop_body, read_bytes) = u16::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.topic_alias = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::MaximumQos) => {{
+        if $properties.maximum_qos.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::MaximumQos)));
+        }
+        let (prop_body, read_bytes) = $crate::packets::QoS::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.maximum_qos = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RetainAvailable) => {{
+        if $properties.retain_available.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RetainAvailable)));
+        }
+        let (prop_body, read_bytes) = bool::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.retain_available = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::UserProperty) => {{
+        let (prop_body_key, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        let (prop_body_value, read_bytes) = Box::<str>::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
 
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::PayloadFormatIndicator) => {
-        {
-            if $properties.payload_format_indicator.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::PayloadFormatIndicator)));
-            }
-            let (prop_body, read_bytes) = u8::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.payload_format_indicator = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::MessageExpiryInterval) => {
-        {
-            if $properties.message_expiry_interval.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval)));
-            }
-            let (prop_body, read_bytes) = u32::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.message_expiry_interval = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ContentType) => {
-        {
-            if $properties.content_type.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ContentType)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.content_type = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ResponseTopic) => {
-        {
-            if $properties.response_topic.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ResponseTopic)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.response_topic = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::CorrelationData) => {
-        {
-            if $properties.correlation_data.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::CorrelationData)));
-            }
-            let (prop_body, read_bytes) = Vec::<u8>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.correlation_data = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SubscriptionIdentifier) => {
-        {
-            let (prop_body, read_bytes) = <u32 as $crate::packets::primitive::VariableInteger>::read_async_variable_integer($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.subscription_identifier = Some(prop_body as u32);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ListSubscriptionIdentifier) => {
-        {
-            let (prop_body, read_bytes) = <u32 as $crate::packets::primitive::VariableInteger>::read_async_variable_integer($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.subscription_identifiers.push(prop_body as u32);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SessionExpiryInterval) => {
-        {
-            if $properties.session_expiry_interval.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::SessionExpiryInterval)));
-            }
-            let (prop_body, read_bytes) = u32::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.session_expiry_interval = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AssignedClientIdentifier) => {
-        {
-            if $properties.assigned_client_id.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::AssignedClientIdentifier)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.assigned_client_id = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ServerKeepAlive) => {
-        {
-            if $properties.server_keep_alive.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ServerKeepAlive)));
-            }
-            let (prop_body, read_bytes) = u16::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.server_keep_alive = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AuthenticationMethod) => {
-        {
-            if $properties.authentication_method.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::AuthenticationMethod)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.authentication_method = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AuthenticationData) => {
-        {
-            if $properties.authentication_data.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::AuthenticationData)));
-            }
-            let (prop_body, read_bytes) = Vec::<u8>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.authentication_data = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestResponseInformation) => {
-        {
-            if $properties.authentication_data.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RequestResponseInformation)));
-            }
-            let (prop_body, read_bytes) = u8::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.request_problem_information = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestProblemInformation) => {
-        {
-            if $properties.authentication_data.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RequestProblemInformation)));
-            }
-            let (prop_body, read_bytes) = u8::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.request_problem_information = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::WillDelayInterval) => {
-        {
-            if $properties.will_delay_interval.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::WillDelayInterval)));
-            }
-            let (prop_body, read_bytes) = u32::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.will_delay_interval = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ResponseInformation) => {
-        {
-            if $properties.response_info.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ResponseInformation)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.response_info = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ServerReference) => {
-        {
-            if $properties.server_reference.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ServerReference)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.server_reference = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ReasonString) => {
-        {
-            if $properties.reason_string.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ReasonString)));
-            }
-            let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.reason_string = Some(prop_body);
+        $properties.user_properties.push((prop_body_key, prop_body_value))
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::MaximumPacketSize) => {{
+        if $properties.maximum_packet_size.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RetainAvailable)));
         }
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ReceiveMaximum) => {
-        {
-            if $properties.receive_maximum.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::ReceiveMaximum)));
-            }
-            let (prop_body, read_bytes) = u16::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.receive_maximum = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::TopicAliasMaximum) => {
-        {
-            if $properties.topic_alias_maximum.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::TopicAliasMaximum)));
-            }
-            let (prop_body, read_bytes) = u16::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.topic_alias_maximum = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::TopicAlias) => {
-        {
-            if $properties.topic_alias.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::MessageExpiryInterval)));
-            }
-            let (prop_body, read_bytes) = u16::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.topic_alias = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::MaximumQos) => {
-        {
-            if $properties.maximum_qos.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::MaximumQos)));
-            }
-            let (prop_body, read_bytes) = $crate::packets::QoS::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.maximum_qos = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RetainAvailable) => {
-        {
-            if $properties.retain_available.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RetainAvailable)));
-            }
-            let (prop_body, read_bytes) = bool::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.retain_available = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::UserProperty) => {
-        {
-            let (prop_body_key, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            let (prop_body_value, read_bytes) = Box::<str>::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            
-            $properties.user_properties.push((prop_body_key, prop_body_value))
+        let (prop_body, read_bytes) = u32::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.maximum_packet_size = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::WildcardSubscriptionAvailable) => {{
+        if $properties.wildcards_available.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::WildcardSubscriptionAvailable,
+            )));
         }
+        let (prop_body, read_bytes) = bool::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.wildcards_available = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SubscriptionIdentifierAvailable) => {{
+        if $properties.subscription_ids_available.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::SubscriptionIdentifierAvailable,
+            )));
+        }
+        let (prop_body, read_bytes) = bool::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.subscription_ids_available = Some(prop_body);
+    }};
+    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SharedSubscriptionAvailable) => {{
+        if $properties.shared_subscription_available.is_some() {
+            return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
+                PropertyType::SharedSubscriptionAvailable,
+            )));
+        }
+        let (prop_body, read_bytes) = bool::async_read($stream).await?;
+        $read_property_bytes += read_bytes;
+        $properties.shared_subscription_available = Some(prop_body);
+    }};
+}
+
+macro_rules! properties_read_match_branch_name {
+    (ListSubscriptionIdentifier) => {
+        PropertyType::SubscriptionIdentifier
     };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::MaximumPacketSize) => {
-        {
-            if $properties.maximum_packet_size.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::RetainAvailable)));
-            }
-            let (prop_body, read_bytes) = u32::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.maximum_packet_size = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::WildcardSubscriptionAvailable) => {
-        {
-            if $properties.wildcards_available.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::WildcardSubscriptionAvailable)));
-            }
-            let (prop_body, read_bytes) = bool::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.wildcards_available = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SubscriptionIdentifierAvailable) => {
-        {
-            if $properties.subscription_ids_available.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::SubscriptionIdentifierAvailable)));
-            }
-            let (prop_body, read_bytes) = bool::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.subscription_ids_available = Some(prop_body);
-        } 
-    };
-    ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::SharedSubscriptionAvailable) => {
-        {
-            if $properties.shared_subscription_available.is_some() {
-                return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(PropertyType::SharedSubscriptionAvailable)));
-            }
-            let (prop_body, read_bytes) = bool::async_read($stream).await?;
-            $read_property_bytes += read_bytes;
-            $properties.shared_subscription_available = Some(prop_body);
-        } 
+    ($name:ident) => {
+        PropertyType::$name
     };
 }
 
-macro_rules! properties_wire_length{
-
+macro_rules! properties_wire_length {
     ($self:ident, $len:ident, PropertyType::PayloadFormatIndicator) => {
         if $self.payload_format_indicator.is_some() {
             $len += 2;
@@ -590,7 +571,7 @@ macro_rules! properties_wire_length{
         }
     };
     ($self:ident, $len:ident, PropertyType::ListSubscriptionIdentifier) => {
-        for sub_id in  &($self.subscription_identifiers) {
+        for sub_id in &($self.subscription_identifiers) {
             $len += 1 + crate::packets::primitive::VariableInteger::variable_integer_len(sub_id);
         }
     };
@@ -703,12 +684,13 @@ macro_rules! properties_wire_length{
             $len += 1 + 1;
         }
     };
-    ($self:ident, $len:ident, $unknown:ident) => (
+    ($self:ident, $len:ident, $unknown:ident) => {
         compile_error!(concat!("Unknown property: ", stringify!($unknown)));
-    );
+    };
 }
 
 pub(crate) use define_properties;
+pub(crate) use properties_read_match_branch_body;
+pub(crate) use properties_read_match_branch_name;
 pub(crate) use properties_struct;
-pub(crate) use properties_read_matches;
 pub(crate) use properties_wire_length;

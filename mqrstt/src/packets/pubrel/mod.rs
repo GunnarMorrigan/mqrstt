@@ -1,4 +1,3 @@
-
 mod reason_code;
 pub use reason_code::PubRelReasonCode;
 
@@ -8,8 +7,8 @@ pub use properties::PubRelProperties;
 use bytes::BufMut;
 
 use super::{
-    error::{DeserializeError, ReadError}, 
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}
+    error::{DeserializeError, ReadError},
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -54,11 +53,14 @@ impl PacketRead for PubRel {
     }
 }
 
-impl<S> PacketAsyncRead<S> for PubRel where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for PubRel
+where
+    S: tokio::io::AsyncReadExt + Unpin,
+{
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), ReadError> {
         let mut total_read_bytes = 0;
-        let (packet_identifier, read_bytes) = u16::async_read(stream).await?;
-        total_read_bytes += read_bytes;
+        let packet_identifier = stream.read_u16().await?;
+        total_read_bytes += 2;
         let res = if remaining_length == 2 {
             Self {
                 packet_identifier,
@@ -119,10 +121,11 @@ impl WireLength for PubRel {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, pubrel::{PubRel, PubRelProperties}, PropertyType, PubRelReasonCode, VariableInteger
+        mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+        pubrel::{PubRel, PubRelProperties},
+        PropertyType, PubRelReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
-    
 
     #[test]
     fn test_wire_len() {
@@ -147,16 +150,15 @@ mod tests {
         assert_eq!(3, buf.len());
     }
 
-    
     #[test]
     fn test_wire_len2() {
         let mut buf = BytesMut::new();
 
-        let prop = PubRelProperties{
+        let prop = PubRelProperties {
             reason_string: Some("reason string, test 1-2-3.".into()), // 26 + 1 + 2
             user_properties: vec![
                 ("This is the key".into(), "This is the value".into()), // 32 + 1 + 2 + 2
-                ("Another thingy".into(), "The thingy".into()), // 24 + 1 + 2 + 2
+                ("Another thingy".into(), "The thingy".into()),         // 24 + 1 + 2 + 2
             ],
         };
 
@@ -212,7 +214,7 @@ mod tests {
 
         assert_eq!(2, buf.len());
         let mut stream: &[u8] = &*buf;
-        
+
         let (pubrel, read_bytes) = PubRel::async_read(0, 2, &mut stream).await.unwrap();
 
         assert_eq!(expected_pubrel, pubrel);
@@ -224,12 +226,11 @@ mod tests {
 
         assert_eq!(3, buf.len());
         let mut stream: &[u8] = &*buf;
-        
+
         let (pubrel, read_bytes) = PubRel::async_read(0, 3, &mut stream).await.unwrap();
         assert_eq!(read_bytes, 3);
         assert_eq!(expected_pubrel, pubrel);
     }
-
 
     #[test]
     fn test_read_simple_pub_rel() {
@@ -323,7 +324,6 @@ mod tests {
 
         buf.extend(properties);
 
-
         let mut stream = &*buf;
         // flags can be 0 because not used.
         // remaining_length must be at least 4
@@ -381,7 +381,7 @@ mod tests {
         assert_eq!(buf.to_vec(), result.to_vec());
         assert_eq!(buf.len(), read_bytes);
     }
-    
+
     #[test]
     fn no_reason_code_or_props() {
         let mut buf = BytesMut::new();
