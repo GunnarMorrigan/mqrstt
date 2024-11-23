@@ -14,6 +14,7 @@ use super::error::SerializeError;
 use super::mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite};
 use super::PacketAsyncRead;
 
+/// UnsubAck packet is sent by the server in response to an [`crate::packets::Unsubscribe`] packet.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
 pub struct UnsubAck {
     pub packet_identifier: u16,

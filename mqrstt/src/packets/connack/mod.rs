@@ -4,14 +4,19 @@ pub use properties::ConnAckProperties;
 mod reason_code;
 pub use reason_code::ConnAckReasonCode;
 
-
 use super::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, VariableInteger,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    VariableInteger,
 };
 use bytes::{Buf, BufMut};
 
-
+/// ConnAck packet is sent by the server in response to a [`crate::packets::Connect`] packet.
+///
+/// The ConnAck packet contains the values used by the server related to this connection.
+///
+/// For example the requested client identifier can be changed by the server.
+/// This is then indicated using the property [`crate::packets::ConnAckProperties::assigned_client_identifier`].
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct ConnAck {
     /// 3.2.2.1 Connect Acknowledge Flags
@@ -43,22 +48,24 @@ impl PacketRead for ConnAck {
     }
 }
 
-impl<S> PacketAsyncRead<S> for ConnAck where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for ConnAck
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(_: u8, _: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
         async move {
             let (connack_flags, read_bytes) = ConnAckFlags::async_read(stream).await?;
             let (reason_code, reason_code_read_bytes) = ConnAckReasonCode::async_read(stream).await?;
             let (connack_properties, connack_properties_read_bytes) = ConnAckProperties::async_read(stream).await?;
-    
+
             Ok((
                 Self {
                     connack_flags,
                     reason_code,
                     connack_properties,
                 },
-                read_bytes + reason_code_read_bytes + connack_properties_read_bytes
+                read_bytes + reason_code_read_bytes + connack_properties_read_bytes,
             ))
-    
         }
     }
 }
@@ -81,19 +88,24 @@ impl WireLength for ConnAck {
     }
 }
 
-
 #[derive(Debug, Default, PartialEq, Eq, Clone, Copy)]
 pub struct ConnAckFlags {
     pub session_present: bool,
 }
 
-impl<S> MqttAsyncRead<S> for ConnAckFlags where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> MqttAsyncRead<S> for ConnAckFlags
+where
+    S: tokio::io::AsyncReadExt + Unpin,
+{
     fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
         async move {
             let byte = stream.read_u8().await?;
-            Ok((Self {
-                session_present: (byte & 0b00000001) == 0b00000001,
-            }, 1))
+            Ok((
+                Self {
+                    session_present: (byte & 0b00000001) == 0b00000001,
+                },
+                1,
+            ))
         }
     }
 }
@@ -125,7 +137,9 @@ impl MqttWrite for ConnAckFlags {
 mod tests {
 
     use crate::packets::{
-        connack::{ConnAck, ConnAckProperties}, mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength}, ConnAckReasonCode, Packet, VariableInteger
+        connack::{ConnAck, ConnAckProperties},
+        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
+        ConnAckReasonCode, Packet, VariableInteger,
     };
 
     #[test]
@@ -133,23 +147,23 @@ mod tests {
         let mut buf = bytes::BytesMut::new();
 
         let connack_properties = ConnAckProperties {
-            session_expiry_interval: Some(60),  // Session expiry interval in seconds
-            receive_maximum: Some(20),  // Maximum number of QoS 1 and QoS 2 publications that the client is willing to process concurrently
-            maximum_qos: Some(crate::packets::QoS::AtMostOnce),  // Maximum QoS level supported by the server
-            retain_available: Some(true),  // Whether the server supports retained messages
-            maximum_packet_size: Some(1024),  // Maximum packet size the server is willing to accept
-            assigned_client_id: Some(Box::from("client-12345")),  // Client identifier assigned by the server
-            topic_alias_maximum: Some(10),  // Maximum number of topic aliases supported by the server
-            reason_string: Some(Box::from("Connection accepted")),  // Reason string for the connection acknowledgment
-            user_properties: vec![(Box::from("key1"), Box::from("value1"))],  // User property key-value pair
-            wildcards_available: Some(true),  // Whether wildcard subscriptions are available
-            subscription_ids_available: Some(true),  // Whether subscription identifiers are available
-            shared_subscription_available: Some(true),  // Whether shared subscriptions are available
-            server_keep_alive: Some(120),  // Server keep alive time in seconds
-            response_info: Some(Box::from("Response info")),  // Response information
-            server_reference: Some(Box::from("server-reference")),  // Server reference
-            authentication_method: Some(Box::from("auth-method")),  // Authentication method
-            authentication_data: Some(vec![1, 2, 3, 4]),  // Authentication data
+            session_expiry_interval: Some(60),                               // Session expiry interval in seconds
+            receive_maximum: Some(20),                                       // Maximum number of QoS 1 and QoS 2 publications that the client is willing to process concurrently
+            maximum_qos: Some(crate::packets::QoS::AtMostOnce),              // Maximum QoS level supported by the server
+            retain_available: Some(true),                                    // Whether the server supports retained messages
+            maximum_packet_size: Some(1024),                                 // Maximum packet size the server is willing to accept
+            assigned_client_identifier: Some(Box::from("client-12345")),     // Client identifier assigned by the server
+            topic_alias_maximum: Some(10),                                   // Maximum number of topic aliases supported by the server
+            reason_string: Some(Box::from("Connection accepted")),           // Reason string for the connection acknowledgment
+            user_properties: vec![(Box::from("key1"), Box::from("value1"))], // User property key-value pair
+            wildcards_available: Some(true),                                 // Whether wildcard subscriptions are available
+            subscription_ids_available: Some(true),                          // Whether subscription identifiers are available
+            shared_subscription_available: Some(true),                       // Whether shared subscriptions are available
+            server_keep_alive: Some(120),                                    // Server keep alive time in seconds
+            response_info: Some(Box::from("Response info")),                 // Response information
+            server_reference: Some(Box::from("server-reference")),           // Server reference
+            authentication_method: Some(Box::from("auth-method")),           // Authentication method
+            authentication_data: Some(vec![1, 2, 3, 4]),                     // Authentication data
         };
 
         let len = connack_properties.wire_len();
@@ -160,7 +174,6 @@ mod tests {
         connack_properties.write(&mut buf).unwrap();
 
         assert_eq!(len + len_of_wire_len, buf.len());
-    
     }
 
     #[test]

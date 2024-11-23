@@ -4,15 +4,15 @@ pub use properties::SubAckProperties;
 mod reason_code;
 pub use reason_code::SubAckReasonCode;
 
-use bytes::BufMut;
-
 use super::{
     error::SerializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
-
 };
+use bytes::BufMut;
+use tokio::io::AsyncReadExt;
 
-/// 3.9 SUBACK – Subscribe acknowledgement
+/// SubAck packet is sent by the server in response to a [`crate::packets::Subscribe`] packet.
+///
 /// A SUBACK packet is sent by the Server to the Client to confirm receipt and processing of a SUBSCRIBE packet.
 /// A SUBACK packet contains a list of Reason Codes, that specify the maximum QoS level that was granted or the error which was found for each Subscription that was requested by the SUBSCRIBE.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
@@ -28,11 +28,11 @@ impl PacketRead for SubAck {
         let properties = SubAckProperties::read(&mut buf)?;
 
         dbg!("aa");
-        
+
         let mut reason_codes = vec![];
         loop {
             let reason_code = SubAckReasonCode::read(&mut buf)?;
-            
+
             dbg!(reason_code);
             reason_codes.push(reason_code);
 
@@ -49,7 +49,10 @@ impl PacketRead for SubAck {
     }
 }
 
-impl<S> PacketAsyncRead<S> for SubAck where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for SubAck
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let mut total_read_bytes = 0;
@@ -61,17 +64,20 @@ impl<S> PacketAsyncRead<S> for SubAck where S: tokio::io::AsyncReadExt + Unpin {
                 let (reason_code, reason_code_read_bytes) = SubAckReasonCode::async_read(stream).await?;
                 total_read_bytes += reason_code_read_bytes;
                 reason_codes.push(reason_code);
-    
+
                 if remaining_length == total_read_bytes {
                     break;
                 }
             }
-    
-            Ok((Self {
-                packet_identifier,
-                properties,
-                reason_codes,
-            }, total_read_bytes))
+
+            Ok((
+                Self {
+                    packet_identifier,
+                    properties,
+                    reason_codes,
+                },
+                total_read_bytes,
+            ))
         }
     }
 }

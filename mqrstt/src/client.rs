@@ -8,22 +8,22 @@ use crate::{
     packets::{
         mqtt_trait::PacketValidation,
         DisconnectReasonCode,
-        Packet, QoS, 
-        // disconnect::{Disconnect, DisconnectProperties}, 
-        // publish::{Publish, PublishProperties}, 
-        // subscribe::{Subscribe, SubscribeProperties, Subscription}, 
+        Packet,
+        QoS,
+        // disconnect::{Disconnect, DisconnectProperties},
+        // publish::{Publish, PublishProperties},
+        // subscribe::{Subscribe, SubscribeProperties, Subscription},
         // unsubscribe::{Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
-
-        {Disconnect, DisconnectProperties}, 
-        {Publish, PublishProperties}, 
-        {Subscribe, SubscribeProperties, Subscription}, 
+        {Disconnect, DisconnectProperties},
+        {Publish, PublishProperties},
+        {Subscribe, SubscribeProperties, SubscribeTopics},
         {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
     },
 };
 
 #[derive(Debug, Clone)]
-/// A Clonable client that can be used to perform MQTT operations
-/// 
+/// A Clonable client that can be used to send MQTT messages
+///
 /// This object is never self constructed but is a obtained by calling the builder functions on [`crate::NetworkBuilder`]
 pub struct MqttClient {
     /// Provides this client with an available packet id or waits on it.
@@ -55,8 +55,6 @@ impl MqttClient {
             max_packet_size,
         }
     }
-
-
 
     /// This function is only here for you to use during testing of for example your handler
     /// For control over the input of this type look at [`MqttClient::test_custom_client`]
@@ -102,7 +100,7 @@ impl MqttClient {
 impl MqttClient {
     /// Creates a subscribe packet that is then asynchronously transferred to the Network stack for transmission
     ///
-    /// Can be called with anything that can be converted into [`Subscription`]
+    /// Can be called with anything that can be converted into [`SubscribeTopics`]
     ///
     /// # Examples
     /// ```
@@ -133,9 +131,9 @@ impl MqttClient {
     /// mqtt_client.subscribe(("final/test/topic", sub_options)).await;
     /// # });
     /// ```
-    pub async fn subscribe<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
+    pub async fn subscribe<A: Into<SubscribeTopics>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
-        let subscription: Subscription = into_subscribtions.into();
+        let subscription: SubscribeTopics = into_subscribtions.into();
         let sub = Subscribe::new(pkid, subscription.0);
 
         sub.validate(self.max_packet_size)?;
@@ -146,7 +144,7 @@ impl MqttClient {
     /// Creates a subscribe packet with additional subscribe packet properties.
     /// The packet is then asynchronously transferred to the Network stack for transmission.
     ///
-    /// Can be called with anything that can be converted into [`Subscription`]
+    /// Can be called with anything that can be converted into [`SubscribeTopics`]
     ///
     /// # Examples
     /// ```
@@ -160,7 +158,7 @@ impl MqttClient {
     ///   subscription_identifier: Some(1),
     ///   user_properties: vec![],
     /// };
-    /// 
+    ///
     /// let sub_properties_clone = sub_properties.clone();
     ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
@@ -192,7 +190,7 @@ impl MqttClient {
     /// mqtt_client.subscribe_with_properties(("final/test/topic", sub_options), sub_properties).await;
     /// # });
     /// ```
-    pub async fn subscribe_with_properties<S: Into<Subscription>>(&self, into_sub: S, properties: SubscribeProperties) -> Result<(), ClientError> {
+    pub async fn subscribe_with_properties<S: Into<SubscribeTopics>>(&self, into_sub: S, properties: SubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv().await.map_err(|_| ClientError::NoNetworkChannel)?;
         let sub = Subscribe {
             packet_identifier: pkid,
@@ -276,7 +274,7 @@ impl MqttClient {
     ///     correlation_data: Some("correlation_data".into()),
     ///     ..Default::default()
     /// };
-    /// 
+    ///
     /// # let properties_clone = properties.clone();
     ///
     /// // publish a message with QoS 0, without a packet identifier
@@ -503,12 +501,12 @@ impl MqttClient {
 impl MqttClient {
     /// Creates a subscribe packet that is then transferred to the Network stack for transmission
     ///
-    /// Can be called with anything that can be converted into [`Subscription`]
+    /// Can be called with anything that can be converted into [`SubscribeTopics`]
     ///
     /// This function blocks until the packet is queued for transmission
     /// Creates a subscribe packet that is then asynchronously transferred to the Network stack for transmission
     ///
-    /// Can be called with anything that can be converted into [`Subscription`]
+    /// Can be called with anything that can be converted into [`SubscribeTopics`]
     ///
     /// # Examples
     /// ```
@@ -538,9 +536,9 @@ impl MqttClient {
     /// mqtt_client.subscribe_blocking(("final/test/topic", sub_options)).unwrap();
     /// # });
     /// ```
-    pub fn subscribe_blocking<A: Into<Subscription>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
+    pub fn subscribe_blocking<A: Into<SubscribeTopics>>(&self, into_subscribtions: A) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
-        let subscription: Subscription = into_subscribtions.into();
+        let subscription: SubscribeTopics = into_subscribtions.into();
         let sub = Subscribe::new(pkid, subscription.0);
 
         sub.validate(self.max_packet_size)?;
@@ -551,7 +549,7 @@ impl MqttClient {
     /// Creates a subscribe packet with additional subscribe packet properties.
     /// The packet is then transferred to the Network stack for transmission.
     ///
-    /// Can be called with anything that can be converted into [`Subscription`]
+    /// Can be called with anything that can be converted into [`SubscribeTopics`]
     ///
     /// This function blocks until the packet is queued for transmission
     /// # Examples
@@ -566,7 +564,7 @@ impl MqttClient {
     ///   user_properties: vec![],
     /// };
     /// # let sub_properties_clone = sub_properties.clone();
-    /// 
+    ///
     /// // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
     /// mqtt_client.subscribe_with_properties_blocking("test/topic", sub_properties).unwrap();
     ///
@@ -596,7 +594,7 @@ impl MqttClient {
     /// mqtt_client.subscribe_with_properties_blocking(("final/test/topic", sub_options), sub_properties).unwrap();
     /// # });
     /// ```
-    pub fn subscribe_with_properties_blocking<S: Into<Subscription>>(&self, into_subscribtions: S, properties: SubscribeProperties) -> Result<(), ClientError> {
+    pub fn subscribe_with_properties_blocking<S: Into<SubscribeTopics>>(&self, into_subscribtions: S, properties: SubscribeProperties) -> Result<(), ClientError> {
         let pkid = self.available_packet_ids_r.recv_blocking().map_err(|_| ClientError::NoNetworkChannel)?;
         let sub = Subscribe {
             packet_identifier: pkid,
@@ -618,7 +616,7 @@ impl MqttClient {
     /// ```
     /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
-    /// 
+    ///
     /// use mqrstt::packets::QoS;
     /// use bytes::Bytes;
     ///
@@ -674,7 +672,7 @@ impl MqttClient {
     /// ```
     /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
-    /// 
+    ///
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::PublishProperties;
     /// use bytes::Bytes;
@@ -684,7 +682,7 @@ impl MqttClient {
     ///     correlation_data: Some("correlation_data".into()),
     ///     ..Default::default()
     /// };
-    /// 
+    ///
     /// # let properties_clone = properties.clone();
     ///
     /// // publish a message with QoS 0, without a packet identifier
@@ -764,7 +762,7 @@ impl MqttClient {
     /// // Unsubscribe from multiple topics specified as an array of String:
     /// let topics = &[String::from("test/topic1"), String::from("test/topic2")];
     /// mqtt_client.unsubscribe_blocking(topics.as_slice());
-    /// 
+    ///
     /// # });
     /// # std::hint::black_box(network);
     /// ```
@@ -827,7 +825,7 @@ impl MqttClient {
     /// // Unsubscribe from multiple topics specified as an array of String:
     /// let topics = ["test/topic1","test/topic2"];
     /// mqtt_client.unsubscribe_with_properties_blocking(topics.as_slice(), properties);
-    /// 
+    ///
     /// # });
     /// # std::hint::black_box(network);
     /// ```
@@ -853,7 +851,7 @@ impl MqttClient {
     /// ```
     /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
-    /// 
+    ///
     /// mqtt_client.disconnect_blocking().unwrap();
     ///
     /// # });
@@ -879,7 +877,7 @@ impl MqttClient {
     ///
     /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
     /// # smol::block_on(async {
-    /// 
+    ///
     /// use mqrstt::packets::DisconnectProperties;
     /// use mqrstt::packets::DisconnectReasonCode;
     ///
@@ -954,15 +952,15 @@ mod tests {
     #[tokio::test]
     async fn test_subscribe_with_properties() {
         let (mqtt_client, client_to_handler_r, to_network_r) = create_new_test_client();
-        
-        let sub_properties = SubscribeProperties{
+
+        let sub_properties = SubscribeProperties {
             subscription_identifier: Some(1),
             user_properties: vec![],
         };
 
         // retain_handling: RetainHandling::ZERO, retain_as_publish: false, no_local: false, qos: QoS::AtMostOnce,
         let res = mqtt_client.subscribe_with_properties("test/topic", sub_properties.clone()).await;
-        
+
         assert!(res.is_ok());
         let packet = client_to_handler_r.recv().await.unwrap();
         // assert!(matches!(packet, Packet::Subscribe(sub) if sub.properties.subscription_id == Some(1)));
@@ -972,7 +970,7 @@ mod tests {
     }
 
     #[test]
-    
+
     fn test_subscribe_blocking() {
         let (client, client_to_handler_r, to_network_r) = create_new_test_client();
 
@@ -1023,7 +1021,6 @@ mod tests {
         std::hint::black_box((client, client_to_handler_r, to_network_r));
     }
 
-
     #[test]
     fn test_unsubscribe_blocking() {
         let (client, client_to_handler_r, to_network_r) = create_new_test_client();
@@ -1049,12 +1046,11 @@ mod tests {
         std::hint::black_box((client, client_to_handler_r, to_network_r));
     }
 
-
     #[test]
     fn test_unsubscribe_with_properties_blocking() {
         let (client, client_to_handler_r, to_network_r) = create_new_test_client();
 
-        let properties = UnsubscribeProperties{
+        let properties = UnsubscribeProperties {
             user_properties: vec![("property".into(), "value".into())],
         };
 
@@ -1098,12 +1094,11 @@ mod tests {
         assert_eq!(res.unwrap_err(), ClientError::ValidationError(PacketValidationError::TopicSize(65538)));
     }
 
-
     #[tokio::test]
     async fn publish_with_properties() {
         let (client, client_to_handler_r, to_network_r) = create_new_test_client();
 
-        let properties = crate::packets::PublishProperties{
+        let properties = crate::packets::PublishProperties {
             response_topic: Some("response/topic".into()),
             correlation_data: Some("correlation_other_data".into()),
             ..Default::default()
@@ -1115,7 +1110,7 @@ mod tests {
             assert!(res.is_ok());
             let packet = client_to_handler_r.recv().await.unwrap();
 
-            let publ = Publish{
+            let publ = Publish {
                 dup: false,
                 qos: *qos,
                 retain: false,
@@ -1131,12 +1126,11 @@ mod tests {
         std::hint::black_box((client, client_to_handler_r, to_network_r));
     }
 
-
     #[tokio::test]
     async fn publish_with_just_right_topic_len_properties() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
 
-        let properties = crate::packets::PublishProperties{
+        let properties = crate::packets::PublishProperties {
             response_topic: Some("response/topic".into()),
             correlation_data: Some("correlation_data".into()),
             ..Default::default()
@@ -1151,7 +1145,7 @@ mod tests {
     async fn publish_with_too_long_topic_properties() {
         let (client, _client_to_handler_r, _) = create_new_test_client();
 
-        let properties = crate::packets::PublishProperties{
+        let properties = crate::packets::PublishProperties {
             response_topic: Some("response/topic".into()),
             correlation_data: Some("correlation_data".into()),
             ..Default::default()
@@ -1226,12 +1220,10 @@ mod tests {
         let disconnect = client_to_handler_r.recv().await.unwrap();
         assert_eq!(PacketType::Disconnect, disconnect.packet_type());
 
-        assert!(
-            matches!(disconnect, Packet::Disconnect(res) 
-                if res.properties == DisconnectProperties::default() && 
-                DisconnectReasonCode::NormalDisconnection == res.reason_code
-            )
-        );
+        assert!(matches!(disconnect, Packet::Disconnect(res)
+            if res.properties == DisconnectProperties::default() &&
+            DisconnectReasonCode::NormalDisconnection == res.reason_code
+        ));
     }
 
     #[tokio::test]
@@ -1258,7 +1250,6 @@ mod tests {
 
         assert!(matches!(disconnect, Packet::Disconnect(res) if properties == res.properties && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
     }
-
 
     #[test]
     fn test_disconnect_blocking() {
@@ -1288,5 +1279,4 @@ mod tests {
 
         assert!(matches!(disconnect, Packet::Disconnect(res) if properties == res.properties && DisconnectReasonCode::KeepAliveTimeout == res.reason_code));
     }
-
 }

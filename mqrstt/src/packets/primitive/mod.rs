@@ -1,7 +1,8 @@
 mod fixed_header;
 pub(crate) use fixed_header::FixedHeader;
 
-pub mod protocol_version;
+mod protocol_version;
+pub use protocol_version::ProtocolVersion;
 
 mod property_type;
 pub(crate) use property_type::PropertyType;

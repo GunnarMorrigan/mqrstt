@@ -1,19 +1,21 @@
 mod reason_code;
 pub use reason_code::PubCompReasonCode;
 
-
 mod properties;
 pub use properties::PubCompProperties;
-
-
-
-use bytes::BufMut;
 
 use super::{
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
 };
+use bytes::BufMut;
+use tokio::io::AsyncReadExt;
 
+/// The PUBCOMP Packet is the response to a PUBLISH Packet with QoS 2.
+/// It is the fourth and final packet of the QoS 2 protocol exchange.
+/// The user of the client application does not have to send this packet, it is handled internally by the client.
+///
+/// Both the client and server can send this packet.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct PubComp {
     pub packet_identifier: u16,
@@ -58,16 +60,22 @@ impl PacketRead for PubComp {
     }
 }
 
-impl<S> PacketAsyncRead<S> for PubComp where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for PubComp
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let packet_identifier = stream.read_u16().await?;
             if remaining_length == 2 {
-                return Ok((Self {
-                    packet_identifier,
-                    reason_code: PubCompReasonCode::Success,
-                    properties: PubCompProperties::default(),
-                }, 2));
+                return Ok((
+                    Self {
+                        packet_identifier,
+                        reason_code: PubCompReasonCode::Success,
+                        properties: PubCompProperties::default(),
+                    },
+                    2,
+                ));
             }
             // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
             else if remaining_length < 4 {
@@ -79,11 +87,14 @@ impl<S> PacketAsyncRead<S> for PubComp where S: tokio::io::AsyncReadExt + Unpin 
 
             assert_eq!(2 + reason_code_read_bytes + properties_read_bytes, remaining_length);
 
-            Ok((Self {
-                packet_identifier,
-                reason_code,
-                properties,
-            }, 2 + reason_code_read_bytes + properties_read_bytes))
+            Ok((
+                Self {
+                    packet_identifier,
+                    reason_code,
+                    properties,
+                },
+                2 + reason_code_read_bytes + properties_read_bytes,
+            ))
         }
     }
 }
@@ -116,11 +127,12 @@ impl WireLength for PubComp {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength}, pubcomp::{PubComp, PubCompProperties}, PropertyType, PubCompReasonCode, VariableInteger
+        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
+        pubcomp::{PubComp, PubCompProperties},
+        PropertyType, PubCompReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 

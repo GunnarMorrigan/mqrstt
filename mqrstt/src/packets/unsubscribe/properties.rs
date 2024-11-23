@@ -6,7 +6,11 @@ use crate::packets::{
     PacketType, PropertyType,
 };
 
-crate::packets::macros::define_properties!(UnsubscribeProperties, UserProperty);
+crate::packets::macros::define_properties!(
+    /// Unsubscribe Properties
+    UnsubscribeProperties,
+    UserProperty
+);
 
 impl MqttRead for UnsubscribeProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {

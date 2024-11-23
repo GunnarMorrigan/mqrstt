@@ -1,4 +1,3 @@
-
 mod properties;
 pub use properties::PubRecProperties;
 
@@ -11,9 +10,14 @@ use tokio::io::AsyncReadExt;
 
 use super::{
     error::DeserializeError,
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength}, PacketAsyncRead,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
+    PacketAsyncRead,
 };
 
+/// The [`PubRec`] (Publish Received) packet is part of the acknowledgment flow for a [`crate::packets::Publish`] with QoS 2.
+///
+/// It means that the Publish has been received, the flow will continue with the [`crate::packets::pubrel::PubRel`]
+/// packet and then the [`crate::packets::pubcomp::PubComp`] packet.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct PubRec {
     pub packet_identifier: u16,
@@ -57,31 +61,39 @@ impl PacketRead for PubRec {
     }
 }
 
-impl<S> PacketAsyncRead<S> for PubRec where S: tokio::io::AsyncRead + Unpin{
+impl<S> PacketAsyncRead<S> for PubRec
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let mut total_read_bytes = 0;
             let packet_identifier = stream.read_u16().await?;
             total_read_bytes += 2;
             if remaining_length == 2 {
-                return Ok((Self {
-                    packet_identifier,
-                    reason_code: PubRecReasonCode::Success,
-                    properties: PubRecProperties::default(),
-                }, total_read_bytes));
+                return Ok((
+                    Self {
+                        packet_identifier,
+                        reason_code: PubRecReasonCode::Success,
+                        properties: PubRecProperties::default(),
+                    },
+                    total_read_bytes,
+                ));
             }
 
             let (reason_code, reason_code_read_bytes) = PubRecReasonCode::async_read(stream).await?;
             let (properties, properties_read_bytes) = PubRecProperties::async_read(stream).await?;
-            
+
             total_read_bytes += reason_code_read_bytes + properties_read_bytes;
 
-            Ok((Self {
-                packet_identifier,
-                properties,
-                reason_code,
-            }, total_read_bytes))
-
+            Ok((
+                Self {
+                    packet_identifier,
+                    properties,
+                    reason_code,
+                },
+                total_read_bytes,
+            ))
         }
     }
 }
@@ -117,7 +129,9 @@ impl WireLength for PubRec {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength}, pubrec::{PubRec, PubRecProperties}, PropertyType, PubRecReasonCode, VariableInteger
+        mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
+        pubrec::{PubRec, PubRecProperties},
+        PropertyType, PubRecReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 

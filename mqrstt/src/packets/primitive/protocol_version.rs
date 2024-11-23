@@ -1,8 +1,15 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::packets::{error::{DeserializeError, ReadError, SerializeError}, mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite}};
+use tokio::io::AsyncReadExt;
 
-/// Protocol version
+use crate::packets::{
+    error::{DeserializeError, ReadError, SerializeError},
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+};
+
+/// Protocol version of the MQTT connection
+///
+/// This client only supports MQTT v5.0.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum ProtocolVersion {
     V5,
@@ -30,7 +37,10 @@ impl MqttRead for ProtocolVersion {
     }
 }
 
-impl<S> MqttAsyncRead<S> for ProtocolVersion where S: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<S> MqttAsyncRead<S> for ProtocolVersion
+where
+    S: tokio::io::AsyncRead + std::marker::Unpin,
+{
     async fn async_read(stream: &mut S) -> Result<(Self, usize), ReadError> {
         match stream.read_u8().await {
             Ok(5) => Ok((ProtocolVersion::V5, 1)),

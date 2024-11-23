@@ -9,6 +9,8 @@ use super::{
     PacketType, PropertyType, VariableInteger,
 };
 
+/// The PUBACK Packet is the response to a PUBLISH Packet with QoS 1.
+/// Both the server and client can send a PUBACK packet.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct PubAck {
     pub packet_identifier: u16,
@@ -112,7 +114,12 @@ impl WireLength for PubAck {
     }
 }
 
-crate::packets::macros::define_properties!(PubAckProperties, ReasonString, UserProperty);
+crate::packets::macros::define_properties!(
+    /// PubAck Properties
+    PubAckProperties,
+    ReasonString,
+    UserProperty
+);
 
 impl MqttRead for PubAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, super::error::DeserializeError> {

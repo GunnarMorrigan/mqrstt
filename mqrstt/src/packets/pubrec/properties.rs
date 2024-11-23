@@ -4,7 +4,12 @@ use crate::packets::{
     PacketType, PropertyType, VariableInteger,
 };
 
-crate::packets::macros::define_properties!(PubRecProperties, ReasonString, UserProperty);
+crate::packets::macros::define_properties!(
+    /// PubRec Properties
+    PubRecProperties,
+    ReasonString,
+    UserProperty
+);
 
 impl MqttRead for PubRecProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {

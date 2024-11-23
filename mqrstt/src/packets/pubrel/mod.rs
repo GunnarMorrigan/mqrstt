@@ -11,6 +11,9 @@ use super::{
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
 };
 
+/// The [`PubRel`] (Publish Release) packet acknowledges the reception of a [`crate::packets::PubRec`] Packet.
+///
+/// This user does not need to send this message, it is handled internally by the client.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct PubRel {
     pub packet_identifier: u16,

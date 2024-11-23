@@ -1,9 +1,9 @@
 use bytes::{Bytes, BytesMut};
 
-
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite}, QoS, WireLength,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+    QoS, WireLength,
 };
 
 use super::{LastWillProperties, VariableInteger};
@@ -46,20 +46,26 @@ impl LastWill {
             last_will_properties,
         })
     }
-    pub(crate) async fn async_read<S>(qos: QoS, retain: bool, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> where S: tokio::io::AsyncReadExt + Unpin{
+    pub(crate) async fn async_read<S>(qos: QoS, retain: bool, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError>
+    where
+        S: tokio::io::AsyncRead + Unpin,
+    {
         let (last_will_properties, last_will_properties_read_bytes) = LastWillProperties::async_read(stream).await?;
         let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
         let (payload, payload_read_bytes) = Vec::<u8>::async_read(stream).await?;
 
         let total_read_bytes = last_will_properties_read_bytes + topic_read_bytes + payload_read_bytes;
 
-        Ok((Self {
-            qos,
-            retain,
-            last_will_properties,
-            topic,
-            payload,
-        }, total_read_bytes))
+        Ok((
+            Self {
+                qos,
+                retain,
+                last_will_properties,
+                topic,
+                payload,
+            },
+            total_read_bytes,
+        ))
     }
 }
 

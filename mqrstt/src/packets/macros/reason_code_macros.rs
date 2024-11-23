@@ -1,12 +1,13 @@
 macro_rules! reason_code {
     ($name:ident, $($code:ident),*) => {
+        use tokio::io::AsyncReadExt;
         #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
         pub enum $name {
             #[default]
             $($code),*
         }
 
-        impl<S> $crate::packets::mqtt_trait::MqttAsyncRead<S> for $name where S: tokio::io::AsyncReadExt + std::marker::Unpin{
+        impl<S> $crate::packets::mqtt_trait::MqttAsyncRead<S> for $name where S: tokio::io::AsyncRead + std::marker::Unpin{
             async fn async_read(stream: &mut S) -> Result<(Self, usize), $crate::packets::error::ReadError> {
                 let input = stream.read_u8().await?;
                 let res = $crate::packets::macros::reason_code_match!(@ $name, input, {
@@ -504,7 +505,7 @@ macro_rules! reason_code_match_write{
         $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
             $($result)*
             $name::PacketIdentifierNotFound => 0x92,
-            
+
         ))
     );
     ( @ $name:ident, $buf:ident, $input:ident, { ReceiveMaximumExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (

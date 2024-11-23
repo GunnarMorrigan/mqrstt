@@ -5,9 +5,13 @@ mod reason_code;
 pub use reason_code::DisconnectReasonCode;
 
 use super::{
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength}, VariableInteger,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    VariableInteger,
 };
 
+/// The DISCONNECT Packet is the final packet.
+///  The client sends this packet to the server to disconnect for example on calling [`crate::MqttClient::disconnect`].
+/// The server can send a disconnect packet to the client to indicate that the connection is being closed.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Disconnect {
     pub reason_code: DisconnectReasonCode,
@@ -20,7 +24,13 @@ where
 {
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
         if remaining_length == 0 {
-            Ok((Self { reason_code: DisconnectReasonCode::NormalDisconnection, properties: DisconnectProperties::default() }, 0))
+            Ok((
+                Self {
+                    reason_code: DisconnectReasonCode::NormalDisconnection,
+                    properties: DisconnectProperties::default(),
+                },
+                0,
+            ))
         } else {
             let (reason_code, reason_code_read_bytes) = DisconnectReasonCode::async_read(stream).await?;
             let (properties, properties_read_bytes) = DisconnectProperties::async_read(stream).await?;
@@ -76,10 +86,7 @@ mod tests {
             properties: DisconnectProperties {
                 session_expiry_interval: Some(123),
                 reason_string: Some(Box::from("Some reason")),
-                user_properties: vec![
-                    (Box::from("key1"), Box::from("value1")),
-                    (Box::from("key2"), Box::from("value2")),
-                ],
+                user_properties: vec![(Box::from("key1"), Box::from("value1")), (Box::from("key2"), Box::from("value2"))],
                 server_reference: Some(Box::from("Server reference")),
             },
             reason_code: DisconnectReasonCode::NormalDisconnection,
@@ -96,15 +103,9 @@ mod tests {
         assert_eq!(read_packet.properties.reason_string, Some(Box::from("Some reason")));
         assert_eq!(
             read_packet.properties.user_properties,
-            vec![
-                (Box::from("key1"), Box::from("value1")),
-                (Box::from("key2"), Box::from("value2")),
-            ]
+            vec![(Box::from("key1"), Box::from("value1")), (Box::from("key2"), Box::from("value2")),]
         );
-        assert_eq!(
-            read_packet.properties.server_reference,
-            Some(Box::from("Server reference"))
-        );
+        assert_eq!(read_packet.properties.server_reference, Some(Box::from("Server reference")));
     }
 
     #[test]
@@ -114,10 +115,7 @@ mod tests {
             properties: DisconnectProperties {
                 session_expiry_interval: Some(123),
                 reason_string: Some(Box::from("Some reason")),
-                user_properties: vec![
-                    (Box::from("key1"), Box::from("value1")),
-                    (Box::from("key2"), Box::from("value2")),
-                ],
+                user_properties: vec![(Box::from("key1"), Box::from("value1")), (Box::from("key2"), Box::from("value2"))],
                 server_reference: Some(Box::from("Server reference")),
             },
             reason_code: DisconnectReasonCode::NormalDisconnection,
@@ -131,15 +129,9 @@ mod tests {
         assert_eq!(read_packet.properties.reason_string, Some(Box::from("Some reason")));
         assert_eq!(
             read_packet.properties.user_properties,
-            vec![
-                (Box::from("key1"), Box::from("value1")),
-                (Box::from("key2"), Box::from("value2")),
-            ]
+            vec![(Box::from("key1"), Box::from("value1")), (Box::from("key2"), Box::from("value2")),]
         );
-        assert_eq!(
-            read_packet.properties.server_reference,
-            Some(Box::from("Server reference"))
-        );
+        assert_eq!(read_packet.properties.server_reference, Some(Box::from("Server reference")));
     }
 
     #[test]
@@ -148,30 +140,20 @@ mod tests {
         let properties = DisconnectProperties {
             session_expiry_interval: Some(123),
             reason_string: Some(Box::from("Some reason")),
-            user_properties: vec![
-                (Box::from("key1"), Box::from("value1")),
-                (Box::from("key2"), Box::from("value2")),
-            ],
+            user_properties: vec![(Box::from("key1"), Box::from("value1")), (Box::from("key2"), Box::from("value2"))],
             server_reference: Some(Box::from("Server reference")),
         };
-    
+
         properties.write(&mut buf).unwrap();
-    
+
         let read_properties = DisconnectProperties::read(&mut buf.into()).unwrap();
-    
+
         assert_eq!(read_properties.session_expiry_interval, Some(123));
         assert_eq!(read_properties.reason_string, Some(Box::from("Some reason")));
         assert_eq!(
             read_properties.user_properties,
-            vec![
-                (Box::from("key1"), Box::from("value1")),
-                (Box::from("key2"), Box::from("value2")),
-            ]
+            vec![(Box::from("key1"), Box::from("value1")), (Box::from("key2"), Box::from("value2")),]
         );
-        assert_eq!(
-            read_properties.server_reference,
-            Some(Box::from("Server reference"))
-        );
+        assert_eq!(read_properties.server_reference, Some(Box::from("Server reference")));
     }
 }
-

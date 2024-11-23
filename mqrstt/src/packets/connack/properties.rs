@@ -6,6 +6,7 @@ use crate::packets::{
 use bytes::BufMut;
 
 crate::packets::macros::define_properties!(
+    /// ConnAck Properties
     ConnAckProperties,
     SessionExpiryInterval,
     ReceiveMaximum,
@@ -73,10 +74,10 @@ impl MqttRead for ConnAckProperties {
                     properties.maximum_packet_size = Some(u32::read(&mut property_data)?);
                 }
                 PropertyType::AssignedClientIdentifier => {
-                    if properties.assigned_client_id.is_some() {
+                    if properties.assigned_client_identifier.is_some() {
                         return Err(DeserializeError::DuplicateProperty(PropertyType::AssignedClientIdentifier));
                     }
-                    properties.assigned_client_id = Some(Box::<str>::read(&mut property_data)?);
+                    properties.assigned_client_identifier = Some(Box::<str>::read(&mut property_data)?);
                 }
                 PropertyType::TopicAliasMaximum => {
                     if properties.topic_alias_maximum.is_some() {
@@ -162,7 +163,7 @@ impl MqttWrite for ConnAckProperties {
             maximum_qos,
             retain_available,
             maximum_packet_size,
-            assigned_client_id,
+            assigned_client_identifier,
             topic_alias_maximum,
             reason_string,
             user_properties,
@@ -196,7 +197,7 @@ impl MqttWrite for ConnAckProperties {
             PropertyType::MaximumPacketSize.write(buf)?;
             buf.put_u32(*maximum_packet_size);
         }
-        if let Some(client_id) = assigned_client_id {
+        if let Some(client_id) = assigned_client_identifier {
             PropertyType::AssignedClientIdentifier.write(buf)?;
             client_id.write(buf)?;
         }

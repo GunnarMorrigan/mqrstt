@@ -12,6 +12,10 @@ use super::{
 };
 use bytes::{Buf, BufMut};
 
+/// Used to subscribe to topic(s).
+///
+/// Multiple topics can be subscribed from at once.
+/// For convenience [`SubscribeTopics`] is provided.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Subscribe {
     pub packet_identifier: u16,
@@ -205,10 +209,18 @@ impl MqttWrite for SubscriptionOptions {
     }
 }
 
+// Please describe the retain handling type, what is it used for
+
+/// Controls how retained messages are handled
+///
+/// Used when a new subscription is established. Here are the three options for retain handling:
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum RetainHandling {
+    /// Send Retained Messages at Subscription: This is the default behavior. When a client subscribes to a topic, the broker sends any retained messages for that topic immediately.
     ZERO,
+    /// Send Retained Messages Only for New Subscriptions: Retained messages are sent only if the subscription did not previously exist.
     ONE,
+    /// Do Not Send Retained Messages: Retained messages are not sent when the subscription is established
     TWO,
 }
 
@@ -298,7 +310,7 @@ where
 
 macro_rules! impl_subscription {
     ($t:ty) => {
-        impl From<$t> for Subscription {
+        impl From<$t> for SubscribeTopics {
             #[inline]
             fn from(value: $t) -> Self {
                 Self(vec![IntoSingleSubscription::into(value)])
@@ -307,19 +319,19 @@ macro_rules! impl_subscription {
     };
 }
 
-pub struct Subscription(pub Vec<(Box<str>, SubscriptionOptions)>);
+pub struct SubscribeTopics(pub Vec<(Box<str>, SubscriptionOptions)>);
 
 // -------------------- Simple types --------------------
 impl_subscription!(&str);
 impl_subscription!(&String);
 impl_subscription!(String);
 impl_subscription!(Box<str>);
-impl From<&(&str, QoS)> for Subscription {
+impl From<&(&str, QoS)> for SubscribeTopics {
     fn from(value: &(&str, QoS)) -> Self {
         Self(vec![IntoSingleSubscription::into(value)])
     }
 }
-impl<T> From<(T, QoS)> for Subscription
+impl<T> From<(T, QoS)> for SubscribeTopics
 where
     (T, QoS): IntoSingleSubscription,
 {
@@ -327,7 +339,7 @@ where
         Self(vec![IntoSingleSubscription::into(value)])
     }
 }
-impl<T> From<(T, SubscriptionOptions)> for Subscription
+impl<T> From<(T, SubscriptionOptions)> for SubscribeTopics
 where
     (T, SubscriptionOptions): IntoSingleSubscription,
 {
@@ -336,7 +348,7 @@ where
     }
 }
 // -------------------- Arrays --------------------
-impl<T, const S: usize> From<&[T; S]> for Subscription
+impl<T, const S: usize> From<&[T; S]> for SubscribeTopics
 where
     for<'any> &'any T: IntoSingleSubscription,
 {
@@ -345,7 +357,7 @@ where
     }
 }
 // -------------------- Slices --------------------
-impl<T> From<&[T]> for Subscription
+impl<T> From<&[T]> for SubscribeTopics
 where
     for<'any> &'any T: IntoSingleSubscription,
 {
@@ -354,7 +366,7 @@ where
     }
 }
 // -------------------- Vecs --------------------
-impl<T> From<Vec<T>> for Subscription
+impl<T> From<Vec<T>> for SubscribeTopics
 where
     T: IntoSingleSubscription,
 {
@@ -362,7 +374,7 @@ where
         Self(value.into_iter().map(|val| IntoSingleSubscription::into(val)).collect())
     }
 }
-impl<T> From<&Vec<T>> for Subscription
+impl<T> From<&Vec<T>> for SubscribeTopics
 where
     for<'any> &'any T: IntoSingleSubscription,
 {

@@ -1,8 +1,11 @@
 macro_rules! define_properties {
-    ($name:ident, $($prop_variant:ident),*) => {
-        $crate::packets::macros::properties_struct!(@ $name { $($prop_variant,)* } -> ());
+    ($(#[$attr:meta])* $name:ident, $($prop_variant:ident),*) => {
+        $crate::packets::macros::properties_struct!(@
+            $(#[$attr])*
+            $name { $($prop_variant,)* } -> ()
+        );
 
-        impl<S> $crate::packets::mqtt_trait::MqttAsyncRead<S> for $name where S: tokio::io::AsyncReadExt + Unpin {
+        impl<S> $crate::packets::mqtt_trait::MqttAsyncRead<S> for $name where S: tokio::io::AsyncRead + Unpin {
             async fn async_read(stream: &mut S) -> Result<(Self, usize), $crate::packets::error::ReadError> {
                 let (len, length_variable_integer) = <usize as crate::packets::primitive::VariableInteger>::read_async_variable_integer(stream).await?;
                 if len == 0 {
@@ -43,54 +46,55 @@ macro_rules! define_properties {
 }
 
 macro_rules! properties_struct {
-    ( @ $name:ident { } -> ($($result:tt)*) ) => (
+    ( @ $(#[$attr:meta])*  $name:ident { } -> ($($result:tt)*) ) => (
+        // $(#[$attr])*
         #[derive(Debug, PartialEq, Eq, Clone, Hash, Default)]
         pub struct $name {
             $($result)*
         }
     );
-    ( @ $name:ident { PayloadFormatIndicator, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { PayloadFormatIndicator, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.2 Payload Format Indicator
             /// 1 (0x01) Byte, Identifier of the Payload Format Indicator.
             pub payload_format_indicator: Option<u8>,
         ));
     );
-    ( @ $name:ident { MessageExpiryInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { MessageExpiryInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.3 Message Expiry Interval
             /// 2 (0x02) Byte, Identifier of the Message Expiry Interval.
             pub message_expiry_interval: Option<u32>,
         ));
     );
-    ( @ $name:ident { ContentType, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ContentType, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.9 Content Type
             /// 3 (0x03) Identifier of the Content Type
             pub content_type: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { ResponseTopic, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ResponseTopic, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.5 Response Topic
             /// 8 (0x08) Byte, Identifier of the Response Topic.
             pub response_topic: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { CorrelationData, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { CorrelationData, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.6 Correlation Data
             /// 9 (0x09) Byte, Identifier of the Correlation Data.
             pub correlation_data: Option<Vec<u8>>,
         ));
     );
-    ( @ $name:ident { ListSubscriptionIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ListSubscriptionIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.8 Subscription Identifier
             /// 11 (0x0B), Identifier of the Subscription Identifier.
@@ -98,183 +102,183 @@ macro_rules! properties_struct {
             pub subscription_identifiers: Vec<u32>,
         ));
     );
-    ( @ $name:ident { SubscriptionIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { SubscriptionIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.8 Subscription Identifier
             /// 11 (0x0B), Identifier of the Subscription Identifier.
             pub subscription_identifier: Option<u32>,
         ));
     );
-    ( @ $name:ident { SessionExpiryInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { SessionExpiryInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.2 Session Expiry Interval
             /// 17 (0x11) Byte Identifier of the Session Expiry Interval
             pub session_expiry_interval: Option<u32>,
         ));
     );
-    ( @ $name:ident { AssignedClientIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { AssignedClientIdentifier, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.7 Assigned Client Identifier
             /// 18 (0x12) Byte, Identifier of the Assigned Client Identifier.
-            pub assigned_client_id: Option<Box<str>>,
+            pub assigned_client_identifier: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { ServerKeepAlive, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ServerKeepAlive, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.14 Server Keep Alive
             /// 19 (0x13) Byte, Identifier of the Server Keep Alive
             pub server_keep_alive: Option<u16>,
         ));
     );
-    ( @ $name:ident { AuthenticationMethod, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { AuthenticationMethod, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.17 Authentication Method
             /// 21 (0x15) Byte, Identifier of the Authentication Method
             pub authentication_method: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { AuthenticationData, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { AuthenticationData, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.18 Authentication Data
             /// 22 (0x16) Byte, Identifier of the Authentication Data
             pub authentication_data: Option<Vec<u8>>,
         ));
     );
-    ( @ $name:ident { RequestProblemInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { RequestProblemInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.1.2.11.7 Request Problem Information
             /// 23 (0x17) Byte, Identifier of the Request Problem Information
             pub request_problem_information: Option<u8>,
         ));
     );
-    ( @ $name:ident { WillDelayInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { WillDelayInterval, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.1.3.2.2 Request Problem Information
             /// 24 (0x18) Byte, Identifier of the Will Delay Interval.
             pub will_delay_interval: Option<u32>,
         ));
     );
-    ( @ $name:ident { RequestResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { RequestResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.1.2.11.6 Request Response Information
             /// 25 (0x19) Byte, Identifier of the Request Response Information
             pub request_response_information: Option<u8>,
         ));
     );
-    ( @ $name:ident { ResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ResponseInformation, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.15 Response Information
             /// 26 (0x1A) Byte, Identifier of the Response Information.
             pub response_info: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { ServerReference, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ServerReference, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.16 Server Reference
             /// 28 (0x1C) Byte, Identifier of the Server Reference
             pub server_reference: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { ReasonString, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ReasonString, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.9 Reason String
             /// 31 (0x1F) Byte Identifier of the Reason String.
             pub reason_string: Option<Box<str>>,
         ));
     );
-    ( @ $name:ident { ReceiveMaximum, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { ReceiveMaximum, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.3 Receive Maximum
             /// 33 (0x21) Byte, Identifier of the Receive Maximum
             pub receive_maximum: Option<u16>,
         ));
     );
-    ( @ $name:ident { TopicAliasMaximum, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { TopicAliasMaximum, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.8 Topic Alias Maximum
             /// 34 (0x22) Byte, Identifier of the Topic Alias Maximum.
             pub topic_alias_maximum: Option<u16>,
         ));
     );
-    ( @ $name:ident { TopicAlias, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { TopicAlias, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.3.2.3.4 Topic Alias
             /// 35 (0x23) Byte, Identifier of the Topic Alias.
             pub topic_alias: Option<u16>,
         ));
     );
-    ( @ $name:ident { MaximumQos, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { MaximumQos, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.4 Maximum QoS
             /// 36 (0x24) Byte, Identifier of the Maximum QoS.
             pub maximum_qos: Option<$crate::packets::QoS>,
         ));
     );
-    ( @ $name:ident { RetainAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { RetainAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.5 Retain Available
             /// 37 (0x25) Byte, Identifier of Retain Available.
             pub retain_available: Option<bool>,
         ));
     );
-    ( @ $name:ident { UserProperty, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { UserProperty, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.10 User Property
             /// 38 (0x26) Byte, Identifier of User Property.
             pub user_properties: Vec<(Box<str>, Box<str>)>,
         ));
     );
-    ( @ $name:ident { MaximumPacketSize, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { MaximumPacketSize, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.6 Maximum Packet Size
             /// 39 (0x27) Byte, Identifier of the Maximum Packet Size.
             pub maximum_packet_size: Option<u32>,
         ));
     );
-    ( @ $name:ident { WildcardSubscriptionAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { WildcardSubscriptionAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.11 Wildcard Subscription Available
             /// 40 (0x28) Byte, Identifier of Wildcard Subscription Available.
             pub wildcards_available: Option<bool>,
         ));
     );
-    ( @ $name:ident { SubscriptionIdentifierAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { SubscriptionIdentifierAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.12 Subscription Identifiers Available
             /// 41 (0x29) Byte, Identifier of Subscription Identifier Available.
             pub subscription_ids_available: Option<bool>,
         ));
     );
-    ( @ $name:ident { SharedSubscriptionAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::properties_struct!(@ $name { $($rest)* } -> (
+    ( @ $(#[$attr:meta])*  $name:ident { SharedSubscriptionAvailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::properties_struct!(@ $(#[$attr])*  $name { $($rest)* } -> (
             $($result)*
             /// 3.2.2.3.13 Shared Subscription Available
             /// 42 (0x2A) Byte, Identifier of Shared Subscription Available.
             pub shared_subscription_available: Option<bool>,
         ));
     );
-    ( @ $name:ident { $unknown:ident, $($rest:tt)* } -> ($($result:tt)*) ) => (
+    ( @ $(#[$attr:meta])*  $name:ident { $unknown:ident, $($rest:tt)* } -> ($($result:tt)*) ) => (
         compile_error!(concat!("Unknown property: ", stringify!($unknown)));
     );
 }
@@ -345,14 +349,14 @@ macro_rules! properties_read_match_branch_body {
         $properties.session_expiry_interval = Some(prop_body);
     }};
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::AssignedClientIdentifier) => {{
-        if $properties.assigned_client_id.is_some() {
+        if $properties.assigned_client_identifier.is_some() {
             return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
                 PropertyType::AssignedClientIdentifier,
             )));
         }
         let (prop_body, read_bytes) = Box::<str>::async_read($stream).await?;
         $read_property_bytes += read_bytes;
-        $properties.assigned_client_id = Some(prop_body);
+        $properties.assigned_client_identifier = Some(prop_body);
     }};
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::ServerKeepAlive) => {{
         if $properties.server_keep_alive.is_some() {
@@ -581,7 +585,7 @@ macro_rules! properties_wire_length {
         }
     };
     ($self:ident, $len:ident, PropertyType::AssignedClientIdentifier) => {
-        if let Some(client_id) = $self.assigned_client_id.as_ref() {
+        if let Some(client_id) = $self.assigned_client_identifier.as_ref() {
             $len += 1 + client_id.wire_len();
         }
     };

@@ -1,6 +1,5 @@
 use std::time::Duration;
 
-
 use crate::util::constants::DEFAULT_RECEIVE_MAXIMUM;
 use crate::{
     packets::{ConnectProperties, LastWill},
@@ -9,10 +8,11 @@ use crate::{
 
 #[derive(Debug, thiserror::Error)]
 pub enum ConnectOptionsError {
-    #[error("Maximum packet size is exceeded. Maximum is {MAXIMUM_PACKET_SIZE}, was provided {0}")]
-    MaximumPacketSize(u32),
+    #[error("Maximum packet size is exceeded. Maximum is {MAXIMUM_PACKET_SIZE}, user provided: {0}")]
+    MaximumPacketSizeExceeded(u32),
 }
 
+/// Options for the connection to the MQTT broker
 #[derive(Debug, Clone)]
 pub struct ConnectOptions {
     /// client identifier
@@ -71,7 +71,7 @@ impl Default for ConnectOptions {
 
 impl ConnectOptions {
     /// Create a new [`ConnectOptions`]
-    /// 
+    ///
     /// Be aware:
     /// This client does not restrict the client identifier in any way. However, the MQTT v5.0 specification does.
     /// It is thus recommended to use a client id that is compatible with the MQTT v5.0 specification.
@@ -121,7 +121,7 @@ impl ConnectOptions {
             username: self.username.clone(),
             password: self.password.clone(),
             connect_properties,
-            protocol_version: crate::packets::protocol_version::ProtocolVersion::V5,
+            protocol_version: crate::packets::ProtocolVersion::V5,
             last_will: self.last_will.clone(),
         };
 
@@ -221,7 +221,7 @@ impl ConnectOptions {
 
     pub fn set_maximum_packet_size(&mut self, maximum_packet_size: u32) -> Result<&mut Self, ConnectOptionsError> {
         if maximum_packet_size > MAXIMUM_PACKET_SIZE {
-            Err(ConnectOptionsError::MaximumPacketSize(maximum_packet_size))
+            Err(ConnectOptionsError::MaximumPacketSizeExceeded(maximum_packet_size))
         } else {
             self.maximum_packet_size = Some(maximum_packet_size);
             Ok(self)

@@ -8,8 +8,6 @@ use crate::packets::Packet;
 /// This guarantees that the end user has handlded the packet.
 /// Trait for async mutable access to handler.
 /// Usefull when you have a single handler
-
-/// This trait can be used types which
 pub trait AsyncEventHandler {
     fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
 }

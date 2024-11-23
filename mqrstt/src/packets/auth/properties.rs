@@ -6,7 +6,14 @@ use crate::packets::{
     PacketType, PropertyType, VariableInteger,
 };
 
-crate::packets::macros::define_properties!(AuthProperties, AuthenticationMethod, AuthenticationData, ReasonString, UserProperty);
+crate::packets::macros::define_properties!(
+    /// Properties of the AUTH packet
+    AuthProperties,
+    AuthenticationMethod,
+    AuthenticationData,
+    ReasonString,
+    UserProperty
+);
 
 impl MqttRead for AuthProperties {
     fn read(buf: &mut Bytes) -> Result<Self, crate::packets::error::DeserializeError> {

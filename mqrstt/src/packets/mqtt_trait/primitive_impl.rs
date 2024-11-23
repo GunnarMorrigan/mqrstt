@@ -1,8 +1,7 @@
-use bytes::{BufMut, Buf, Bytes, BytesMut};
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::packets::mqtt_trait::{MqttRead, MqttAsyncRead, MqttWrite, WireLength};
 use crate::packets::error::{DeserializeError, ReadError, SerializeError};
-
+use crate::packets::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, WireLength};
 
 impl MqttRead for Box<str> {
     #[inline]
@@ -16,7 +15,10 @@ impl MqttRead for Box<str> {
     }
 }
 
-impl<S> MqttAsyncRead<S> for Box<str> where S: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<S> MqttAsyncRead<S> for Box<str>
+where
+    S: tokio::io::AsyncRead + std::marker::Unpin,
+{
     async fn async_read(stream: &mut S) -> Result<(Self, usize), ReadError> {
         let (content, read_bytes) = Vec::async_read(stream).await?;
         match String::from_utf8(content) {
@@ -68,7 +70,10 @@ impl MqttRead for String {
     }
 }
 
-impl<T> MqttAsyncRead<T> for String where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for String
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         let (content, read_bytes) = Bytes::async_read(buf).await?;
         match String::from_utf8(content.to_vec()) {
@@ -110,7 +115,10 @@ impl MqttRead for Bytes {
         Ok(buf.split_to(len))
     }
 }
-impl<S> MqttAsyncRead<S> for Bytes where S: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<S> MqttAsyncRead<S> for Bytes
+where
+    S: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(stream: &mut S) -> Result<(Self, usize), ReadError> {
         let size = stream.read_u16().await? as usize;
         // let mut data = BytesMut::with_capacity(size);
@@ -148,7 +156,7 @@ impl MqttRead for Vec<u8> {
         Ok(buf.split_to(len).into())
     }
 }
-impl MqttWrite for  Vec<u8> {
+impl MqttWrite for Vec<u8> {
     #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u16(self.len() as u16);
@@ -163,7 +171,10 @@ impl WireLength for Vec<u8> {
         self.len() + 2
     }
 }
-impl<S> MqttAsyncRead<S> for Vec<u8> where S: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<S> MqttAsyncRead<S> for Vec<u8>
+where
+    S: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(stream: &mut S) -> Result<(Self, usize), ReadError> {
         let size = stream.read_u16().await? as usize;
         // let mut data = BytesMut::with_capacity(size);
@@ -173,7 +184,6 @@ impl<S> MqttAsyncRead<S> for Vec<u8> where S: tokio::io::AsyncReadExt + std::mar
         Ok((data, 2 + size))
     }
 }
-
 
 impl MqttRead for bool {
     fn read(buf: &mut Bytes) -> Result<Self, crate::packets::error::DeserializeError> {
@@ -188,7 +198,10 @@ impl MqttRead for bool {
         }
     }
 }
-impl<T> MqttAsyncRead<T> for bool where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for bool
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         match buf.read_u8().await? {
             0 => Ok((false, 1)),
@@ -219,7 +232,10 @@ impl MqttRead for u8 {
         Ok(buf.get_u8())
     }
 }
-impl<T> MqttAsyncRead<T> for u8 where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for u8
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         Ok((buf.read_u8().await?, 1))
     }
@@ -234,7 +250,10 @@ impl MqttRead for u16 {
         Ok(buf.get_u16())
     }
 }
-impl<T> MqttAsyncRead<T> for u16 where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for u16
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         Ok((buf.read_u16().await?, 2))
     }
@@ -256,7 +275,10 @@ impl MqttRead for u32 {
         Ok(buf.get_u32())
     }
 }
-impl<T> MqttAsyncRead<T> for u32 where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for u32
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         Ok((buf.read_u32().await?, 4))
     }

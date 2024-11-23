@@ -1,31 +1,27 @@
 //! A pure rust MQTT client which is easy to use, efficient and provides both sync and async options.
 //!
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
-//! For an async approach the stream has to implement the `AsyncReadExt` and `AsyncWriteExt` traits.
-//! That is [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`] for tokio and [`::smol::io::AsyncReadExt`] and [`::smol::io::AsyncWriteExt`] for smol.
+//! For an async approach the stream has to implement the `AsyncRead` and `AsyncWrite` traits.
+//! That is [`::tokio::io::AsyncRead`] and [`::tokio::io::AsyncWrite`] for tokio and [`::smol::io::AsyncRead`] and [`::smol::io::AsyncWrite`] for smol.
 //!
 //! Features:
 //! ----------------------------
 //!  - MQTT v5
 //!  - Runtime agnostic (Smol, Tokio)
-//!  - TLS/TCP
+//!  - Packets are acknoledged after handler has processed them
+//!  - Runs on just a stream so you can use all TCP backends
 //!  - Lean
 //!  - Keep alive depends on actual communication
 //!
 //! To do
 //! ----------------------------
-//!  - Enforce size of outbound messages (e.g. Publish)
-//!  - QUIC via QUINN
 //!  - Even More testing
-//!  - More documentation
-//!  - Remove logging calls or move all to test flag
 //!
 //! Notes:
 //! ----------------------------
-//! - Your handler should not wait too long
-//! - Create a new connection when an error or disconnect is encountered
+//! - While the handler is processing a message the stream blocks. To prevent this, spawn a task in the handler or use [tokio::ConcurrentHandler].
 //! - Handlers only get incoming packets
-//! - Sync mode requires a non blocking stream
+//! - Create a new connection when an error or disconnect is encountered
 //!
 //! Smol example:
 //! ----------------------------
@@ -111,59 +107,6 @@
 //!     assert!(n.is_ok());
 //! }
 //! ```
-//!
-// //! Sync example:
-// //! ----------------------------
-// //! ```rust
-// //! use mqrstt::{
-// //!     MqttClient,
-// //!     example_handlers::NOP,
-// //!     ConnectOptions,
-// //!     packets::{self, Packet},
-// //!     EventHandler,
-// //!     sync::NetworkStatus,
-// //! };
-// //! use std::net::TcpStream;
-// //!
-// //! let mut client_id: String = "SyncTcppingrespTestExample".to_string();
-// //! let options = ConnectOptions::new(client_id);
-// //!
-// //! let address = "broker.emqx.io";
-// //! let port = 1883;
-// //!
-// //! let (mut network, client) = new_sync(options);
-// //!
-// //! // Construct a no op handler
-// //! let mut nop = NOP{};
-// //!
-// //! // In normal operations you would want to loop connect
-// //! // To reconnect after a disconnect or error
-// //! let stream = TcpStream::connect((address, port)).unwrap();
-// //! // IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
-// //! stream.set_nonblocking(true).unwrap();
-// //! network.connect(stream, &mut nop).unwrap();
-// //!
-// //! let res_join_handle = std::thread::spawn(move ||
-// //!     loop {
-// //!         match network.poll(&mut nop) {
-// //!             Ok(NetworkStatus::ActivePending) => {
-// //!                 std::thread::sleep(std::time::Duration::from_millis(100));
-// //!             },
-// //!             Ok(NetworkStatus::ActiveReady) => {
-// //!                 std::thread::sleep(std::time::Duration::from_millis(100));
-// //!             },
-// //!             otherwise => return otherwise,
-// //!         }
-// //!     }
-// //! );
-// //!
-// //! std::thread::sleep(std::time::Duration::from_secs(30));
-// //! client.disconnect_blocking().unwrap();
-// //! let join_res = res_join_handle.join();
-// //! assert!(join_res.is_ok());
-// //! let res = join_res.unwrap();
-// //! assert!(res.is_ok());
-// //! ```
 
 const CHANNEL_SIZE: usize = 100;
 
@@ -173,16 +116,26 @@ mod connect_options;
 mod state_handler;
 mod util;
 
+/// Contains the reader writer parts for the smol runtime.
+///
+/// Module [`crate::smol`] only contains a synchronized approach to call the users `Handler`.
 #[cfg(feature = "smol")]
 pub mod smol;
+/// Contains the reader and writer parts for the tokio runtime.
+///
+/// Module [`crate::tokio`] contains both a synchronized and concurrent approach to call the users `Handler`.
 #[cfg(any(feature = "tokio"))]
 pub mod tokio;
 
+/// Error types that the user can see during operation of the client.
+///
+/// Wraps all other errors that can be encountered.
 pub mod error;
+
 mod event_handlers;
+/// All MQTT packets are defined here
 pub mod packets;
 mod state;
-use std::marker::PhantomData;
 
 pub use event_handlers::*;
 
@@ -190,6 +143,7 @@ pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 use state_handler::StateHandler;
 
+use std::marker::PhantomData;
 #[cfg(test)]
 pub mod tests;
 

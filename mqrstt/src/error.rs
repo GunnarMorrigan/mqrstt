@@ -4,8 +4,7 @@ use async_channel::{RecvError, SendError};
 
 use crate::packets::{
     error::{DeserializeError, ReadBytes, SerializeError},
-    ConnAckReasonCode,
-    {Packet, PacketType},
+    ConnAckReasonCode, {Packet, PacketType},
 };
 
 /// Critical errors that can happen during the operation of the entire client
@@ -43,7 +42,7 @@ pub enum ConnectionError {
     JoinError(#[from] tokio::task::JoinError),
 }
 
-/// Errors that the [`crate::StateHandler`] can emit
+/// Errors that the internal StateHandler can emit
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum HandlerError {
     #[error("Missing Packet ID")]

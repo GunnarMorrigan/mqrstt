@@ -13,7 +13,7 @@ pub enum WriteError {
 }
 
 #[derive(Error, Debug)]
-pub enum ReadError{
+pub enum ReadError {
     #[error("{0}")]
     DeserializeError(#[from] DeserializeError),
     #[error("{0}")]
@@ -39,10 +39,10 @@ pub enum DeserializeError {
 
     #[error("There is insufficient for {0} data ({1}) to take {2} bytes")]
     InsufficientData(&'static str, usize, usize),
-    
+
     #[error("There is insufficient to read the protocol version.")]
     InsufficientDataForProtocolVersion,
-    
+
     #[error("Read more data for the packet than indicated length")]
     ReadTooMuchData(&'static str, usize, usize),
 
@@ -72,7 +72,7 @@ impl From<String> for DeserializeError {
 }
 
 #[derive(Error, Clone, Debug)]
-pub enum ReadBytes<T> {
+pub(crate) enum ReadBytes<T> {
     #[error("Normal error")]
     Err(#[from] T),
 

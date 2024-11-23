@@ -2,7 +2,12 @@ use crate::packets::error::DeserializeError;
 use crate::packets::mqtt_trait::{MqttRead, MqttWrite, WireLength};
 use crate::packets::{PacketType, PropertyType, VariableInteger};
 
-crate::packets::macros::define_properties!(UnsubAckProperties, ReasonString, UserProperty);
+crate::packets::macros::define_properties!(
+    /// UnsubAck Properties
+    UnsubAckProperties,
+    ReasonString,
+    UserProperty
+);
 
 impl MqttRead for UnsubAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {

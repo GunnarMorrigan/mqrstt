@@ -65,7 +65,7 @@ where
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
-    pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> {
+    pub(crate) async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> {
         let (mut network, conn_ack) = Stream::connect(&self.options, stream).await?;
         self.last_network_action = Instant::now();
 

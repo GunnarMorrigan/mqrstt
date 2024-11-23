@@ -5,13 +5,14 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use crate::packets::mqtt_trait::MqttAsyncRead;
 
-use super::VariableInteger;
 use super::mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
-use bytes::BufMut;
+use super::VariableInteger;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use tokio::io::AsyncReadExt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-/// Used to unsubscribe from topics.
-/// 
+/// Used to unsubscribe from topic(s).
+///
 /// Multiple topics can be unsubscribed from at once.
 /// For convenience [`UnsubscribeTopics`] is provided.
 pub struct Unsubscribe {
@@ -53,7 +54,10 @@ impl PacketRead for Unsubscribe {
     }
 }
 
-impl<S> PacketAsyncRead<S> for Unsubscribe where S: tokio::io::AsyncReadExt + Unpin{
+impl<S> PacketAsyncRead<S> for Unsubscribe
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let mut total_read_bytes = 0;
@@ -73,11 +77,14 @@ impl<S> PacketAsyncRead<S> for Unsubscribe where S: tokio::io::AsyncReadExt + Un
                 }
             }
 
-            Ok((Self {
-                packet_identifier,
-                properties,
-                topics,
-            }, total_read_bytes))
+            Ok((
+                Self {
+                    packet_identifier,
+                    properties,
+                    topics,
+                },
+                total_read_bytes,
+            ))
         }
     }
 }
@@ -207,19 +214,6 @@ where
     }
 }
 
-// impl<T: ?Sized> From<&[&T]> for UnsubscribeTopics
-// where
-//     SingleUnsubscribeTopic: for<'any> From<&'any T>,
-// {
-//     fn from(value: &[&T]) -> Self {
-//         Self(
-//             value
-//                 .iter()
-//                 .map(|val| SingleUnsubscribeTopic::from(val).0)
-//                 .collect(),
-//         )
-//     }
-// }
 // -------------------- Vecs --------------------
 impl<T> From<Vec<T>> for UnsubscribeTopics
 where

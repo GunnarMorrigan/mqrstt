@@ -9,6 +9,7 @@ use crate::packets::{
 };
 
 crate::packets::macros::define_properties!(
+    /// Publish Properties
     PublishProperties,
     PayloadFormatIndicator,
     MessageExpiryInterval,

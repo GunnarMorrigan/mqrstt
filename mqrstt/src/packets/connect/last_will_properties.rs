@@ -8,6 +8,7 @@ use crate::packets::{
 };
 
 crate::packets::macros::define_properties!(
+    /// Last Will Properties
     LastWillProperties,
     WillDelayInterval,
     PayloadFormatIndicator,

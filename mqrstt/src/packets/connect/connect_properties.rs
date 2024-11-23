@@ -7,15 +7,15 @@ use crate::packets::{
     PacketType, PropertyType, WireLength,
 };
 
-// /// Connect Properties
-// ///
-// /// The wire representation starts with the length of all properties after which
-// /// the identifiers and their actual value are given
-// ///
-// /// 3.1.2.11.1 Property Length
-// /// The length of the Properties in the CONNECT packet Variable Header encoded as a Variable Byte Integer.
-// /// Followed by all possible connect properties:
+// /
+// / The wire representation starts with the length of all properties after which
+// / the identifiers and their actual value are given
+// /
+// / 3.1.2.11.1 Property Length
+// / The length of the Properties in the CONNECT packet Variable Header encoded as a Variable Byte Integer.
+// / Followed by all possible connect properties:
 crate::packets::macros::define_properties!(
+    /// Connect Properties
     ConnectProperties,
     SessionExpiryInterval,
     ReceiveMaximum,
@@ -155,41 +155,3 @@ impl MqttRead for ConnectProperties {
         Ok(properties)
     }
 }
-
-// impl WireLength for ConnectProperties {
-//     fn wire_len(&self) -> usize {
-//         let mut len: usize = 0;
-
-//         if self.session_expiry_interval.is_some() {
-//             len += 1 + 4;
-//         }
-//         if self.receive_maximum.is_some() {
-//             len += 1 + 2;
-//         }
-//         if self.maximum_packet_size.is_some() {
-//             len += 1 + 4;
-//         }
-//         if self.topic_alias_maximum.is_some() {
-//             len += 1 + 2;
-//         }
-//         if self.request_response_information.is_some() {
-//             len += 2;
-//         }
-//         if self.request_problem_information.is_some() {
-//             len += 2;
-//         }
-//         for (key, value) in &self.user_properties {
-//             len += 1;
-//             len += key.wire_len();
-//             len += value.wire_len();
-//         }
-//         if let Some(authentication_method) = &self.authentication_method {
-//             len += 1 + authentication_method.wire_len();
-//         }
-//         if !self.authentication_data.is_empty() && self.authentication_method.is_some() {
-//             len += 1 + self.authentication_data.wire_len();
-//         }
-
-//         len
-//     }
-// }

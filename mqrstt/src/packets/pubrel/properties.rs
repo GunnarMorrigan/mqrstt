@@ -4,7 +4,12 @@ use crate::packets::{
     PacketType, PropertyType, VariableInteger,
 };
 
-crate::packets::macros::define_properties!(PubRelProperties, ReasonString, UserProperty);
+crate::packets::macros::define_properties!(
+    /// PubRel Properties
+    PubRelProperties,
+    ReasonString,
+    UserProperty
+);
 
 impl PubRelProperties {
     pub fn is_empty(&self) -> bool {

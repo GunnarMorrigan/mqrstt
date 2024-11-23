@@ -15,6 +15,14 @@ use super::{
     QoS,
 };
 
+/// The PUBLISH Packet is used to send data from either side of the connection.
+/// This packet is handed to the [`crate::AsyncEventHandler`] to be handled by the user.
+///
+/// The following flow is determined by the QoS level used in PUBLISH Packet.
+/// QoS 0: Send and forget, no deliviery garantee.
+/// QoS 1: Send and acknowledgement, uised to ensure that the packet is delivered at least once.
+/// QoS 2: Send and 2-step acknowledgement, used to ensure that the packet is delivered only once.
+/// The packet can be send using for example [`crate::MqttClient::publish`] or [`crate::MqttClient::publish_with_properties`].
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub struct Publish {
     /// 3.3.1.1 dup

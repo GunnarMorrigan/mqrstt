@@ -1,9 +1,11 @@
 use bytes::{Buf, BufMut};
 
+use tokio::io::AsyncReadExt;
 
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite}, QoS,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+    QoS,
 };
 
 /// The connect flags describe some information related the session.
@@ -71,7 +73,10 @@ impl MqttRead for ConnectFlags {
     }
 }
 
-impl<S> MqttAsyncRead<S> for ConnectFlags where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> MqttAsyncRead<S> for ConnectFlags
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {
             let byte = stream.read_u8().await?;

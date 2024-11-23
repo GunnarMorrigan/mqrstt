@@ -1,5 +1,5 @@
 pub mod error;
-pub mod mqtt_trait;
+pub(crate) mod mqtt_trait;
 
 mod macros;
 
@@ -42,7 +42,7 @@ use std::fmt::Display;
 use self::error::{DeserializeError, SerializeError};
 use self::mqtt_trait::{PacketRead, PacketWrite, WireLength};
 
-// ==================== Packets ====================
+/// Enum to bundle the different MQTT packets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Packet {
     Connect(Connect),

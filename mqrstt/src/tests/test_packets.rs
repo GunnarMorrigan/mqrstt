@@ -16,7 +16,7 @@ pub fn connack_case() -> (&'static [u8], Packet) {
             maximum_qos: None,
             retain_available: Some(true),
             maximum_packet_size: Some(1048576),
-            assigned_client_id: None,
+            assigned_client_identifier: None,
             topic_alias_maximum: Some(65535),
             reason_string: None,
             user_properties: vec![],
@@ -202,7 +202,7 @@ pub fn publish_packet_4() -> Packet {
 }
 
 pub fn create_subscribe_packet(packet_identifier: u16) -> Packet {
-    let subscription: Subscription = "test/topic".into();
+    let subscription: SubscribeTopics = "test/topic".into();
     let sub = Subscribe::new(packet_identifier, subscription.0);
     Packet::Subscribe(sub)
 }

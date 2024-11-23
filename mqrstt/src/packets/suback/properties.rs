@@ -6,7 +6,12 @@ use crate::packets::{
 
 use crate::packets::primitive::VariableInteger;
 
-crate::packets::macros::define_properties!(SubAckProperties, SubscriptionIdentifier, UserProperty);
+crate::packets::macros::define_properties!(
+    /// SubAck Properties
+    SubAckProperties,
+    SubscriptionIdentifier,
+    UserProperty
+);
 
 impl MqttRead for SubAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, crate::packets::error::DeserializeError> {

@@ -10,22 +10,24 @@ pub use connect_properties::ConnectProperties;
 mod last_will;
 pub use last_will::LastWill;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-
 use crate::packets::error::ReadError;
 
 use super::{
-    error::{DeserializeError, SerializeError}, mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite}, protocol_version::ProtocolVersion, VariableInteger, WireLength
+    error::{DeserializeError, SerializeError},
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
+    ProtocolVersion, VariableInteger, WireLength,
 };
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+use tokio::io::AsyncReadExt;
 
 /// Connect packet send by the client to the server to initialize a connection.
-/// 
+///
 /// Variable Header
 /// - Protocol Name and Version: Identifies the MQTT protocol and version.
 /// - Connect Flags: Options like clean start, will flag, will QoS, will retain, password flag, and username flag.
 /// - Keep Alive Interval: Maximum time interval between messages.
 /// - Properties: Optional settings such as session expiry interval, receive maximum, maximum packet size, and topic alias maximum.
-/// 
+///
 /// Payload
 /// - Client Identifier: Unique ID for the client.
 /// - Will Message: Optional message sent if the client disconnects unexpectedly.
@@ -108,7 +110,10 @@ impl PacketRead for Connect {
     }
 }
 
-impl<S> PacketAsyncRead<S> for Connect where S: tokio::io::AsyncReadExt + Unpin {
+impl<S> PacketAsyncRead<S> for Connect
+where
+    S: tokio::io::AsyncRead + Unpin,
+{
     async fn async_read(_: u8, _: usize, stream: &mut S) -> Result<(Self, usize), super::error::ReadError> {
         let mut total_read_bytes = 0;
         let expected_protocol = [0x00, 0x04, b'M', b'Q', b'T', b'T'];
@@ -127,9 +132,9 @@ impl<S> PacketAsyncRead<S> for Connect where S: tokio::io::AsyncReadExt + Unpin 
         let keep_alive = stream.read_u16().await?;
         // Add keep alive read bytes
         total_read_bytes += 2;
-        
+
         let (connect_properties, prop_read_bytes) = ConnectProperties::async_read(stream).await?;
-        let (client_id, client_read_bytes)  = Box::<str>::async_read(stream).await?;
+        let (client_id, client_read_bytes) = Box::<str>::async_read(stream).await?;
         total_read_bytes += prop_read_bytes + client_read_bytes;
 
         let last_will = if connect_flags.will_flag {
@@ -141,14 +146,18 @@ impl<S> PacketAsyncRead<S> for Connect where S: tokio::io::AsyncReadExt + Unpin 
             None
         };
 
-        let (username, username_read_bytes) = if connect_flags.username { 
+        let (username, username_read_bytes) = if connect_flags.username {
             let (username, username_read_bytes) = Box::<str>::async_read(stream).await?;
             (Some(username), username_read_bytes)
-            } else { (None, 0) };
-        let (password, password_read_bytes) = if connect_flags.password { 
+        } else {
+            (None, 0)
+        };
+        let (password, password_read_bytes) = if connect_flags.password {
             let (password, password_read_bytes) = Box::<str>::async_read(stream).await?;
             (Some(password), password_read_bytes)
-            } else { (None, 0) };
+        } else {
+            (None, 0)
+        };
 
         total_read_bytes += username_read_bytes + password_read_bytes;
 
