@@ -4,10 +4,12 @@ use futures::Future;
 
 use crate::packets::Packet;
 
-/// Handlers are used to deal with packets before they are further processed (acked)
-/// This guarantees that the end user has handlded the packet.
-/// Trait for async mutable access to handler.
-/// Usefull when you have a single handler
+/// Handlers are used to deal with packets before they are acknowledged to the broker.
+/// This guarantees that the end user has handlded the packet. Additionally, handlers only deal with incoming packets.
+///
+/// This handler can be used to handle message sequentialy or concurrently.
+///
+/// To send messages look at [`crate::MqttClient`]
 pub trait AsyncEventHandler {
     fn handle(&self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
 }
@@ -29,16 +31,24 @@ where
         <T>::handle(&self, incoming_packet)
     }
 }
+/// This is a simple no operation handler.
 impl AsyncEventHandler for () {
     fn handle(&self, _: Packet) -> impl Future<Output = ()> + Send + Sync {
         async {}
     }
 }
 
+/// Handlers are used to deal with packets before they are acknowledged to the broker.
+/// This guarantees that the end user has handlded the packet. Additionally, handlers only deal with incoming packets.
+///
+/// This handler can be used to handle message sequentialy.
+///
+/// To send messages look at [`crate::MqttClient`]
 pub trait AsyncEventHandlerMut {
     fn handle(&mut self, incoming_packet: Packet) -> impl Future<Output = ()> + Send + Sync;
 }
 
+/// This is a simple no operation handler.
 impl AsyncEventHandlerMut for () {
     fn handle(&mut self, _: Packet) -> impl Future<Output = ()> + Send + Sync {
         async {}

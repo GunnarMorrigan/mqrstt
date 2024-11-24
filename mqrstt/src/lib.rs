@@ -132,6 +132,9 @@ pub mod tokio;
 /// Wraps all other errors that can be encountered.
 pub mod error;
 
+/// All event handler traits are defined here.
+///
+/// Event handlers are used to process incoming packets.
 mod event_handlers;
 /// All MQTT packets are defined here
 pub mod packets;

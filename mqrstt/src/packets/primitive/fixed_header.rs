@@ -10,16 +10,18 @@ use crate::packets::{
 use super::read_fixed_header_rem_len;
 
 /// 2.1.1 Fixed Header
-/// ```
-///          7                          3                          0
-///          +--------------------------+--------------------------+
-/// byte 1   | MQTT Control Packet Type | Flags for Packet type    |
-///          +--------------------------+--------------------------+
-///          |                   Remaining Length                  |
-///          +-----------------------------------------------------+
 ///
-/// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901021
-/// ```
+/// The fixed header indicates the pakcet type in the first four bits [7 - 4] and for some packets it also contains some flags in the second four bits [3 - 0].
+/// The remaining length encodes the length of the variable header and the payload.
+///
+/// | Bit      | 7 - 4                      | 3 - 0                      |
+/// |----------|----------------------------|----------------------------|
+/// | byte 1   | MQTT Control Packet Type   | Flags for Packet type      |
+/// |          |                            |                            |
+/// | byte 2+  |                   Remaining Length                      |
+/// |          |---------------------------------------------------------|
+///
+/// [MQTT v5.0 Specification](https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901021)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub(crate) struct FixedHeader {
     pub packet_type: PacketType,

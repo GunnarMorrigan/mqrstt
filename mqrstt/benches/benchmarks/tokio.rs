@@ -210,7 +210,7 @@ fn tokio_concurrent_benchmarks(c: &mut Criterion) {
     });
 }
 
-fn tokio_synchronous_benchmarks(c: &mut Criterion) {
+fn tokio_sequential_benchmarks(c: &mut Criterion) {
     let mut group = c.benchmark_group("Tokio sequential");
     group.sample_size(30);
     group.measurement_time(Duration::from_secs(120));
@@ -282,4 +282,4 @@ fn tokio_synchronous_benchmarks(c: &mut Criterion) {
 }
 
 criterion_group!(tokio_concurrent, tokio_concurrent_benchmarks);
-criterion_group!(tokio_synchronous, tokio_synchronous_benchmarks);
+criterion_group!(tokio_sequential, tokio_sequential_benchmarks);

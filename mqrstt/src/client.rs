@@ -22,9 +22,11 @@ use crate::{
 };
 
 #[derive(Debug, Clone)]
-/// A Clonable client that can be used to send MQTT messages
+/// A Clonable client that can be used to send MQTT messages.
 ///
-/// This object is never self constructed but is a obtained by calling the builder functions on [`crate::NetworkBuilder`]
+/// This object can be obtained by calling the builder functions on [`crate::NetworkBuilder`]
+///
+/// This client should be used in combindation with a handler [`crate::AsyncEventHandler`] or [`crate::AsyncEventHandlerMut`] to handle incoming messages.
 pub struct MqttClient {
     /// Provides this client with an available packet id or waits on it.
     available_packet_ids_r: Receiver<u16>,
