@@ -1,25 +1,11 @@
-pub mod read_half;
-pub mod write_half;
-
-use std::io::{self, Error, ErrorKind};
-
-use bytes::{Buf, BytesMut};
-
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 
 #[cfg(feature = "logs")]
 use tracing::trace;
 
-use crate::packets::error::WriteError;
 use crate::packets::ConnAck;
-use crate::packets::{
-    error::ReadBytes,
-    ConnAckReasonCode, {FixedHeader, Packet},
-};
+use crate::packets::{ConnAckReasonCode, Packet};
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
-
-use self::read_half::ReadStream;
-use self::write_half::WriteStream;
 
 #[derive(Debug)]
 pub struct Stream<S> {
@@ -30,14 +16,6 @@ impl<S> Stream<S>
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Sized + Unpin,
 {
-    pub fn split(self) -> (ReadStream<S>, WriteStream<S>) {
-        let Self { stream } = self;
-
-        let (read_stream, write_stream) = tokio::io::split(stream);
-
-        (ReadStream::new(read_stream), WriteStream::new(write_stream))
-    }
-
     pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
         let mut s = Self { stream };
 
@@ -62,29 +40,6 @@ where
     pub async fn read(&mut self) -> Result<Packet, ConnectionError> {
         Ok(Packet::async_read(&mut self.stream).await?)
     }
-
-    // pub async fn read_bytes(&mut self) -> io::Result<usize> {
-    //     let read = self.stream.read(&mut self.const_buffer).await?;
-    //     if read == 0 {
-    //         Err(io::Error::new(io::ErrorKind::ConnectionReset, "Connection reset by peer"))
-    //     } else {
-    //         self.read_buffer.extend_from_slice(&self.const_buffer[0..read]);
-    //         Ok(read)
-    //     }
-    // }
-
-    // /// Reads more than 'required' bytes to frame a packet into self.read buffer
-    // pub async fn read_required_bytes(&mut self, required: usize) -> io::Result<usize> {
-    //     let mut total_read = 0;
-
-    //     loop {
-    //         let read = self.read_bytes().await?;
-    //         total_read += read;
-    //         if total_read >= required {
-    //             return Ok(total_read);
-    //         }
-    //     }
-    // }
 
     pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
         match packet.async_write(&mut self.stream).await {
