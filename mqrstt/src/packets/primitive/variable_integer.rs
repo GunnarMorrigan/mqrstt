@@ -147,7 +147,7 @@ impl VariableInteger for usize {
                     break;
                 }
             }
-            stream.write_all(&buf[0..length]).await;
+            stream.write_all(&buf[0..length]).await?;
             Ok(length)
         }
     }
@@ -249,7 +249,7 @@ impl VariableInteger for u32 {
                     break;
                 }
             }
-            stream.write_all(&buf[0..length]).await;
+            stream.write_all(&buf[0..length]).await?;
             Ok(length)
         }
     }
