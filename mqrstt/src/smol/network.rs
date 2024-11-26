@@ -11,7 +11,7 @@ use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::{Disconnect, DisconnectReasonCode, Packet, PacketType};
 use crate::NetworkStatus;
-use crate::{AsyncEventHandlerMut, StateHandler};
+use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
 
@@ -61,7 +61,7 @@ impl<H, S> Network<H, S> {
 
 impl<H, S> Network<H, S>
 where
-    H: AsyncEventHandlerMut,
+    H: AsyncEventHandler,
     S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
