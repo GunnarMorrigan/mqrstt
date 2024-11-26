@@ -215,6 +215,60 @@ impl PacketWrite for Connect {
     }
 }
 
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Connect
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let mut total_writen_bytes = 6 // protocol header
+                + 1 // protocol version
+                + 1 // connect flags
+                + 2; // keep alive
+            let protocol = [0x00, 0x04, b'M', b'Q', b'T', b'T'];
+            // We allready start with 6 as total writen bytes thus dont add anymore
+            stream.write_all(&protocol).await?;
+
+            self.protocol_version.async_write(stream).await?;
+
+            let mut connect_flags = ConnectFlags {
+                clean_start: self.clean_start,
+                username: self.username.is_some(),
+                password: self.password.is_some(),
+                ..Default::default()
+            };
+
+            if let Some(last_will) = &self.last_will {
+                connect_flags.will_flag = true;
+                connect_flags.will_retain = last_will.retain;
+                connect_flags.will_qos = last_will.qos;
+            }
+
+            connect_flags.async_write(stream).await?;
+
+            stream.write_u16(self.keep_alive).await?;
+
+            total_writen_bytes += self.connect_properties.async_write(stream).await?;
+
+            total_writen_bytes += self.client_id.async_write(stream).await?;
+
+            if let Some(last_will) = &self.last_will {
+                total_writen_bytes += last_will.async_write(stream).await?;
+            }
+            if let Some(username) = &self.username {
+                total_writen_bytes += username.async_write(stream).await?;
+            }
+            if let Some(password) = &self.password {
+                total_writen_bytes += password.async_write(stream).await?;
+            }
+
+            Ok(total_writen_bytes)
+        }
+    }
+}
+
 impl WireLength for Connect {
     fn wire_len(&self) -> usize {
         let mut len = "MQTT".wire_len() + 1 + 1 + 2; // protocol version, connect_flags and keep alive

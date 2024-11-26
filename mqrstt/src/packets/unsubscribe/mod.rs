@@ -7,7 +7,7 @@ use crate::packets::mqtt_trait::MqttAsyncRead;
 
 use super::mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use super::VariableInteger;
-use bytes::{Buf, BufMut, Bytes, BytesMut};
+use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -99,6 +99,25 @@ impl PacketWrite for Unsubscribe {
         }
 
         Ok(())
+    }
+}
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Unsubscribe
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let mut total_written_bytes = 2;
+            stream.write_u16(self.packet_identifier).await?;
+
+            for topic in &self.topics {
+                total_written_bytes += topic.async_write(stream).await?;
+            }
+
+            Ok(total_written_bytes)
+        }
     }
 }
 

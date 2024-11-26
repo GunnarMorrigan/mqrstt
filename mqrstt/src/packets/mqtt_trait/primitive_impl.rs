@@ -1,7 +1,11 @@
+use tokio::io::AsyncWriteExt;
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::packets::error::{DeserializeError, ReadError, SerializeError};
 use crate::packets::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, WireLength};
+
+use super::MqttAsyncWrite;
 
 impl MqttRead for Box<str> {
     #[inline]
@@ -35,6 +39,20 @@ impl MqttWrite for Box<str> {
     }
 }
 
+impl<S> MqttAsyncWrite<S> for Box<str>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let size = (self.len() as u16).to_be_bytes();
+            stream.write_all(&size).await?;
+            stream.write_all(self.as_bytes()).await?;
+            Ok(2 + self.len())
+        }
+    }
+}
+
 impl WireLength for Box<str> {
     #[inline(always)]
     fn wire_len(&self) -> usize {
@@ -48,6 +66,20 @@ impl MqttWrite for &str {
         buf.put_u16(self.len() as u16);
         buf.extend(self.as_bytes());
         Ok(())
+    }
+}
+
+impl<S> MqttAsyncWrite<S> for &str
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let size = (self.len() as u16).to_be_bytes();
+            stream.write_all(&size).await?;
+            stream.write_all(self.as_bytes()).await?;
+            Ok(2 + self.len())
+        }
     }
 }
 
@@ -95,6 +127,19 @@ impl MqttWrite for String {
         Ok(())
     }
 }
+impl<S> MqttAsyncWrite<S> for String
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let size = (self.len() as u16).to_be_bytes();
+            stream.write_all(&size).await?;
+            stream.write_all(self.as_bytes()).await?;
+            Ok(2 + self.len())
+        }
+    }
+}
 
 impl WireLength for String {
     #[inline(always)]
@@ -106,6 +151,9 @@ impl WireLength for String {
 impl MqttRead for Bytes {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
+        if buf.len() < 2 {
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Bytes>(), buf.len(), 2));
+        }
         let len = buf.get_u16() as usize;
 
         if len > buf.len() {
@@ -137,6 +185,20 @@ impl MqttWrite for Bytes {
         Ok(())
     }
 }
+impl<S> MqttAsyncWrite<S> for Bytes
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let size = (self.len() as u16).to_be_bytes();
+            stream.write_all(&size).await?;
+            stream.write_all(self.as_ref()).await?;
+            Ok(2 + self.len())
+        }
+    }
+}
+
 impl WireLength for Bytes {
     #[inline(always)]
     fn wire_len(&self) -> usize {
@@ -147,6 +209,9 @@ impl WireLength for Bytes {
 impl MqttRead for Vec<u8> {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
+        if buf.len() < 2 {
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 2));
+        }
         let len = buf.get_u16() as usize;
 
         if len > buf.len() {
@@ -163,6 +228,19 @@ impl MqttWrite for Vec<u8> {
         buf.extend(self);
 
         Ok(())
+    }
+}
+impl<S> MqttAsyncWrite<S> for Vec<u8>
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let size = (self.len() as u16).to_be_bytes();
+            stream.write_all(&size).await?;
+            stream.write_all(self).await?;
+            Ok(2 + self.len())
+        }
     }
 }
 impl WireLength for Vec<u8> {
@@ -222,7 +300,21 @@ impl MqttWrite for bool {
         }
     }
 }
-
+impl<S> MqttAsyncWrite<S> for bool
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            if *self {
+                stream.write_all(&[1]).await?;
+            } else {
+                stream.write_all(&[0]).await?;
+            }
+            Ok(1)
+        }
+    }
+}
 impl MqttRead for u8 {
     #[inline]
     fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
@@ -238,6 +330,17 @@ where
 {
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         Ok((buf.read_u8().await?, 1))
+    }
+}
+impl<S> MqttAsyncWrite<S> for u8
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            stream.write_all(self.to_be_bytes().as_slice()).await?;
+            Ok(1)
+        }
     }
 }
 
@@ -265,6 +368,17 @@ impl MqttWrite for u16 {
         Ok(())
     }
 }
+impl<S> MqttAsyncWrite<S> for u16
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            stream.write_all(self.to_be_bytes().as_slice()).await?;
+            Ok(2)
+        }
+    }
+}
 
 impl MqttRead for u32 {
     #[inline]
@@ -287,5 +401,16 @@ impl MqttWrite for u32 {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u32(*self);
         Ok(())
+    }
+}
+impl<S> MqttAsyncWrite<S> for u32
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            stream.write_all(self.to_be_bytes().as_slice()).await?;
+            Ok(4)
+        }
     }
 }

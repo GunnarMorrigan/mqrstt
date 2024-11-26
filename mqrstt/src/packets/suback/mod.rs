@@ -27,13 +27,10 @@ impl PacketRead for SubAck {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubAckProperties::read(&mut buf)?;
 
-        dbg!("aa");
-
         let mut reason_codes = vec![];
         loop {
             let reason_code = SubAckReasonCode::read(&mut buf)?;
 
-            dbg!(reason_code);
             reason_codes.push(reason_code);
 
             if buf.is_empty() {
@@ -92,6 +89,29 @@ impl PacketWrite for SubAck {
         }
 
         Ok(())
+    }
+}
+
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for SubAck
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let mut total_written_bytes = 2;
+            stream.write_u16(self.packet_identifier).await?;
+
+            total_written_bytes += self.properties.async_write(stream).await?;
+
+            for reason_code in &self.reason_codes {
+                reason_code.async_write(stream).await?;
+            }
+            total_written_bytes += self.reason_codes.len();
+
+            Ok(total_written_bytes)
+        }
     }
 }
 

@@ -1,8 +1,10 @@
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
 use crate::packets::{
     error::{DeserializeError, ReadError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -123,12 +125,12 @@ impl MqttRead for PropertyType {
     }
 }
 
-impl<T> MqttAsyncRead<T> for PropertyType
+impl<S> MqttAsyncRead<S> for PropertyType
 where
-    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+    S: tokio::io::AsyncRead + std::marker::Unpin,
 {
-    async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
-        match buf.read_u8().await {
+    async fn async_read(stream: &mut S) -> Result<(Self, usize), ReadError> {
+        match stream.read_u8().await {
             Ok(t) => Ok((t.try_into()?, 1)),
             Err(e) => Err(ReadError::IoError(e)),
         }
@@ -139,5 +141,18 @@ impl MqttWrite for PropertyType {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u8(self.into());
         Ok(())
+    }
+}
+
+impl<S> MqttAsyncWrite<S> for PropertyType
+where
+    S: tokio::io::AsyncWrite + std::marker::Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let buf: [u8; 1] = [u8::from(self)];
+            stream.write_all(&buf).await?;
+            Ok(1)
+        }
     }
 }

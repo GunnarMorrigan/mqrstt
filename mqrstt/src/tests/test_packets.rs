@@ -233,6 +233,27 @@ pub fn create_publish_packet(qos: QoS, dup: bool, retain: bool, packet_identifie
     })
 }
 
+pub fn create_empty_publish_packet() -> Packet {
+    Packet::Publish(Publish {
+        dup: false,
+        qos: QoS::AtMostOnce,
+        retain: false,
+        topic: "test/#".into(),
+        packet_identifier: None,
+        publish_properties: PublishProperties {
+            payload_format_indicator: None,
+            message_expiry_interval: Some(3600),
+            topic_alias: Some(1),
+            response_topic: None,
+            correlation_data: Some(b"1212".to_vec()),
+            subscription_identifiers: vec![1],
+            user_properties: vec![],
+            content_type: Some("Garbage".into()),
+        },
+        payload: vec![],
+    })
+}
+
 pub fn create_puback_packet(packet_identifier: u16) -> Packet {
     Packet::PubAck(PubAck {
         packet_identifier,

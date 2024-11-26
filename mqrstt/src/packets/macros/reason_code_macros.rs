@@ -7,12 +7,24 @@ macro_rules! reason_code {
             $($code),*
         }
 
+        impl $name {
+            pub(crate) fn from_u8(val: u8) -> Result<Self, $crate::packets::error::DeserializeError> {
+                $crate::packets::macros::reason_code_match!(@ $name, val, {
+                    $($code,)*
+                } -> ())
+            }
+
+            pub(crate) fn to_u8(&self) -> u8 {
+                $crate::packets::macros::reason_code_match_write!(@ $name, self, {
+                    $($code,)*
+                } -> ())
+            }
+        }
+
         impl<S> $crate::packets::mqtt_trait::MqttAsyncRead<S> for $name where S: tokio::io::AsyncRead + std::marker::Unpin{
             async fn async_read(stream: &mut S) -> Result<(Self, usize), $crate::packets::error::ReadError> {
                 let input = stream.read_u8().await?;
-                let res = $crate::packets::macros::reason_code_match!(@ $name, input, {
-                    $($code,)*
-                } -> ())?;
+                let res = Self::from_u8(input)?;
                 Ok((res, 1))
             }
         }
@@ -23,19 +35,24 @@ macro_rules! reason_code {
                     return Err($crate::packets::error::DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 1));
                 }
                 use bytes::Buf;
-                let res = buf.get_u8();
-                $crate::packets::macros::reason_code_match!(@ $name, res, {
-                    $($code,)*
-                } -> ())
+                let input = buf.get_u8();
+                Self::from_u8(input)
+            }
+        }
+
+        impl<S> $crate::packets::mqtt_trait::MqttAsyncWrite<S> for $name where S: tokio::io::AsyncWrite + std::marker::Unpin{
+            async fn async_write(&self, stream: &mut S) -> Result<usize, $crate::packets::error::WriteError> {
+                use tokio::io::AsyncWriteExt;
+                let val = self.to_u8();
+                stream.write_u8(val).await?;
+                Ok(1)
             }
         }
 
         impl $crate::packets::mqtt_trait::MqttWrite for $name {
             fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), $crate::packets::error::SerializeError> {
-                let val = $crate::packets::macros::reason_code_match_write!(@ $name, buf, self, {
-                    $($code,)*
-                } -> ());
                 use bytes::BufMut;
+                let val = self.to_u8();
                 buf.put_u8(val);
                 Ok(())
             }
@@ -327,285 +344,285 @@ macro_rules! reason_code_match {
 }
 
 macro_rules! reason_code_match_write{
-    ( @ $name:ident, $buf:ident, $input:ident, { } -> ($($result:tt)*) ) => (
+    ( @ $name:ident, $input:ident, { } -> ($($result:tt)*) ) => (
         match $input {
             $($result)*
         }
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { Success, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { Success, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::Success => 0x00,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { NormalDisconnection, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { NormalDisconnection, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::NormalDisconnection => 0x00,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { GrantedQoS0, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { GrantedQoS0, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::GrantedQoS0 => 0x00,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { GrantedQoS1, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { GrantedQoS1, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::GrantedQoS1 => 0x01,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { GrantedQoS2, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { GrantedQoS2, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::GrantedQoS2 => 0x02,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { DisconnectWithWillMessage, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { DisconnectWithWillMessage, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::DisconnectWithWillMessage => 0x04,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { NoMatchingSubscribers, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { NoMatchingSubscribers, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::NoMatchingSubscribers => 0x10,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { NoSubscriptionExisted, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { NoSubscriptionExisted, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::NoSubscriptionExisted => 0x11,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ContinueAuthentication, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ContinueAuthentication, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ContinueAuthentication => 0x18,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ReAuthenticate, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ReAuthenticate, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ReAuthenticate => 0x19,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { UnspecifiedError, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { UnspecifiedError, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::UnspecifiedError => 0x80,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { MalformedPacket, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { MalformedPacket, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::MalformedPacket => 0x81,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ProtocolError, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ProtocolError, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ProtocolError => 0x82,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ImplementationSpecificError, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ImplementationSpecificError, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ImplementationSpecificError => 0x83,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { UnsupportedProtocolVersion, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { UnsupportedProtocolVersion, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::UnsupportedProtocolVersion => 0x84,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ClientIdentifierNotValid, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ClientIdentifierNotValid, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ClientIdentifierNotValid => 0x85,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { BadUsernameOrPassword, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { BadUsernameOrPassword, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::BadUsernameOrPassword => 0x86,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { NotAuthorized, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { NotAuthorized, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::NotAuthorized => 0x87,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ServerUnavailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ServerUnavailable, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ServerUnavailable => 0x88,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ServerBusy, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ServerBusy, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ServerBusy => 0x89,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { Banned, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { Banned, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::Banned => 0x8A,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ServerShuttingDown, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ServerShuttingDown, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ServerShuttingDown => 0x8B ,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { BadAuthenticationMethod, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { BadAuthenticationMethod, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::BadAuthenticationMethod => 0x8C,
         ))
     );
 
-    ( @ $name:ident, $buf:ident, $input:ident, { KeepAliveTimeout, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { KeepAliveTimeout, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::KeepAliveTimeout => 0x8D,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { SessionTakenOver, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { SessionTakenOver, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::SessionTakenOver => 0x8E,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { TopicFilterInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { TopicFilterInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::TopicFilterInvalid => 0x8F,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { TopicNameInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { TopicNameInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::TopicNameInvalid => 0x90,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { PacketIdentifierInUse, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { PacketIdentifierInUse, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::PacketIdentifierInUse => 0x91,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { PacketIdentifierNotFound, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { PacketIdentifierNotFound, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::PacketIdentifierNotFound => 0x92,
 
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ReceiveMaximumExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ReceiveMaximumExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ReceiveMaximumExceeded => 0x93,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { TopicAliasInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { TopicAliasInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::TopicAliasInvalid => 0x94,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { PacketTooLarge, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { PacketTooLarge, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::PacketTooLarge => 0x95,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { MessageRateTooHigh, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { MessageRateTooHigh, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::MessageRateTooHigh => 0x96,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { QuotaExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { QuotaExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::QuotaExceeded => 0x97,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { AdministrativeAction, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { AdministrativeAction, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::AdministrativeAction => 0x98,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { PayloadFormatInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { PayloadFormatInvalid, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::PayloadFormatInvalid => 0x99,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { RetainNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { RetainNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::RetainNotSupported => 0x9A,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { QosNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { QosNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::QosNotSupported => 0x9B,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { UseAnotherServer, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { UseAnotherServer, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::UseAnotherServer => 0x9C,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ServerMoved, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ServerMoved, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ServerMoved => 0x9D,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { SharedSubscriptionsNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { SharedSubscriptionsNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::SharedSubscriptionsNotSupported => 0x9E,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { ConnectionRateExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { ConnectionRateExceeded, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::ConnectionRateExceeded => 0x9F,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { MaximumConnectTime, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { MaximumConnectTime, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::MaximumConnectTime => 0xA0,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { SubscriptionIdentifiersNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { SubscriptionIdentifiersNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::SubscriptionIdentifiersNotSupported => 0xA1,
         ))
     );
-    ( @ $name:ident, $buf:ident, $input:ident, { WildcardSubscriptionsNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
-        $crate::packets::macros::reason_code_match_write!(@ $name, $buf, $input, { $($rest)* } -> (
+    ( @ $name:ident, $input:ident, { WildcardSubscriptionsNotSupported, $($rest:tt)* } -> ($($result:tt)*) ) => (
+        $crate::packets::macros::reason_code_match_write!(@ $name, $input, { $($rest)* } -> (
             $($result)*
             $name::WildcardSubscriptionsNotSupported => 0xA2,
         ))
     );
 
-    ( @ $name:ident, $buf:ident, $input:ident, { $unknown:ident, $($rest:tt)* } -> ($($result:tt)*) ) => (
+    ( @ $name:ident, $input:ident, { $unknown:ident, $($rest:tt)* } -> ($($result:tt)*) ) => (
         compile_error!(concat!("Unknown reason_code: ", stringify!($unknown)))
     );
 }

@@ -13,8 +13,7 @@ use tracing::trace;
 use crate::packets::ConnAck;
 use crate::packets::{
     error::ReadBytes,
-    ConnAckReasonCode,
-    {FixedHeader, Packet},
+    ConnAckReasonCode, {FixedHeader, Packet},
 };
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 
@@ -143,14 +142,20 @@ where
     }
 
     pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
-        packet.write(&mut self.write_buffer)?;
+        match packet.async_write(&mut self.stream).await {
+            Ok(_) => (),
+            Err(err) => {
+                return match err {
+                    crate::packets::error::WriteError::SerializeError(serialize_error) => Err(ConnectionError::SerializationError(serialize_error)),
+                    crate::packets::error::WriteError::IoError(error) => Err(ConnectionError::Io(error)),
+                }
+            }
+        }
 
         #[cfg(feature = "logs")]
         trace!("Sending packet {}", packet);
 
-        self.stream.write_all(&self.write_buffer[..]).await?;
         self.stream.flush().await?;
-        self.write_buffer.clear();
         Ok(())
     }
 

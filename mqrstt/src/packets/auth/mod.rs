@@ -1,4 +1,6 @@
 mod properties;
+use std::future::Future;
+
 pub use properties::AuthProperties;
 mod reason_code;
 pub use reason_code::AuthReasonCode;
@@ -6,7 +8,7 @@ pub use reason_code::AuthReasonCode;
 use bytes::Bytes;
 
 use super::{
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite, PacketAsyncRead, PacketAsyncWrite, PacketRead, PacketWrite, WireLength},
     VariableInteger,
 };
 
@@ -39,6 +41,19 @@ where
         let (properties, properties_read_bytes) = AuthProperties::async_read(stream).await?;
 
         Ok((Self { reason_code, properties }, reason_code_read_bytes + properties_read_bytes))
+    }
+}
+
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Auth
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let reason_code_writen = self.reason_code.async_write(stream).await?;
+            let properties_writen = self.properties.async_write(stream).await?;
+            Ok(reason_code_writen + properties_writen)
+        }
     }
 }
 

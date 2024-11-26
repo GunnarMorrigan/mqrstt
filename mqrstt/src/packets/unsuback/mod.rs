@@ -93,6 +93,29 @@ impl PacketWrite for UnsubAck {
     }
 }
 
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for UnsubAck
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let mut total_written_bytes = 2;
+            stream.write_u16(self.packet_identifier).await?;
+
+            total_written_bytes += self.properties.async_write(stream).await?;
+
+            for reason_code in &self.reason_codes {
+                reason_code.async_write(stream).await?;
+            }
+            total_written_bytes += self.reason_codes.len();
+
+            Ok(total_written_bytes)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use bytes::{Bytes, BytesMut};

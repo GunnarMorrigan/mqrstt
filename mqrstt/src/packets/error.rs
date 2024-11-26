@@ -46,6 +46,9 @@ pub enum DeserializeError {
     #[error("Read more data for the packet than indicated length")]
     ReadTooMuchData(&'static str, usize, usize),
 
+    #[error("While reading a packet {read} bytes was read, but the packet indicated a remaining length of {remaining_length} bytes")]
+    RemainingDataError { read: usize, remaining_length: usize },
+
     #[error("Reason code {0} is not allowed for packet type {1:?}")]
     UnexpectedReasonCode(u8, PacketType),
 
@@ -72,7 +75,7 @@ impl From<String> for DeserializeError {
 }
 
 #[derive(Error, Clone, Debug)]
-pub(crate) enum ReadBytes<T> {
+pub enum ReadBytes<T> {
     #[error("Normal error")]
     Err(#[from] T),
 

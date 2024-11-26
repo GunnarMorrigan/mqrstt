@@ -4,7 +4,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
     QoS,
 };
 
@@ -89,5 +89,20 @@ impl MqttWrite for ConnectFlags {
     fn write(&self, buf: &mut bytes::BytesMut) -> Result<(), crate::packets::error::SerializeError> {
         buf.put_u8(self.into_u8()?);
         Ok(())
+    }
+}
+
+impl<S> MqttAsyncWrite<S> for ConnectFlags
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            use tokio::io::AsyncWriteExt;
+            let byte = self.into_u8()?;
+            stream.write_u8(byte).await?;
+
+            Ok(1)
+        }
     }
 }

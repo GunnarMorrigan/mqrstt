@@ -1,9 +1,11 @@
+use crate::packets::error::WriteError;
 use crate::packets::error::{DeserializeError, ReadBytes, ReadError, SerializeError};
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use core::slice::Iter;
 use std::future::Future;
 
 use tokio::io::AsyncReadExt;
+use tokio::io::AsyncWriteExt;
 
 pub(crate) fn read_fixed_header_rem_len(mut buf: Iter<u8>) -> Result<(usize, usize), ReadBytes<DeserializeError>> {
     let mut integer = 0;
@@ -45,7 +47,8 @@ pub(crate) trait VariableInteger: Sized {
     fn variable_integer_len(&self) -> usize;
     fn write_variable_integer(&self, buf: &mut BytesMut) -> Result<usize, SerializeError>;
     fn read_variable_integer(buf: &mut Bytes) -> Result<(Self, usize), DeserializeError>;
-    fn read_async_variable_integer<S: tokio::io::AsyncReadExt + Unpin>(stream: &mut S) -> impl Future<Output = Result<(Self, usize), ReadError>>;
+    fn read_async_variable_integer<S: tokio::io::AsyncRead + Unpin>(stream: &mut S) -> impl Future<Output = Result<(Self, usize), ReadError>>;
+    fn write_async_variable_integer<S: tokio::io::AsyncWrite + Unpin>(&self, stream: &mut S) -> impl Future<Output = Result<usize, WriteError>>;
 }
 
 impl VariableInteger for usize {
@@ -102,7 +105,7 @@ impl VariableInteger for usize {
         Err(DeserializeError::MalformedPacket)
     }
 
-    fn read_async_variable_integer<S: tokio::io::AsyncReadExt + Unpin>(stream: &mut S) -> impl Future<Output = Result<(Self, usize), ReadError>> {
+    fn read_async_variable_integer<S: tokio::io::AsyncRead + Unpin>(stream: &mut S) -> impl Future<Output = Result<(Self, usize), ReadError>> {
         async move {
             let mut integer = 0;
             let mut length = 0;
@@ -118,6 +121,34 @@ impl VariableInteger for usize {
                 }
             }
             Err(ReadError::DeserializeError(DeserializeError::MalformedPacket))
+        }
+    }
+
+    fn write_async_variable_integer<S: tokio::io::AsyncWrite + Unpin>(&self, stream: &mut S) -> impl Future<Output = Result<usize, WriteError>> {
+        async move {
+            let mut buf = [0u8; 4];
+
+            if *self > 268_435_455 {
+                return Err(WriteError::SerializeError(SerializeError::VariableIntegerOverflow(*self as usize)));
+            }
+
+            let mut write = *self;
+            let mut length = 1;
+
+            for i in 0..4 {
+                let mut byte = (write % 128) as u8;
+                write /= 128;
+                if write > 0 {
+                    byte |= 128;
+                }
+                buf[i] = byte;
+                if write == 0 {
+                    length = i + 1;
+                    break;
+                }
+            }
+            stream.write_all(&buf[0..length]).await;
+            Ok(length)
         }
     }
 }
@@ -176,7 +207,7 @@ impl VariableInteger for u32 {
         Err(DeserializeError::MalformedPacket)
     }
 
-    fn read_async_variable_integer<S: tokio::io::AsyncReadExt + Unpin>(stream: &mut S) -> impl Future<Output = Result<(Self, usize), ReadError>> {
+    fn read_async_variable_integer<S: tokio::io::AsyncRead + Unpin>(stream: &mut S) -> impl Future<Output = Result<(Self, usize), ReadError>> {
         async move {
             let mut integer = 0;
             let mut length = 0;
@@ -192,6 +223,34 @@ impl VariableInteger for u32 {
                 }
             }
             Err(ReadError::DeserializeError(DeserializeError::MalformedPacket))
+        }
+    }
+
+    fn write_async_variable_integer<S: tokio::io::AsyncWrite + Unpin>(&self, stream: &mut S) -> impl Future<Output = Result<usize, WriteError>> {
+        async move {
+            let mut buf = [0u8; 4];
+
+            if *self > 268_435_455 {
+                return Err(WriteError::SerializeError(SerializeError::VariableIntegerOverflow(*self as usize)));
+            }
+
+            let mut write = *self;
+            let mut length = 1;
+
+            for i in 0..4 {
+                let mut byte = (write % 128) as u8;
+                write /= 128;
+                if write > 0 {
+                    byte |= 128;
+                }
+                buf[i] = byte;
+                if write == 0 {
+                    length = i + 1;
+                    break;
+                }
+            }
+            stream.write_all(&buf[0..length]).await;
+            Ok(length)
         }
     }
 }

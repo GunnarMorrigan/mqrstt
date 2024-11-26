@@ -18,8 +18,8 @@ mod unsuback;
 mod unsubscribe;
 
 mod primitive;
-use error::ReadError;
-use mqtt_trait::PacketAsyncRead;
+use error::{ReadError, WriteError};
+use mqtt_trait::{PacketAsyncRead, PacketAsyncWrite};
 pub use primitive::*;
 
 pub use auth::*;
@@ -80,6 +80,38 @@ impl Packet {
             Packet::PingResp => PacketType::PingResp,
             Packet::Disconnect(_) => PacketType::Disconnect,
             Packet::Auth(_) => PacketType::Auth,
+        }
+    }
+
+    pub(crate) fn first_byte(&self) -> u8 {
+        match self {
+            Packet::Connect(_) => 0b0001_0000,
+            Packet::ConnAck(_) => 0b0010_0000,
+            Packet::Publish(p) => {
+                let mut first_byte = 0b0011_0000u8;
+                if p.dup {
+                    first_byte |= 0b1000;
+                }
+                first_byte |= p.qos.into_u8() << 1;
+                if p.retain {
+                    first_byte |= 0b0001;
+                }
+                first_byte
+            }
+            Packet::PubAck(_) => 0b0100_0000,
+            Packet::PubRec(_) => 0b0101_0000,
+            Packet::PubRel(_) => 0b0110_0010,
+            Packet::PubComp(_) => 0b0111_0000,
+            Packet::Subscribe(_) => 0b1000_0010,
+            Packet::SubAck(_) => {
+                unreachable!()
+            }
+            Packet::Unsubscribe(_) => 0b1010_0010,
+            Packet::UnsubAck(_) => 0b1011_0000,
+            Packet::PingReq => 0b1100_0000,
+            Packet::PingResp => 0b1101_0000,
+            Packet::Disconnect(_) => 0b1110_0000,
+            Packet::Auth(_) => 0b1111_0000,
         }
     }
 
@@ -170,6 +202,97 @@ impl Packet {
         Ok(())
     }
 
+    pub(crate) async fn async_write<S>(&self, stream: &mut S) -> Result<usize, WriteError>
+    where
+        S: tokio::io::AsyncWrite + Unpin,
+    {
+        use tokio::io::AsyncWriteExt;
+        let mut written = 1;
+        match self {
+            Packet::Connect(p) => {
+                stream.write_u8(0b0001_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::ConnAck(p) => {
+                stream.write_u8(0b0010_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Publish(p) => {
+                let mut first_byte = 0b0011_0000u8;
+                if p.dup {
+                    first_byte |= 0b1000;
+                }
+
+                first_byte |= p.qos.into_u8() << 1;
+
+                if p.retain {
+                    first_byte |= 0b0001;
+                }
+                stream.write_u8(first_byte).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubAck(p) => {
+                stream.write_u8(0b0100_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubRec(p) => {
+                stream.write_u8(0b0101_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubRel(p) => {
+                stream.write_u8(0b0110_0010).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubComp(p) => {
+                stream.write_u8(0b0111_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Subscribe(p) => {
+                stream.write_u8(0b1000_0010).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::SubAck(_) => {
+                unreachable!()
+            }
+            Packet::Unsubscribe(p) => {
+                stream.write_u8(0b1010_0010).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::UnsubAck(_) => {
+                unreachable!();
+                // stream.write_u8(0b1011_0000).await?;
+            }
+            Packet::PingReq => {
+                stream.write_u8(0b1100_0000).await?;
+                stream.write_u8(0).await?; // Variable header length.
+            }
+            Packet::PingResp => {
+                stream.write_u8(0b1101_0000).await?;
+                stream.write_u8(0).await?; // Variable header length.
+            }
+            Packet::Disconnect(p) => {
+                stream.write_u8(0b1110_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Auth(p) => {
+                stream.write_u8(0b1111_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+        }
+        Ok(written)
+    }
+
     pub(crate) fn read(header: FixedHeader, buf: Bytes) -> Result<Packet, DeserializeError> {
         let packet = match header.packet_type {
             PacketType::Connect => Packet::Connect(Connect::read(header.flags, header.remaining_length, buf)?),
@@ -215,8 +338,7 @@ impl Packet {
         Ok(packet)
     }
 
-    #[cfg(test)]
-    pub(crate) async fn async_read_from_buffer<S>(stream: &mut S) -> Result<Packet, ReadError>
+    pub async fn async_read_from_buffer<S>(stream: &mut S) -> Result<Packet, ReadError>
     where
         S: tokio::io::AsyncRead + Unpin,
     {
@@ -225,8 +347,7 @@ impl Packet {
         Ok(Packet::async_read(header, stream).await?)
     }
 
-    #[cfg(test)]
-    pub(crate) fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {
+    pub fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {
         use bytes::Buf;
         use error::ReadBytes;
 
@@ -327,7 +448,26 @@ mod tests {
 
     use crate::packets::Packet;
 
-    use crate::tests::test_packets::{disconnect_case, ping_req_case, ping_resp_case, publish_case, pubrel_case, pubrel_smallest_case};
+    use crate::tests::test_packets::{create_empty_publish_packet, disconnect_case, ping_req_case, ping_resp_case, publish_case, pubrel_case, pubrel_smallest_case};
+
+    #[rstest::rstest]
+    // #[case(disconnect_case())]
+    // #[case(ping_req_case())]
+    // #[case(ping_resp_case())]
+    // #[case(publish_case())]
+    // #[case(pubrel_case())]
+    #[case(create_empty_publish_packet())]
+    fn test_write_read_write_read_cases(#[case] packet: Packet) {
+        let mut buffer = BytesMut::new();
+        packet.write(&mut buffer).unwrap();
+        let res1 = Packet::read_from_buffer(&mut buffer).unwrap();
+
+        let mut buffer = BytesMut::new();
+        res1.write(&mut buffer).unwrap();
+        let res2 = Packet::read_from_buffer(&mut buffer).unwrap();
+
+        assert_eq!(res1, res2);
+    }
 
     #[rstest::rstest]
     #[case(disconnect_case())]
@@ -378,4 +518,15 @@ mod tests {
 
         // assert_eq!()
     }
+
+    // #[rstest::rstest]
+    // #[case(&[59, 1, 0, 59])]
+    // #[case(&[16, 14, 0, 4, 77, 81, 84, 84, 5, 247, 247, 252, 1, 17, 247, 247, 247])]
+    // fn test_read_error(#[case] bytes: &[u8]) {
+    //     let mut buffer = BytesMut::from_iter(bytes);
+
+    //     let res = Packet::read_from_buffer(&mut buffer);
+
+    //     assert!(res.is_err());
+    // }
 }

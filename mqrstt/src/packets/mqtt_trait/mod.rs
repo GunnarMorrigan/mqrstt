@@ -51,6 +51,11 @@ where
         <T>::write(self, buf)
     }
 }
+pub(crate) trait MqttAsyncWrite<S>: Sized {
+    /// Write `Self` to the provided stream.
+    /// Returns the deserialized instance and the number of bytes read from the stream.
+    fn async_write(&self, stream: &mut S) -> impl Future<Output = Result<usize, crate::packets::error::WriteError>>;
+}
 
 pub trait PacketValidation: Sized {
     fn validate(&self, max_packet_size: usize) -> Result<(), crate::error::PacketValidationError>;

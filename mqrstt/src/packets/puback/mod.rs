@@ -98,6 +98,27 @@ impl PacketWrite for PubAck {
     }
 }
 
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for PubAck
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        async move {
+            let mut total_written_bytes = 0;
+            if self.reason_code == PubAckReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+                return Ok(total_written_bytes);
+            } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+                total_written_bytes += self.reason_code.async_write(stream).await?;
+            } else {
+                total_written_bytes += self.reason_code.async_write(stream).await?;
+                total_written_bytes += self.properties.async_write(stream).await?;
+            }
+            Ok(total_written_bytes)
+        }
+    }
+}
+
 impl WireLength for PubAck {
     fn wire_len(&self) -> usize {
         if self.reason_code == PubAckReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {

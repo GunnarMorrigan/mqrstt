@@ -4,7 +4,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::packets::{
     error::{DeserializeError, ReadError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
 };
 
 /// Protocol version of the MQTT connection
@@ -19,6 +19,19 @@ impl MqttWrite for ProtocolVersion {
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         buf.put_u8(5u8);
         Ok(())
+    }
+}
+
+impl<S> MqttAsyncWrite<S> for ProtocolVersion
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use tokio::io::AsyncWriteExt;
+        async move {
+            stream.write_u8(5).await?;
+            Ok(1)
+        }
     }
 }
 

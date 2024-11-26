@@ -2,7 +2,7 @@ use bytes::{Bytes, BytesMut};
 
 use crate::packets::{
     error::{DeserializeError, SerializeError},
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
     QoS, WireLength,
 };
 
@@ -75,6 +75,21 @@ impl MqttWrite for LastWill {
         self.topic.write(buf)?;
         self.payload.write(buf)?;
         Ok(())
+    }
+}
+
+impl<S> MqttAsyncWrite<S> for LastWill
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let properties_written = self.last_will_properties.async_write(stream).await?;
+            let topic_written = self.topic.async_write(stream).await?;
+            let payload_written = self.payload.async_write(stream).await?;
+
+            Ok(properties_written + topic_written + payload_written)
+        }
     }
 }
 

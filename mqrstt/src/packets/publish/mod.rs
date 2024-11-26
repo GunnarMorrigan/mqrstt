@@ -6,6 +6,7 @@ use tokio::io::AsyncReadExt;
 use bytes::BufMut;
 
 use crate::error::PacketValidationError;
+use crate::packets::error::ReadError;
 use crate::util::constants::MAXIMUM_TOPIC_SIZE;
 
 use super::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
@@ -113,6 +114,16 @@ where
             let (publish_properties, properties_read_bytes) = PublishProperties::async_read(stream).await?;
             total_read_bytes += properties_read_bytes;
 
+            if total_read_bytes != remaining_length {
+                return Err(ReadError::DeserializeError(DeserializeError::RemainingDataError {
+                    read: total_read_bytes,
+                    remaining_length: remaining_length,
+                }));
+            }
+
+            if total_read_bytes > remaining_length {
+                return Err(ReadError::DeserializeError(DeserializeError::MalformedPacket));
+            }
             let payload_len = remaining_length - total_read_bytes;
             let mut payload = vec![0u8; payload_len];
             let payload_read_bytes = stream.read_exact(&mut payload).await?;
@@ -148,6 +159,31 @@ impl PacketWrite for Publish {
         buf.extend(&self.payload);
 
         Ok(())
+    }
+}
+
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Publish
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let mut total_written_bytes = 0;
+            total_written_bytes += self.topic.async_write(stream).await?;
+
+            if let Some(pkid) = self.packet_identifier {
+                stream.write_u16(pkid).await?;
+                total_written_bytes += 2;
+            }
+            total_written_bytes += self.publish_properties.async_write(stream).await?;
+
+            stream.write_all(&self.payload).await?;
+            total_written_bytes += self.payload.len();
+
+            Ok(total_written_bytes)
+        }
     }
 }
 

@@ -1,7 +1,11 @@
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 
-use crate::packets::{error::{DeserializeError, ReadError, SerializeError}, mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite}};
+use crate::packets::{
+    error::{DeserializeError, ReadError, SerializeError},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
+};
 
+use tokio::io::AsyncWriteExt;
 
 /// Quality of service
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -45,7 +49,10 @@ impl MqttRead for QoS {
     }
 }
 
-impl<T> MqttAsyncRead<T> for QoS where T: tokio::io::AsyncReadExt + std::marker::Unpin {
+impl<T> MqttAsyncRead<T> for QoS
+where
+    T: tokio::io::AsyncReadExt + std::marker::Unpin,
+{
     async fn async_read(buf: &mut T) -> Result<(Self, usize), ReadError> {
         match buf.read_u8().await {
             Ok(0) => Ok((QoS::AtMostOnce, 1)),
@@ -60,12 +67,20 @@ impl<T> MqttAsyncRead<T> for QoS where T: tokio::io::AsyncReadExt + std::marker:
 impl MqttWrite for QoS {
     #[inline]
     fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        let val = match self {
-            QoS::AtMostOnce => 0,
-            QoS::AtLeastOnce => 1,
-            QoS::ExactlyOnce => 2,
-        };
+        let val = self.into_u8();
         buf.put_u8(val);
         Ok(())
+    }
+}
+impl<S> MqttAsyncWrite<S> for QoS
+where
+    S: tokio::io::AsyncWrite + std::marker::Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            let buf: [u8; 1] = [self.into_u8()];
+            stream.write_all(&buf).await?;
+            Ok(1)
+        }
     }
 }

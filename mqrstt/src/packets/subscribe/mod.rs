@@ -7,7 +7,7 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
     error::DeserializeError,
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
     QoS, VariableInteger,
 };
 use bytes::{Buf, BufMut};
@@ -103,6 +103,27 @@ impl PacketWrite for Subscribe {
         }
 
         Ok(())
+    }
+}
+
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Subscribe
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let mut total_written_bytes = 2;
+            stream.write_u16(self.packet_identifier).await?;
+
+            total_written_bytes += self.properties.async_write(stream).await?;
+            for (topic, options) in &self.topics {
+                total_written_bytes += topic.async_write(stream).await?;
+                total_written_bytes += options.async_write(stream).await?;
+            }
+            Ok(total_written_bytes)
+        }
     }
 }
 
@@ -209,7 +230,19 @@ impl MqttWrite for SubscriptionOptions {
     }
 }
 
-// Please describe the retain handling type, what is it used for
+impl<S> MqttAsyncWrite<S> for SubscriptionOptions
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use tokio::io::AsyncWriteExt;
+        async move {
+            let byte = (self.retain_handling.into_u8() << 4) | ((self.retain_as_publish as u8) << 3) | ((self.no_local as u8) << 2) | self.qos.into_u8();
+            stream.write_u8(byte).await?;
+            Ok(1)
+        }
+    }
+}
 
 /// Controls how retained messages are handled
 ///

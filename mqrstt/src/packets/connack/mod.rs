@@ -80,6 +80,22 @@ impl PacketWrite for ConnAck {
     }
 }
 
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for ConnAck
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            use crate::packets::mqtt_trait::MqttAsyncWrite;
+            let connack_flags_writen = self.connack_flags.async_write(stream).await?;
+            let reason_code_writen = self.reason_code.async_write(stream).await?;
+            let connack_properties_writen = self.connack_properties.async_write(stream).await?;
+
+            Ok(connack_flags_writen + reason_code_writen + connack_properties_writen)
+        }
+    }
+}
+
 impl WireLength for ConnAck {
     fn wire_len(&self) -> usize {
         2 + // 1 for connack_flags and 1 for reason_code 
@@ -130,6 +146,21 @@ impl MqttWrite for ConnAckFlags {
 
         buf.put_u8(byte);
         Ok(())
+    }
+}
+
+impl<S> crate::packets::mqtt_trait::MqttAsyncWrite<S> for ConnAckFlags
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        async move {
+            use tokio::io::AsyncWriteExt;
+            let byte = self.session_present as u8;
+
+            stream.write_u8(byte).await?;
+            Ok(1)
+        }
     }
 }
 

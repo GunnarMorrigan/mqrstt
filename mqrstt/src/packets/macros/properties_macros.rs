@@ -33,6 +33,43 @@ macro_rules! define_properties {
             }
         }
 
+        impl<S> $crate::packets::mqtt_trait::MqttAsyncWrite<S> for $name where S: tokio::io::AsyncWrite + Unpin {
+            fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+                async move {
+                    let mut bytes_writen = 0;
+                    $(
+                        $crate::packets::macros::properties_write!(self, bytes_writen, stream, PropertyType::$prop_variant);
+                    )*
+
+                    Ok(bytes_writen)
+                }
+
+                // let (len, length_variable_integer) = <usize as crate::packets::primitive::VariableInteger>::read_async_variable_integer(stream).await?;
+                // if len == 0 {
+                //     return Ok((Self::default(), length_variable_integer));
+                // }
+
+                // let mut properties = $name::default();
+
+                // let mut read_property_bytes = 0;
+                // loop {
+                //     let (prop, read_bytes) = crate::packets::PropertyType::async_read(stream).await?;
+                //     read_property_bytes += read_bytes;
+                //     match prop {
+                //         $(
+                //             $crate::packets::macros::properties_read_match_branch_name!($prop_variant) => $crate::packets::macros::properties_read_match_branch_body!(stream, properties, read_property_bytes, PropertyType::$prop_variant),
+                //         )*
+                //         e => return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::UnexpectedProperty(e, PacketType::PubRel))),
+                //     }
+                //     if read_property_bytes == len {
+                //         break;
+                //     }
+                // }
+
+                // Ok((properties, length_variable_integer + read_property_bytes))
+            }
+        }
+
         impl $crate::packets::mqtt_trait::WireLength for $name {
             fn wire_len(&self) -> usize {
                 let mut len: usize = 0;
@@ -543,6 +580,178 @@ macro_rules! properties_read_match_branch_name {
     };
 }
 
+macro_rules! properties_write {
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::PayloadFormatIndicator) => {
+        if let Some(payload_format_indicator) = &($self.payload_format_indicator) {
+            $bytes_writen += PropertyType::PayloadFormatIndicator.async_write($stream).await?;
+            $bytes_writen += payload_format_indicator.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::MessageExpiryInterval) => {
+        if let Some(message_expiry_interval) = &($self.message_expiry_interval) {
+            $bytes_writen += PropertyType::MessageExpiryInterval.async_write($stream).await?;
+            $bytes_writen += message_expiry_interval.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ContentType) => {
+        if let Some(content_type) = &($self.content_type) {
+            $bytes_writen += PropertyType::ContentType.async_write($stream).await?;
+            $bytes_writen += content_type.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ResponseTopic) => {
+        if let Some(response_topic) = &($self.response_topic) {
+            $bytes_writen += PropertyType::ResponseTopic.async_write($stream).await?;
+            $bytes_writen += response_topic.as_ref().async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::CorrelationData) => {
+        if let Some(correlation_data) = &($self.correlation_data) {
+            $bytes_writen += PropertyType::CorrelationData.async_write($stream).await?;
+            $bytes_writen += correlation_data.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::SubscriptionIdentifier) => {
+        if let Some(sub_id) = &($self.subscription_identifier) {
+            $bytes_writen += PropertyType::SubscriptionIdentifier.async_write($stream).await?;
+            $bytes_writen += $crate::packets::primitive::VariableInteger::write_async_variable_integer(sub_id, $stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ListSubscriptionIdentifier) => {
+        for sub_id in &($self.subscription_identifiers) {
+            $bytes_writen += PropertyType::SubscriptionIdentifier.async_write($stream).await?;
+            $bytes_writen += $crate::packets::primitive::VariableInteger::write_async_variable_integer(sub_id, $stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::SessionExpiryInterval) => {
+        if let Some(session_expiry_interval) = &($self.session_expiry_interval) {
+            $bytes_writen += PropertyType::SessionExpiryInterval.async_write($stream).await?;
+            $bytes_writen += session_expiry_interval.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::AssignedClientIdentifier) => {};
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ServerKeepAlive) => {
+        if let Some(server_keep_alive) = &($self.server_keep_alive) {
+            $bytes_writen += PropertyType::ServerKeepAlive.async_write($stream).await?;
+            $bytes_writen += server_keep_alive.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::AuthenticationMethod) => {
+        if let Some(authentication_method) = &($self.authentication_method) {
+            $bytes_writen += PropertyType::AuthenticationMethod.async_write($stream).await?;
+            $bytes_writen += authentication_method.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::AuthenticationData) => {
+        if let Some(authentication_data) = &($self.authentication_data) {
+            if !authentication_data.is_empty() && ($self.authentication_method).is_some() {
+                $bytes_writen += PropertyType::AuthenticationData.async_write($stream).await?;
+                $bytes_writen += authentication_data.async_write($stream).await?;
+            }
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::RequestProblemInformation) => {
+        if let Some(request_problem_information) = &($self.request_problem_information) {
+            $bytes_writen += PropertyType::RequestProblemInformation.async_write($stream).await?;
+            $bytes_writen += request_problem_information.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::WillDelayInterval) => {
+        if let Some(delay_interval) = &($self.will_delay_interval) {
+            $bytes_writen += PropertyType::WillDelayInterval.async_write($stream).await?;
+            $bytes_writen += delay_interval.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::RequestResponseInformation) => {
+        if let Some(request_response_information) = &($self.request_response_information) {
+            $bytes_writen += PropertyType::RequestResponseInformation.async_write($stream).await?;
+            $bytes_writen += request_response_information.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ResponseInformation) => {
+        if let Some(response_info) = &($self.response_info) {
+            $bytes_writen += PropertyType::ResponseInformation.async_write($stream).await?;
+            $bytes_writen += response_info.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ServerReference) => {
+        if let Some(server_refrence) = &($self.server_reference) {
+            $bytes_writen += PropertyType::ServerReference.async_write($stream).await?;
+            server_refrence.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ReasonString) => {
+        if let Some(reason_string) = &($self.reason_string) {
+            $bytes_writen += PropertyType::ReasonString.async_write($stream).await?;
+            $bytes_writen += reason_string.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::ReceiveMaximum) => {
+        if let Some(receive_maximum) = &($self.receive_maximum) {
+            $bytes_writen += PropertyType::ReceiveMaximum.async_write($stream).await?;
+            $bytes_writen += receive_maximum.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::TopicAliasMaximum) => {
+        if let Some(topic_alias_maximum) = &($self.topic_alias_maximum) {
+            $bytes_writen += PropertyType::TopicAliasMaximum.async_write($stream).await?;
+            $bytes_writen += topic_alias_maximum.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::TopicAlias) => {
+        if let Some(topic_alias) = &($self.topic_alias) {
+            $bytes_writen += PropertyType::TopicAlias.async_write($stream).await?;
+            $bytes_writen += topic_alias.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::MaximumQos) => {
+        if let Some(maximum_qos) = &($self.maximum_qos) {
+            $bytes_writen += PropertyType::MaximumQos.async_write($stream).await?;
+            $bytes_writen += maximum_qos.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::RetainAvailable) => {
+        if let Some(retain_available) = &($self.retain_available) {
+            $bytes_writen += PropertyType::RetainAvailable.async_write($stream).await?;
+            $bytes_writen += retain_available.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::UserProperty) => {
+        for (key, value) in &($self.user_properties) {
+            $bytes_writen += PropertyType::UserProperty.async_write($stream).await?;
+            $bytes_writen += key.async_write($stream).await?;
+            $bytes_writen += value.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::MaximumPacketSize) => {
+        if let Some(maximum_packet_size) = &($self.maximum_packet_size) {
+            $bytes_writen += PropertyType::MaximumPacketSize.async_write($stream).await?;
+            $bytes_writen += maximum_packet_size.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::WildcardSubscriptionAvailable) => {
+        if let Some(wildcards_available) = &($self.wildcards_available) {
+            $bytes_writen += PropertyType::WildcardSubscriptionAvailable.async_write($stream).await?;
+            $bytes_writen += wildcards_available.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::SubscriptionIdentifierAvailable) => {
+        if let Some(subscription_ids_available) = &($self.subscription_ids_available) {
+            $bytes_writen += PropertyType::SubscriptionIdentifierAvailable.async_write($stream).await?;
+            $bytes_writen += subscription_ids_available.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, PropertyType::SharedSubscriptionAvailable) => {
+        if let Some(shared_subscription_available) = &($self.shared_subscription_available) {
+            $bytes_writen += PropertyType::SharedSubscriptionAvailable.async_write($stream).await?;
+            $bytes_writen += shared_subscription_available.async_write($stream).await?;
+        }
+    };
+    ($self:ident, $bytes_writen:ident, $stream:ident, $unknown:ident) => {
+        compile_error!(concat!("Unknown property: ", stringify!($unknown)));
+    };
+}
+
 macro_rules! properties_wire_length {
     ($self:ident, $len:ident, PropertyType::PayloadFormatIndicator) => {
         if $self.payload_format_indicator.is_some() {
@@ -698,3 +907,4 @@ pub(crate) use properties_read_match_branch_body;
 pub(crate) use properties_read_match_branch_name;
 pub(crate) use properties_struct;
 pub(crate) use properties_wire_length;
+pub(crate) use properties_write;
