@@ -3,8 +3,8 @@ use std::io;
 use async_channel::{RecvError, SendError};
 
 use crate::packets::{
-    error::{DeserializeError, ReadBytes, SerializeError},
-    ConnAckReasonCode, {Packet, PacketType},
+    error::{DeserializeError, ReadBytes, ReadError, SerializeError, WriteError},
+    ConnAckReasonCode, Packet, PacketType,
 };
 
 /// Critical errors that can happen during the operation of the entire client
@@ -40,6 +40,24 @@ pub enum ConnectionError {
     #[cfg(feature = "tokio")]
     #[error("Join error")]
     JoinError(#[from] tokio::task::JoinError),
+}
+
+impl From<ReadError> for ConnectionError {
+    fn from(value: ReadError) -> Self {
+        match value {
+            ReadError::DeserializeError(deserialize_error) => ConnectionError::DeserializationError(deserialize_error),
+            ReadError::IoError(error) => ConnectionError::Io(error),
+        }
+    }
+}
+
+impl From<WriteError> for ConnectionError {
+    fn from(value: WriteError) -> Self {
+        match value {
+            WriteError::SerializeError(error) => ConnectionError::SerializationError(error),
+            WriteError::IoError(error) => ConnectionError::Io(error),
+        }
+    }
 }
 
 /// Errors that the internal StateHandler can emit
