@@ -5,6 +5,7 @@ mod properties;
 pub use properties::PubRelProperties;
 
 use bytes::BufMut;
+use tokio::io::AsyncReadExt;
 
 use super::{
     error::{DeserializeError, ReadError},
@@ -58,7 +59,7 @@ impl PacketRead for PubRel {
 
 impl<S> PacketAsyncRead<S> for PubRel
 where
-    S: tokio::io::AsyncReadExt + Unpin,
+    S: tokio::io::AsyncRead + Unpin,
 {
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), ReadError> {
         let mut total_read_bytes = 0;
@@ -352,7 +353,7 @@ mod tests {
         let mut stream = &*buf;
         // flags can be 0 because not used.
         // remaining_length must be at least 4
-        let (p_ack, read_bytes) = PubRel::async_read(0, buf.len(), &mut stream).await.unwrap();
+        let (p_ack, _) = PubRel::async_read(0, buf.len(), &mut stream).await.unwrap();
 
         let mut result = BytesMut::new();
         p_ack.write(&mut result).unwrap();

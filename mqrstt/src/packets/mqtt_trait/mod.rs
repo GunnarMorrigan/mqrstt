@@ -10,7 +10,7 @@ pub(crate) trait PacketRead: Sized {
 
 pub(crate) trait PacketAsyncRead<S>: Sized
 where
-    S: tokio::io::AsyncReadExt + Unpin,
+    S: tokio::io::AsyncRead + Unpin,
 {
     fn async_read(flags: u8, remaining_length: usize, stream: &mut S) -> impl Future<Output = Result<(Self, usize), crate::packets::error::ReadError>>;
 }

@@ -1,13 +1,13 @@
 mod reason_code;
 pub use reason_code::PubAckReasonCode;
 
-use bytes::BufMut;
-
 use super::{
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
     PacketType, PropertyType, VariableInteger,
 };
+use bytes::BufMut;
+use tokio::io::AsyncReadExt;
 
 /// The PUBACK Packet is the response to a PUBLISH Packet with QoS 1.
 /// Both the server and client can send a PUBACK packet.
@@ -20,7 +20,7 @@ pub struct PubAck {
 
 impl<S> PacketAsyncRead<S> for PubAck
 where
-    S: tokio::io::AsyncReadExt + Unpin,
+    S: tokio::io::AsyncRead + Unpin,
 {
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
         let packet_identifier = stream.read_u16().await?;

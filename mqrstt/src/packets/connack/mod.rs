@@ -10,6 +10,7 @@ use super::{
     VariableInteger,
 };
 use bytes::{Buf, BufMut};
+use tokio::io::AsyncReadExt;
 
 /// ConnAck packet is sent by the server in response to a [`crate::packets::Connect`] packet.
 ///
@@ -111,7 +112,7 @@ pub struct ConnAckFlags {
 
 impl<S> MqttAsyncRead<S> for ConnAckFlags
 where
-    S: tokio::io::AsyncReadExt + Unpin,
+    S: tokio::io::AsyncRead + Unpin,
 {
     fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
         async move {

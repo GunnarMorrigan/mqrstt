@@ -59,7 +59,7 @@ impl PacketRead for Subscribe {
 
 impl<S> PacketAsyncRead<S> for Subscribe
 where
-    S: tokio::io::AsyncReadExt + Unpin,
+    S: tokio::io::AsyncRead + Unpin,
 {
     fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
         async move {

@@ -20,7 +20,7 @@ pub struct Disconnect {
 
 impl<S> PacketAsyncRead<S> for Disconnect
 where
-    S: tokio::io::AsyncReadExt + Unpin,
+    S: tokio::io::AsyncRead + Unpin,
 {
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
         if remaining_length == 0 {
