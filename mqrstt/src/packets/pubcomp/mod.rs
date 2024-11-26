@@ -129,7 +129,9 @@ where
     fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
         async move {
-            let mut total_writen_bytes = 0;
+            let mut total_writen_bytes = 2;
+            self.packet_identifier.async_write(stream).await?;
+
             if self.reason_code == PubCompReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
                 return Ok(total_writen_bytes);
             } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
