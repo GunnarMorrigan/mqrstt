@@ -125,7 +125,7 @@ where
         } = self;
 
         let mut await_pingresp = None;
-        let mut outgoing_packet_buffer = Vec::new();
+        // let mut outgoing_packet_buffer = Vec::new();
 
         loop {
             let sleep;
@@ -137,40 +137,33 @@ where
 
             if let Some(stream) = network {
                 tokio::select! {
-                    res = stream.read_bytes() => {
-                        res?;
-                        loop{
-                            let packet = match stream.parse_message().await {
-                                Err(ReadBytes::Err(err)) => return Err(err),
-                                Err(ReadBytes::InsufficientBytes(_)) => break,
-                                Ok(packet) => packet,
-                            };
-                            match packet{
-                                Packet::PingResp => {
-                                    SequentialHandler::call_handler_await(handler, packet).await;
-                                    await_pingresp = None;
-                                },
-                                Packet::Disconnect(_) => {
-                                    SequentialHandler::call_handler_await(handler, packet).await;
-                                    return Ok(NetworkStatus::IncomingDisconnect);
-                                }
-                                packet => {
-                                    match state_handler.handle_incoming_packet(&packet)? {
-                                        (maybe_reply_packet, true) => {
-                                            SequentialHandler::call_handler_await(handler, packet).await;
-                                            if let Some(reply_packet) = maybe_reply_packet {
-                                                outgoing_packet_buffer.push(reply_packet);
-                                            }
-                                        },
-                                        (Some(reply_packet), false) => {
-                                            outgoing_packet_buffer.push(reply_packet);
-                                        },
-                                        (None, false) => (),
-                                    }
+                    res = stream.read() => {
+                        let packet = res?;
+                        match packet{
+                            Packet::PingResp => {
+                                SequentialHandler::call_handler_await(handler, packet).await;
+                                await_pingresp = None;
+                            },
+                            Packet::Disconnect(_) => {
+                                SequentialHandler::call_handler_await(handler, packet).await;
+                                return Ok(NetworkStatus::IncomingDisconnect);
+                            }
+                            packet => {
+                                match state_handler.handle_incoming_packet(&packet)? {
+                                    (maybe_reply_packet, true) => {
+                                        SequentialHandler::call_handler_await(handler, packet).await;
+                                        if let Some(reply_packet) = maybe_reply_packet {
+                                            stream.write(&reply_packet).await?;
+                                            *last_network_action = Instant::now();
+                                        }
+                                    },
+                                    (Some(reply_packet), false) => {
+                                        stream.write(&reply_packet).await?;
+                                        *last_network_action = Instant::now();
+                                    },
+                                    (None, false) => (),
                                 }
                             }
-                            stream.write_all(&mut outgoing_packet_buffer).await?;
-                            *last_network_action = Instant::now();
                         }
                     },
                     outgoing = to_network_r.recv() => {
@@ -270,7 +263,7 @@ pub struct NetworkReader<N, H, S> {
 impl<N, H, S> NetworkReader<N, H, S>
 where
     N: HandlerExt<H>,
-    S: tokio::io::AsyncReadExt + Sized + Unpin + Send + 'static,
+    S: tokio::io::AsyncRead + Sized + Unpin + Send + 'static,
 {
     /// Runs the read half of the mqtt connection.
     /// Continuously loops until disconnect or error.
@@ -289,16 +282,8 @@ where
     }
     async fn read(&mut self) -> Result<NetworkStatus, ConnectionError> {
         while self.run_signal.load(std::sync::atomic::Ordering::Acquire) {
-            let _ = self.read_stream.read_bytes().await?;
             loop {
-                let packet = match self.read_stream.parse_message() {
-                    Err(ReadBytes::Err(err)) => return Err(err),
-                    Err(ReadBytes::InsufficientBytes(_)) => {
-                        break;
-                    }
-                    Ok(packet) => packet,
-                };
-
+                let packet = self.read_stream.read().await?;
                 match packet {
                     Packet::PingResp => {
                         N::call_handler(&mut self.handler, packet).await;

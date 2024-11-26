@@ -52,12 +52,12 @@ pub fn subscribe_packet() -> Vec<u8> {
 fn publish_packet_test(#[case] bytes: Vec<u8>) {
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
     let mut write_buffer = BytesMut::new();
-    let packet = Packet::read_from_buffer(&mut read_buffer).unwrap();
+    let packet = Packet::read(&mut read_buffer).unwrap();
     packet.write(&mut write_buffer).unwrap();
 
     assert_eq!(bytes.len(), write_buffer.len());
 
-    let packet_from_write_buffer = Packet::read_from_buffer(&mut write_buffer).unwrap();
+    let packet_from_write_buffer = Packet::read(&mut write_buffer).unwrap();
 
     assert_eq!(packet, packet_from_write_buffer);
 }
@@ -68,7 +68,7 @@ fn test_connect() {
 
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
     let mut write_buffer = BytesMut::new();
-    let packet = Packet::read_from_buffer(&mut read_buffer).unwrap();
+    let packet = Packet::read(&mut read_buffer).unwrap();
     packet.write(&mut write_buffer).unwrap();
 
     if let Packet::Connect(p) = &packet {
@@ -79,7 +79,7 @@ fn test_connect() {
     assert_eq!(bytes.len(), write_buffer.len());
     assert_eq!(bytes, write_buffer.to_vec());
 
-    let packet_from_write_buffer = Packet::read_from_buffer(&mut write_buffer).unwrap();
+    let packet_from_write_buffer = Packet::read(&mut write_buffer).unwrap();
 
     assert_eq!(packet, packet_from_write_buffer);
 }
@@ -93,7 +93,7 @@ fn test_connect() {
 fn test_equal_read_write_packet_from_bytes(#[case] bytes: Vec<u8>) {
     let mut read_buffer = BytesMut::from_iter(bytes.iter());
     let mut write_buffer = BytesMut::new();
-    let packet = Packet::read_from_buffer(&mut read_buffer).unwrap();
+    let packet = Packet::read(&mut read_buffer).unwrap();
     packet.write(&mut write_buffer).unwrap();
 
     assert_eq!(bytes, write_buffer.to_vec());

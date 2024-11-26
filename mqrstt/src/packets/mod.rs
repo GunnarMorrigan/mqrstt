@@ -293,7 +293,7 @@ impl Packet {
         Ok(written)
     }
 
-    pub(crate) fn read(header: FixedHeader, buf: Bytes) -> Result<Packet, DeserializeError> {
+    pub(crate) fn read_packet(header: FixedHeader, buf: Bytes) -> Result<Packet, DeserializeError> {
         let packet = match header.packet_type {
             PacketType::Connect => Packet::Connect(Connect::read(header.flags, header.remaining_length, buf)?),
             PacketType::ConnAck => Packet::ConnAck(ConnAck::read(header.flags, header.remaining_length, buf)?),
@@ -314,7 +314,7 @@ impl Packet {
         Ok(packet)
     }
 
-    pub(crate) async fn async_read<S>(header: FixedHeader, stream: &mut S) -> Result<Packet, ReadError>
+    async fn async_read_packet<S>(header: FixedHeader, stream: &mut S) -> Result<Packet, ReadError>
     where
         S: tokio::io::AsyncRead + Unpin,
     {
@@ -338,16 +338,19 @@ impl Packet {
         Ok(packet)
     }
 
-    pub async fn async_read_from_buffer<S>(stream: &mut S) -> Result<Packet, ReadError>
+    pub async fn async_read<S>(stream: &mut S) -> Result<Packet, ReadError>
     where
         S: tokio::io::AsyncRead + Unpin,
     {
         let (header, _) = FixedHeader::async_read(stream).await?;
 
-        Ok(Packet::async_read(header, stream).await?)
+        #[cfg(feature = "logs")]
+        tracing::trace!("Read packet header: {:?}", header);
+
+        Ok(Packet::async_read_packet(header, stream).await?)
     }
 
-    pub fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {
+    pub fn read(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {
         use bytes::Buf;
         use error::ReadBytes;
 
@@ -359,7 +362,7 @@ impl Packet {
 
         let buf = buffer.split_to(header.remaining_length);
 
-        Ok(Packet::read(header, buf.into())?)
+        Ok(Packet::read_packet(header, buf.into())?)
     }
 }
 
@@ -460,26 +463,26 @@ mod tests {
     fn test_write_read_write_read_cases(#[case] packet: Packet) {
         let mut buffer = BytesMut::new();
         packet.write(&mut buffer).unwrap();
-        let res1 = Packet::read_from_buffer(&mut buffer).unwrap();
+        let res1 = Packet::read(&mut buffer).unwrap();
 
         let mut buffer = BytesMut::new();
         res1.write(&mut buffer).unwrap();
-        let res2 = Packet::read_from_buffer(&mut buffer).unwrap();
+        let res2 = Packet::read(&mut buffer).unwrap();
 
         assert_eq!(res1, res2);
     }
 
     #[rstest::rstest]
-    #[case(disconnect_case())]
-    #[case(ping_req_case())]
-    #[case(ping_resp_case())]
-    #[case(publish_case())]
-    #[case(pubrel_case())]
-    #[case(pubrel_smallest_case())]
+    #[case::disconnect(disconnect_case())]
+    #[case::ping_req(ping_req_case())]
+    #[case::ping_resp(ping_resp_case())]
+    #[case::publish(publish_case())]
+    #[case::pubrel(pubrel_case())]
+    #[case::pubrel_smallest(pubrel_smallest_case())]
     fn test_read_write_cases(#[case] (bytes, expected_packet): (&[u8], Packet)) {
         let mut buffer = BytesMut::from_iter(bytes);
 
-        let res = Packet::read_from_buffer(&mut buffer);
+        let res = Packet::read(&mut buffer);
 
         assert!(res.is_ok());
 
@@ -495,17 +498,17 @@ mod tests {
     }
 
     #[rstest::rstest]
-    #[case(disconnect_case())]
-    #[case(ping_req_case())]
-    #[case(ping_resp_case())]
-    #[case(publish_case())]
-    #[case(pubrel_case())]
-    #[case(pubrel_smallest_case())]
+    #[case::disconnect(disconnect_case())]
+    #[case::ping_req(ping_req_case())]
+    #[case::ping_resp(ping_resp_case())]
+    #[case::publish(publish_case())]
+    #[case::pubrel(pubrel_case())]
+    #[case::pubrel_smallest(pubrel_smallest_case())]
     #[tokio::test]
     async fn test_async_read_write(#[case] (mut bytes, expected_packet): (&[u8], Packet)) {
-        // let mut buffer = BytesMut::from(bytes);
+        let input = bytes.to_vec();
 
-        let res = Packet::async_read_from_buffer(&mut bytes).await;
+        let res = Packet::async_read(&mut bytes).await;
 
         dbg!(&res);
         assert!(res.is_ok());
@@ -514,9 +517,11 @@ mod tests {
 
         assert_eq!(packet, expected_packet);
 
-        // packet.write(&mut buffer).unwrap();
+        let mut out = Vec::with_capacity(1000);
 
-        // assert_eq!()
+        packet.async_write(&mut out).await.unwrap();
+
+        assert_eq!(out, input)
     }
 
     // #[rstest::rstest]

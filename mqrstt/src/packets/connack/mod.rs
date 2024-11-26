@@ -216,7 +216,7 @@ mod tests {
 
         p1.write(&mut buf).unwrap();
 
-        let p2 = Packet::read_from_buffer(&mut buf).unwrap();
+        let p2 = Packet::read(&mut buf).unwrap();
 
         assert_eq!(p1, p2);
     }

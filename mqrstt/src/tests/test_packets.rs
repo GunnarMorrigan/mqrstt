@@ -292,7 +292,7 @@ fn test_equal_write_read(#[case] packet: Packet) {
 
     packet.write(&mut buffer).unwrap();
 
-    let read_packet = Packet::read_from_buffer(&mut buffer).unwrap();
+    let read_packet = Packet::read(&mut buffer).unwrap();
 
     assert_eq!(packet, read_packet);
 }
