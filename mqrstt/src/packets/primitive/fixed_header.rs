@@ -30,7 +30,7 @@ pub(crate) struct FixedHeader {
 }
 
 impl FixedHeader {
-    pub fn read_fixed_header(mut header: Iter<u8>) -> Result<(Self, usize), ReadBytes<DeserializeError>> {
+    pub(crate) fn read_fixed_header(mut header: Iter<u8>) -> Result<(Self, usize), ReadBytes<DeserializeError>> {
         if header.len() < 2 {
             return Err(ReadBytes::InsufficientBytes(2 - header.len()));
         }
@@ -46,7 +46,7 @@ impl FixedHeader {
         Ok((Self { packet_type, flags, remaining_length }, header_length))
     }
 
-    pub async fn async_read<S>(stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError>
+    pub(crate) async fn async_read<S>(stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError>
     where
         S: tokio::io::AsyncRead + Unpin,
     {
