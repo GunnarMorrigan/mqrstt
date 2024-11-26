@@ -40,23 +40,6 @@ where
     }
 }
 
-impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Disconnect
-where
-    S: tokio::io::AsyncWrite + Unpin,
-{
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        use crate::packets::mqtt_trait::MqttAsyncWrite;
-        async move {
-            let mut total_written_bytes = 0;
-            if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
-                total_written_bytes += self.reason_code.async_write(stream).await?;
-                total_written_bytes += self.properties.async_write(stream).await?;
-            }
-            Ok(total_written_bytes)
-        }
-    }
-}
-
 impl PacketRead for Disconnect {
     fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let reason_code;
@@ -81,6 +64,24 @@ impl PacketWrite for Disconnect {
         Ok(())
     }
 }
+
+impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Disconnect
+where
+    S: tokio::io::AsyncWrite + Unpin,
+{
+    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        async move {
+            let mut total_written_bytes = 0;
+            if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
+                total_written_bytes += self.reason_code.async_write(stream).await?;
+                total_written_bytes += self.properties.async_write(stream).await?;
+            }
+            Ok(total_written_bytes)
+        }
+    }
+}
+
 impl WireLength for Disconnect {
     fn wire_len(&self) -> usize {
         if self.reason_code != DisconnectReasonCode::NormalDisconnection || self.properties.wire_len() != 0 {
