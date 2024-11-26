@@ -114,13 +114,6 @@ where
             let (publish_properties, properties_read_bytes) = PublishProperties::async_read(stream).await?;
             total_read_bytes += properties_read_bytes;
 
-            if total_read_bytes != remaining_length {
-                return Err(ReadError::DeserializeError(DeserializeError::RemainingDataError {
-                    read: total_read_bytes,
-                    remaining_length: remaining_length,
-                }));
-            }
-
             if total_read_bytes > remaining_length {
                 return Err(ReadError::DeserializeError(DeserializeError::MalformedPacket));
             }
