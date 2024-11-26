@@ -37,6 +37,7 @@ macro_rules! define_properties {
             fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
                 async move {
                     let mut bytes_writen = 0;
+                    $crate::packets::VariableInteger::write_async_variable_integer(&self.wire_len(), stream).await?;
                     $(
                         $crate::packets::macros::properties_write!(self, bytes_writen, stream, PropertyType::$prop_variant);
                     )*
