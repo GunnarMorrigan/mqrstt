@@ -75,8 +75,3 @@ async-rustls = { version = "0.4.1" }
 tokio-rustls = "0.24.1"
 rstest = "0.23.0"
 rand = "0.8.5"
-
-
-[[bench]]
-name = "bench_main"
-harness = false
