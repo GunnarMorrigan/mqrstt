@@ -7,65 +7,76 @@ use crate::packets::ConnAck;
 use crate::packets::{ConnAckReasonCode, Packet};
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 
-#[derive(Debug)]
-pub struct Stream<S> {
-    stream: S,
+pub(crate) trait StreamExt {
+    fn connect(&mut self, options: &ConnectOptions) -> impl std::future::Future<Output = Result<ConnAck, ConnectionError>>;
+    fn read_packet(&mut self) -> impl std::future::Future<Output = Result<Packet, ConnectionError>>;
+    fn write_packet(&mut self, packet: &Packet) -> impl std::future::Future<Output = Result<(), ConnectionError>>;
+    fn write_packets(&mut self, packets: &[Packet]) -> impl std::future::Future<Output = Result<(), ConnectionError>>;
+    fn flush_packets(&mut self) -> impl std::future::Future<Output = std::io::Result<()>>;
 }
 
-impl<S> Stream<S>
+impl<S> StreamExt for S
 where
     S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Sized + Unpin,
 {
-    pub async fn connect(options: &ConnectOptions, stream: S) -> Result<(Self, ConnAck), ConnectionError> {
-        let mut s = Self { stream };
+    fn connect(&mut self, options: &ConnectOptions) -> impl std::future::Future<Output = Result<ConnAck, ConnectionError>> {
+        async move {
+            let connect = options.create_connect_from_options();
 
-        let connect = options.create_connect_from_options();
+            self.write_packet(&connect).await?;
 
-        s.write(&connect).await?;
-
-        let packet = Packet::async_read(&mut s.stream).await?;
-        if let Packet::ConnAck(con) = packet {
-            if con.reason_code == ConnAckReasonCode::Success {
-                #[cfg(feature = "logs")]
-                trace!("Connected to server");
-                Ok((s, con))
+            let packet = Packet::async_read(self).await?;
+            if let Packet::ConnAck(con) = packet {
+                if con.reason_code == ConnAckReasonCode::Success {
+                    #[cfg(feature = "logs")]
+                    trace!("Connected to server");
+                    Ok(con)
+                } else {
+                    Err(ConnectionError::ConnectionRefused(con.reason_code))
+                }
             } else {
-                Err(ConnectionError::ConnectionRefused(con.reason_code))
+                Err(ConnectionError::NotConnAck(packet))
             }
-        } else {
-            Err(ConnectionError::NotConnAck(packet))
         }
     }
 
-    pub async fn read(&mut self) -> Result<Packet, ConnectionError> {
-        Ok(Packet::async_read(&mut self.stream).await?)
+    fn read_packet(&mut self) -> impl std::future::Future<Output = Result<Packet, ConnectionError>> {
+        async move { Ok(Packet::async_read(self).await?) }
     }
 
-    pub async fn write(&mut self, packet: &Packet) -> Result<(), ConnectionError> {
-        match packet.async_write(&mut self.stream).await {
-            Ok(_) => (),
-            Err(err) => {
-                return match err {
-                    crate::packets::error::WriteError::SerializeError(serialize_error) => Err(ConnectionError::SerializationError(serialize_error)),
-                    crate::packets::error::WriteError::IoError(error) => Err(ConnectionError::Io(error)),
+    fn write_packet(&mut self, packet: &Packet) -> impl std::future::Future<Output = Result<(), ConnectionError>> {
+        async move {
+            match packet.async_write(self).await {
+                Ok(_) => (),
+                Err(err) => {
+                    return match err {
+                        crate::packets::error::WriteError::SerializeError(serialize_error) => Err(ConnectionError::SerializationError(serialize_error)),
+                        crate::packets::error::WriteError::IoError(error) => Err(ConnectionError::Io(error)),
+                    }
                 }
             }
+
+            #[cfg(feature = "logs")]
+            trace!("Sending packet {}", packet);
+
+            self.flush().await?;
+            // self.flush_packets().await?;
+
+            Ok(())
         }
-        self.stream.flush().await?;
-
-        #[cfg(feature = "logs")]
-        trace!("Sending packet {}", packet);
-
-        Ok(())
     }
 
-    pub async fn write_all(&mut self, packets: &mut Vec<Packet>) -> Result<(), ConnectionError> {
+    async fn write_packets(&mut self, packets: &[Packet]) -> Result<(), ConnectionError> {
         for packet in packets {
-            let _ = packet.async_write(&mut self.stream).await;
+            let _ = packet.async_write(self).await;
             #[cfg(feature = "logs")]
             trace!("Sending packet {}", packet);
         }
-        self.stream.flush().await?;
+        self.flush_packets().await?;
         Ok(())
+    }
+
+    fn flush_packets(&mut self) -> impl std::future::Future<Output = std::io::Result<()>> {
+        tokio::io::AsyncWriteExt::flush(self)
     }
 }

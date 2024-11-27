@@ -44,7 +44,7 @@
 //!     // To reconnect after a disconnect or error
 //!     let (mut network, client) = NetworkBuilder
 //!         ::new_from_client_id("mqrsttSmolExample")
-//!         .smol_sequential_network();
+//!         .smol_network();
 //!     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
 //!         .unwrap();
@@ -236,9 +236,9 @@ where
     /// ```
     /// let (mut network, client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>
     ///     ::new_from_client_id("ExampleClient")
-    ///     .smol_sequential_network();
+    ///     .smol_network();
     /// ```
-    pub fn smol_sequential_network(self) -> (smol::Network<H, S>, MqttClient) {
+    pub fn smol_network(self) -> (smol::Network<H, S>, MqttClient) {
         let (to_network_s, to_network_r) = async_channel::bounded(CHANNEL_SIZE);
 
         let (apkids, apkids_r) = available_packet_ids::AvailablePacketIds::new(self.options.send_maximum());
@@ -251,38 +251,6 @@ where
 
         (network, client)
     }
-}
-
-#[cfg(feature = "todo")]
-/// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
-/// S should implement [`std::io::Read`] and [`std::io::Write`].
-/// Additionally, S should be made non_blocking otherwise it will not progress.
-///
-/// # Example
-///
-/// ```
-/// use mqrstt::ConnectOptions;
-///
-/// let options = ConnectOptions::new("ExampleClient");
-/// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-/// ```
-pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
-where
-    S: std::io::Read + std::io::Write + Sized + Unpin,
-{
-    use available_packet_ids::AvailablePacketIds;
-
-    let (to_network_s, to_network_r) = async_channel::bounded(100);
-
-    let (apkids, apkids_r) = AvailablePacketIds::new(options.send_maximum());
-
-    let max_packet_size = options.maximum_packet_size();
-
-    let client = MqttClient::new(apkids_r, to_network_s, max_packet_size);
-
-    let network = sync::Network::new(options, to_network_r, apkids);
-
-    (network, client)
 }
 
 #[cfg(test)]
@@ -310,7 +278,7 @@ mod smol_lib_test {
             let address = "broker.emqx.io";
             let port = 1883;
 
-            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
+            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_network();
 
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
             let mut pingpong = PingPong::new(client.clone());
@@ -347,7 +315,7 @@ mod smol_lib_test {
             let address = "broker.emqx.io";
             let port = 1883;
 
-            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
+            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_network();
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
 
             let mut pingresp = crate::example_handlers::PingResp::new(client.clone());
@@ -393,7 +361,7 @@ mod smol_lib_test {
 
             let (n, _) = futures::join!(
                 async {
-                    let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
+                    let (mut network, client) = NetworkBuilder::new_from_options(options).smol_network();
                     let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
                     let mut pingresp = crate::example_handlers::PingResp::new(client.clone());
                     network.connect(stream, &mut pingresp).await

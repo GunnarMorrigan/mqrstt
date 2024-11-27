@@ -46,56 +46,6 @@ impl MqttClient {
             max_packet_size,
         }
     }
-
-    /// This function is only here for you to use during testing of for example your handler
-    /// For a simple client look at [`MqttClient::test_client`]
-    #[cfg(feature = "test")]
-    pub fn test_custom_client(available_packet_ids_r: Receiver<u16>, to_network_s: Sender<Packet>, max_packet_size: usize) -> Self {
-        Self {
-            available_packet_ids_r,
-            to_network_s,
-            max_packet_size,
-        }
-    }
-
-    /// This function is only here for you to use during testing of for example your handler
-    /// For control over the input of this type look at [`MqttClient::test_custom_client`]
-    ///
-    /// The returned values should not be dropped otherwise the client won't be able to operate normally.
-    ///
-    /// # Example
-    /// ```ignore
-    /// let (
-    ///     client, // An instance of this client
-    ///     ids, // Allows you to indicate which packet IDs have become available again.
-    ///     network_receiver // Messages send through the `client` will be dispatched through this channel
-    /// ) = MqttClient::test_client();
-    ///
-    /// // perform testing
-    ///
-    /// // Make sure to not drop these before the test is done!
-    /// std::hint::black_box((ids, network_receiver));
-    /// ```
-    #[cfg(feature = "test")]
-    pub fn test_client() -> (Self, crate::available_packet_ids::AvailablePacketIds, Receiver<Packet>) {
-        use async_channel::unbounded;
-
-        use crate::{available_packet_ids::AvailablePacketIds, util::constants::MAXIMUM_PACKET_SIZE};
-
-        let (available_packet_ids, available_packet_ids_r) = AvailablePacketIds::new(u16::MAX);
-
-        let (s, r) = unbounded();
-
-        (
-            Self {
-                available_packet_ids_r,
-                to_network_s: s,
-                max_packet_size: MAXIMUM_PACKET_SIZE as usize,
-            },
-            available_packet_ids,
-            r,
-        )
-    }
 }
 
 /// Async functions to perform MQTT operations
@@ -106,7 +56,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("example_id").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("example_id").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -140,6 +90,8 @@ impl MqttClient {
 
         sub.validate(self.max_packet_size)?;
         self.to_network_s.send(Packet::Subscribe(sub)).await.map_err(|_| ClientError::NoNetworkChannel)?;
+        #[cfg(feature = "logs")]
+        info!("Send to network: Subscribe with ID {:?}", pkid);
         Ok(())
     }
 
@@ -150,7 +102,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("example_id").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("example_id").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -210,7 +162,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (_, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (_, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -264,7 +216,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -334,7 +286,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// // Unsubscribe from a single topic specified as a string:
@@ -381,7 +333,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let (_, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (_, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::UnsubscribeProperties;
@@ -450,7 +402,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// mqtt_client.disconnect().await.unwrap();
@@ -476,7 +428,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::DisconnectProperties;
@@ -512,7 +464,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::{SubscriptionOptions, RetainHandling};
@@ -556,7 +508,7 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::{SubscribeProperties, SubscriptionOptions, RetainHandling};
@@ -616,7 +568,7 @@ impl MqttClient {
     /// This function blocks until the packet is queued for transmission
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -672,7 +624,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
@@ -742,7 +694,7 @@ impl MqttClient {
     ///
     /// # Examples
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// // Unsubscribe from a single topic specified as a string:
@@ -790,7 +742,7 @@ impl MqttClient {
     /// # Examples
     ///
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::UnsubscribeProperties;
@@ -851,7 +803,7 @@ impl MqttClient {
     /// # Example
     ///
     /// ```
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// mqtt_client.disconnect_blocking().unwrap();
@@ -877,7 +829,7 @@ impl MqttClient {
     ///
     /// ```
     ///
-    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_sequential_network();
+    /// # let (network, mqtt_client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>::new_from_client_id("Example").smol_network();
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::DisconnectProperties;

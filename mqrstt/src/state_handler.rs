@@ -1,7 +1,6 @@
 use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::HandlerError;
-use crate::packets::{PubRecReasonCode, PubAckReasonCode, ConnAckReasonCode};
 use crate::packets::PubComp;
 use crate::packets::PubRec;
 use crate::packets::PubRel;
@@ -12,6 +11,7 @@ use crate::packets::Subscribe;
 use crate::packets::UnsubAck;
 use crate::packets::Unsubscribe;
 use crate::packets::{ConnAck, Disconnect};
+use crate::packets::{ConnAckReasonCode, PubAckReasonCode, PubRecReasonCode};
 use crate::packets::{Packet, PacketType};
 use crate::packets::{PubAck, PubAckProperties};
 use crate::state::State;
@@ -188,6 +188,7 @@ impl StateHandler {
             _a => {
                 #[cfg(test)]
                 unreachable!("Was given unexpected packet {:?} ", _a);
+                #[cfg(not(test))]
                 Ok(())
             }
         }
@@ -247,13 +248,8 @@ mod handler_tests {
     use crate::{
         available_packet_ids::AvailablePacketIds,
         packets::{
-            Packet, 
-            PubComp, PubCompProperties, PubCompReasonCode, 
-            PubRec, PubRecProperties, PubRecReasonCode,
-            PubRel, PubRelProperties, PubRelReasonCode,
-            QoS,
-            SubAck, SubAckProperties, SubAckReasonCode,
-            UnsubAck, UnsubAckProperties, UnsubAckReasonCode
+            Packet, PubComp, PubCompProperties, PubCompReasonCode, PubRec, PubRecProperties, PubRecReasonCode, PubRel, PubRelProperties, PubRelReasonCode, QoS, SubAck, SubAckProperties,
+            SubAckReasonCode, UnsubAck, UnsubAckProperties, UnsubAckReasonCode,
         },
         tests::test_packets::{create_connack_packet, create_puback_packet, create_publish_packet, create_subscribe_packet, create_unsubscribe_packet},
         ConnectOptions, StateHandler,
