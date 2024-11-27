@@ -1,0 +1,19 @@
+[package]
+name = "tcp"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+smol = { version = "2" }
+
+tokio = { version = "1", features = ["full"] }
+
+mqrstt = { path = "../../mqrstt", features = ["logs"] }
+
+[[bin]]
+name = "tokio"
+path = "src/tokio.rs"
+
+[[bin]]
+name = "smol"
+path = "src/smol.rs"

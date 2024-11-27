@@ -3,4 +3,5 @@
 members = [
     "mqrstt",
     "fuzz",
+    "examples/tcp"
 ]
