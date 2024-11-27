@@ -1,6 +1,6 @@
 [package]
 name = "mqrstt"
-version = "0.3.0"
+version = "0.4.0"
 homepage = "https://github.com/GunnarMorrigan/mqrstt"
 repository = "https://github.com/GunnarMorrigan/mqrstt"
 documentation = "https://docs.rs/mqrstt"
@@ -10,7 +10,6 @@ edition = "2021"
 license = "MPL-2.0"
 keywords = ["MQTT", "IoT", "MQTTv5", "messaging", "client"]
 description = "Pure rust MQTTv5 client implementation Smol and Tokio"
-
 rust-version = "1.75"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -53,8 +52,6 @@ tokio = { version = "1", features = [
 smol = { version = "2", optional = true }
 
 [dev-dependencies]
-criterion = { version = "0.5.1", features = ["async_tokio"] }
-
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 smol = { version = "2.0.0" }
