@@ -451,14 +451,23 @@ mod tests {
 
     use crate::packets::Packet;
 
-    use crate::tests::test_packets::{create_empty_publish_packet, disconnect_case, ping_req_case, ping_resp_case, publish_case, pubrel_case, pubrel_smallest_case};
+    use crate::tests::test_packets::*;
 
     #[rstest::rstest]
-    // #[case(disconnect_case())]
-    // #[case(ping_req_case())]
-    // #[case(ping_resp_case())]
-    // #[case(publish_case())]
-    // #[case(pubrel_case())]
+    #[case(ping_req_case().1)]
+    #[case(ping_resp_case().1)]
+    #[case(connack_case().1)]
+    #[case(create_subscribe_packet(1))]
+    #[case(create_subscribe_packet(65335))]
+    #[case(create_puback_packet(1))]
+    #[case(create_puback_packet(65335))]
+    #[case(create_disconnect_packet())]
+    #[case(create_connack_packet(true))]
+    #[case(create_connack_packet(false))]
+    #[case(publish_packet_1())]
+    #[case(publish_packet_2())]
+    #[case(publish_packet_3())]
+    #[case(publish_packet_4())]
     #[case(create_empty_publish_packet())]
     fn test_write_read_write_read_cases(#[case] packet: Packet) {
         let mut buffer = BytesMut::new();

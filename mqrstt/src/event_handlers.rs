@@ -50,15 +50,12 @@ pub mod example_handlers {
 
     pub struct PingResp {
         pub client: MqttClient,
-        pub ping_resp_received: AtomicU16,
+        pub ping_resp_received: u32,
     }
 
     impl PingResp {
         pub fn new(client: MqttClient) -> Self {
-            Self {
-                client,
-                ping_resp_received: AtomicU16::new(0),
-            }
+            Self { client, ping_resp_received: 0 }
         }
     }
 
@@ -66,7 +63,7 @@ pub mod example_handlers {
         async fn handle(&mut self, event: packets::Packet) -> () {
             use Packet::*;
             if event == PingResp {
-                self.ping_resp_received.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.ping_resp_received += 1;
             }
             println!("Received packet: {}", event);
         }
@@ -76,7 +73,7 @@ pub mod example_handlers {
         fn handle(&mut self, event: Packet) {
             use Packet::*;
             if event == PingResp {
-                self.ping_resp_received.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                self.ping_resp_received += 1;
             }
             println!("Received packet: {}", event);
         }

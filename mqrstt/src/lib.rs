@@ -19,7 +19,6 @@
 //!
 //! Notes:
 //! ----------------------------
-//! - While the handler is processing a message the stream blocks. To prevent this, spawn a task in the handler or use [tokio::ConcurrentHandler].
 //! - Handlers only get incoming packets
 //! - Create a new connection when an error or disconnect is encountered
 //!
@@ -83,7 +82,7 @@
 //! async fn main() {
 //!     let (mut network, client) = NetworkBuilder
 //!         ::new_from_client_id("TokioTcpPingPongExample")
-//!         .tokio_sequential_network();
+//!         .tokio_network();
 //!
 //!     // Construct a no op handler
 //!     let mut nop = NOP{};
@@ -206,7 +205,7 @@ where
     /// let options = ConnectOptions::new("ExampleClient");
     /// let (mut network, client) = mqrstt::NetworkBuilder::<(), tokio::net::TcpStream>
     ///     ::new_from_options(options)
-    ///     .tokio_sequential_network();
+    ///     .tokio_network();
     /// ```
     pub fn tokio_network(self) -> (tokio::Network<H, S>, MqttClient)
     where
@@ -266,12 +265,12 @@ mod smol_lib_test {
 
     use rand::Rng;
 
-    use crate::{example_handlers::PingPong, packets::QoS, ConnectOptions, NetworkBuilder};
+    use crate::{example_handlers::PingPong, packets::QoS, random_chars, ConnectOptions, NetworkBuilder};
 
     #[test]
     fn test_smol_tcp() {
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
+            let mut client_id: String = random_chars();
             client_id += "_SmolTcpPingPong";
             let options = ConnectOptions::new(client_id);
 
@@ -339,7 +338,7 @@ mod smol_lib_test {
             );
             assert!(n.is_ok());
             let pingresp = n.unwrap();
-            assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
+            assert_eq!(2, pingresp.ping_resp_received);
         });
     }
 
@@ -385,45 +384,45 @@ mod smol_lib_test {
 #[cfg(feature = "tokio")]
 #[cfg(test)]
 mod tokio_lib_test {
-    use crate::example_handlers::PingPong;
+    use crate::example_handlers::PingResp;
+    use crate::random_chars;
+    use crate::ConnectOptions;
 
-    use crate::packets::QoS;
+    use std::time::Duration;
 
-    use std::{sync::Arc, time::Duration};
+    #[tokio::test]
+    async fn test_tokio_ping_req() {
+        let mut client_id: String = random_chars();
+        client_id += "_TokioTcppingrespTest";
+        let mut options = ConnectOptions::new(client_id);
+        let keep_alive_interval = 5;
+        options.set_keep_alive_interval(Duration::from_secs(keep_alive_interval));
 
-    // #[tokio::test]
-    // async fn test_tokio_ping_req() {
-    //     let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-    //     client_id += "_TokioTcppingrespTest";
-    //     let mut options = ConnectOptions::new(client_id);
-    //     let keep_alive_interval = 5;
-    //     options.set_keep_alive_interval(Duration::from_secs(keep_alive_interval));
+        let wait_duration = options.get_keep_alive_interval() * 2 + options.get_keep_alive_interval() / 2;
 
-    //     let wait_duration = options.get_keep_alive_interval() * 2 + options.get_keep_alive_interval() / 2;
+        let (mut network, client) = crate::NetworkBuilder::new_from_options(options).tokio_network();
 
-    //     let (mut network, client) = new_tokio(options);
+        let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
-    //     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
+        let mut pingresp = PingResp::new(client.clone());
 
-    //     let pingresp = Arc::new(crate::test_handlers::PingResp::new(client.clone()));
+        network.connect(stream, &mut pingresp).await.unwrap();
 
-    //     network.connect(stream, &mut pingresp).await.unwrap();
+        let network_handle = tokio::task::spawn(async move {
+            network.run(&mut pingresp).await;
+            pingresp
+        });
 
-    //     let (read, write) = network.split(pingresp.clone()).unwrap();
+        tokio::time::sleep(wait_duration).await;
+        client.disconnect().await.unwrap();
 
-    //     let read_handle = tokio::task::spawn(read.run());
-    //     let write_handle = tokio::task::spawn(write.run());
+        tokio::time::sleep(Duration::from_secs(1)).await;
 
-    //     tokio::time::sleep(wait_duration).await;
-    //     client.disconnect().await.unwrap();
-
-    //     tokio::time::sleep(Duration::from_secs(1)).await;
-
-    //     let (read_result, write_result) = tokio::join!(read_handle, write_handle);
-    //     let (read_result, write_result) = (read_result.unwrap(), write_result.unwrap());
-    //     assert!(write_result.is_ok());
-    //     assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
-    // }
+        let result = network_handle.await;
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(2, result.ping_resp_received);
+    }
 
     #[cfg(all(feature = "tokio", target_family = "windows"))]
     #[tokio::test]
@@ -435,11 +434,11 @@ mod tokio_lib_test {
         let address = ("127.0.0.1", 2000);
 
         let client_id: String = crate::random_chars() + "_TokioTcppingrespTest";
-        let options = ConnectOptions::new(client_id);
+        let options = crate::ConnectOptions::new(client_id);
 
         let (n, _) = tokio::join!(
             async move {
-                let (mut network, client) = NetworkBuilder::new_from_options(options).tokio_sequential_network();
+                let (mut network, client) = NetworkBuilder::new_from_options(options).tokio_network();
 
                 let stream = tokio::net::TcpStream::connect(address).await.unwrap();
 
@@ -456,8 +455,7 @@ mod tokio_lib_test {
         );
 
         if let ConnectionError::Io(err) = n.unwrap_err() {
-            assert_eq!(ErrorKind::ConnectionReset, err.kind());
-            assert_eq!("Connection reset by peer".to_string(), err.to_string());
+            assert_eq!(ErrorKind::UnexpectedEof, err.kind());
         } else {
             panic!();
         }

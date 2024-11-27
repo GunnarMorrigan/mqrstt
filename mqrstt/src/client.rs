@@ -7,16 +7,7 @@ use crate::{
     error::ClientError,
     packets::{
         mqtt_trait::PacketValidation,
-        DisconnectReasonCode,
-        Packet,
-        QoS,
-        // disconnect::{Disconnect, DisconnectProperties},
-        // publish::{Publish, PublishProperties},
-        // subscribe::{Subscribe, SubscribeProperties, Subscription},
-        // unsubscribe::{Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
-        {Disconnect, DisconnectProperties},
-        {Publish, PublishProperties},
-        {Subscribe, SubscribeProperties, SubscribeTopics},
+        DisconnectReasonCode, Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, SubscribeTopics},
         {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
     },
 };
@@ -26,7 +17,7 @@ use crate::{
 ///
 /// This object can be obtained by calling the builder functions on [`crate::NetworkBuilder`]
 ///
-/// This client should be used in combindation with a handler [`crate::AsyncEventHandler`] or [`crate::AsyncEventHandlerMut`] to handle incoming messages.
+/// This client should be used in combination with a handler [`crate::AsyncEventHandler`] to receive and send messages.
 pub struct MqttClient {
     /// Provides this client with an available packet id or waits on it.
     available_packet_ids_r: Receiver<u16>,
@@ -212,7 +203,7 @@ impl MqttClient {
     /// Creates a Publish packet with additional publish properties.
     /// The packet is then asynchronously transferred to the Network stack for transmission.
     ///
-    /// Can be called with any payload that can be converted into [`Bytes`]
+    /// Can be called with any payload that can be converted into [`Vec<u8>`]
     ///
     /// # Examples
     /// ```
@@ -563,7 +554,7 @@ impl MqttClient {
 
     /// Creates a Publish packet which is then transferred to the Network stack for transmission.
     ///
-    /// Can be called with any payload that can be converted into [`Bytes`]
+    /// Can be called with any payload that can be converted into [`Vec<u8>`]
     ///
     /// This function blocks until the packet is queued for transmission
     /// # Examples
@@ -618,7 +609,7 @@ impl MqttClient {
     /// Creates a Publish packet with additional publish properties.
     /// The packet is then transferred to the Network stack for transmission.
     ///
-    /// Can be called with any payload that can be converted into [`Bytes`]
+    /// Can be called with any payload that can be converted into [`Vec<u8>`]
     ///
     /// This function blocks until the packet is queued for transmission
     ///
