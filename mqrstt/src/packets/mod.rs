@@ -83,36 +83,6 @@ impl Packet {
         }
     }
 
-    pub(crate) fn first_byte(&self) -> u8 {
-        match self {
-            Packet::Connect(_) => 0b0001_0000,
-            Packet::ConnAck(_) => 0b0010_0000,
-            Packet::Publish(p) => {
-                let mut first_byte = 0b0011_0000u8;
-                if p.dup {
-                    first_byte |= 0b1000;
-                }
-                first_byte |= p.qos.into_u8() << 1;
-                if p.retain {
-                    first_byte |= 0b0001;
-                }
-                first_byte
-            }
-            Packet::PubAck(_) => 0b0100_0000,
-            Packet::PubRec(_) => 0b0101_0000,
-            Packet::PubRel(_) => 0b0110_0010,
-            Packet::PubComp(_) => 0b0111_0000,
-            Packet::Subscribe(_) => 0b1000_0010,
-            Packet::SubAck(_) => 0b1001_0000,
-            Packet::Unsubscribe(_) => 0b1010_0010,
-            Packet::UnsubAck(_) => 0b1011_0000,
-            Packet::PingReq => 0b1100_0000,
-            Packet::PingResp => 0b1101_0000,
-            Packet::Disconnect(_) => 0b1110_0000,
-            Packet::Auth(_) => 0b1111_0000,
-        }
-    }
-
     pub(crate) fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         match self {
             Packet::Connect(p) => {
