@@ -22,8 +22,6 @@ The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWrite`
 - Lean
 - Keep alive depends on actual communication
 - This tokio implemention has been fuzzed using cargo-fuzz!
-
-
   
 ### To do
 - Even More testing
