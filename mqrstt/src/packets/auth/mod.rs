@@ -48,9 +48,9 @@ where
     S: tokio::io::AsyncWrite + Unpin,
 {
     async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
-        let reason_code_writen = self.reason_code.async_write(stream).await?;
-        let properties_writen = self.properties.async_write(stream).await?;
-        Ok(reason_code_writen + properties_writen)
+        let reason_code_written = self.reason_code.async_write(stream).await?;
+        let properties_written = self.properties.async_write(stream).await?;
+        Ok(reason_code_written + properties_written)
     }
 }
 

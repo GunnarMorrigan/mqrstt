@@ -409,7 +409,7 @@ mod tokio_lib_test {
         network.connect(stream, &mut pingresp).await.unwrap();
 
         let network_handle = tokio::task::spawn(async move {
-            let result = network.run(&mut pingresp).await;
+            let _result = network.run(&mut pingresp).await;
             // check result and or restart the connection
             pingresp
         });

@@ -118,18 +118,18 @@ where
     fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
         async move {
-            let mut total_writen_bytes = 2;
+            let mut total_written_bytes = 2;
             self.packet_identifier.async_write(stream).await?;
 
             if self.reason_code == PubRecReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
-                return Ok(total_writen_bytes);
+                return Ok(total_written_bytes);
             } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
-                total_writen_bytes += self.reason_code.async_write(stream).await?;
+                total_written_bytes += self.reason_code.async_write(stream).await?;
             } else {
-                total_writen_bytes += self.reason_code.async_write(stream).await?;
-                total_writen_bytes += self.properties.async_write(stream).await?;
+                total_written_bytes += self.reason_code.async_write(stream).await?;
+                total_written_bytes += self.properties.async_write(stream).await?;
             }
-            Ok(total_writen_bytes)
+            Ok(total_written_bytes)
         }
     }
 }

@@ -44,7 +44,7 @@ impl MqttRead for SubAckProperties {
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::SubAck)),
             }
 
-            if buf.is_empty() {
+            if properties_data.is_empty() {
                 break;
             }
         }
@@ -58,7 +58,6 @@ impl MqttWrite for SubAckProperties {
         if let Some(sub_id) = self.subscription_identifier {
             PropertyType::SubscriptionIdentifier.write(buf)?;
             sub_id.write_variable_integer(buf)?;
-            // sub_id.write_variable_integer(buf)?;
         }
         for (key, value) in &self.user_properties {
             PropertyType::UserProperty.write(buf)?;

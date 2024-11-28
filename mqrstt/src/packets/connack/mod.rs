@@ -85,11 +85,11 @@ where
 {
     async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
-        let connack_flags_writen = self.connack_flags.async_write(stream).await?;
-        let reason_code_writen = self.reason_code.async_write(stream).await?;
-        let connack_properties_writen = self.connack_properties.async_write(stream).await?;
+        let connack_flags_written = self.connack_flags.async_write(stream).await?;
+        let reason_code_written = self.reason_code.async_write(stream).await?;
+        let connack_properties_written = self.connack_properties.async_write(stream).await?;
 
-        Ok(connack_flags_writen + reason_code_writen + connack_properties_writen)
+        Ok(connack_flags_written + reason_code_written + connack_properties_written)
     }
 }
 

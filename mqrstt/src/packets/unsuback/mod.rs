@@ -12,7 +12,7 @@ use tokio::io::AsyncReadExt;
 
 use super::error::SerializeError;
 use super::mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite};
-use super::PacketAsyncRead;
+use super::{PacketAsyncRead, VariableInteger, WireLength};
 
 /// UnsubAck packet is sent by the server in response to an [`crate::packets::Unsubscribe`] packet.
 #[derive(Debug, Default, PartialEq, Eq, Clone)]
@@ -23,18 +23,20 @@ pub struct UnsubAck {
 }
 
 impl PacketRead for UnsubAck {
-    fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = UnsubAckProperties::read(&mut buf)?;
         let mut reason_codes = vec![];
+
+        let mut read = 2 + properties.wire_len().variable_integer_len() + properties.wire_len();
         loop {
-            let reason_code = UnsubAckReasonCode::read(&mut buf)?;
-
-            reason_codes.push(reason_code);
-
-            if buf.is_empty() {
+            if read == remaining_length {
                 break;
             }
+
+            let reason_code = UnsubAckReasonCode::read(&mut buf)?;
+            reason_codes.push(reason_code);
+            read += 1;
         }
 
         Ok(Self {
@@ -50,23 +52,22 @@ where
     S: tokio::io::AsyncRead + Unpin,
 {
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
-        let mut total_read_bytes = 0;
+        let mut total_read_bytes = 2;
         let packet_identifier = stream.read_u16().await?;
-        total_read_bytes += 2;
 
         let (properties, properties_read_bytes) = UnsubAckProperties::async_read(stream).await?;
         total_read_bytes += properties_read_bytes;
 
         let mut reason_codes = vec![];
         loop {
+            if total_read_bytes >= remaining_length {
+                break;
+            }
+
             let (reason_code, reason_code_read_bytes) = UnsubAckReasonCode::async_read(stream).await?;
             total_read_bytes += reason_code_read_bytes;
 
             reason_codes.push(reason_code);
-
-            if total_read_bytes >= remaining_length {
-                break;
-            }
         }
 
         Ok((
@@ -111,6 +112,12 @@ where
 
             Ok(total_written_bytes)
         }
+    }
+}
+
+impl WireLength for UnsubAck {
+    fn wire_len(&self) -> usize {
+        2 + self.properties.wire_len().variable_integer_len() + self.properties.wire_len() + self.reason_codes.len()
     }
 }
 

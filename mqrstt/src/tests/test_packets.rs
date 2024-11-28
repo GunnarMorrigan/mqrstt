@@ -276,6 +276,60 @@ pub fn create_disconnect_packet() -> Packet {
     })
 }
 
+pub fn suback_case() -> Packet {
+    let expected = SubAck {
+        packet_identifier: 3,
+        reason_codes: vec![SubAckReasonCode::GrantedQoS0, SubAckReasonCode::GrantedQoS1, SubAckReasonCode::GrantedQoS2],
+        properties: SubAckProperties {
+            user_properties: vec![(String::from("test").into(), String::from("test").into())],
+            subscription_identifier: Some(2000),
+        },
+    };
+
+    Packet::SubAck(expected)
+}
+
+pub fn subscribe_case() -> Packet {
+    let expected = Subscribe {
+        packet_identifier: 3,
+        topics: vec![("test/topic".into(), SubscriptionOptions::default())],
+        properties: SubscribeProperties {
+            user_properties: vec![(String::from("test").into(), String::from("test").into())],
+            subscription_identifier: Some(2000),
+        },
+    };
+
+    Packet::Subscribe(expected)
+}
+
+// return a crazy big packet
+pub fn unsuback_case() -> Packet {
+    let expected = UnsubAck {
+        packet_identifier: 3,
+        reason_codes: vec![
+            UnsubAckReasonCode::NoSubscriptionExisted,
+            UnsubAckReasonCode::UnspecifiedError,
+            UnsubAckReasonCode::ImplementationSpecificError,
+        ],
+        properties: UnsubAckProperties {
+            user_properties: vec![],
+            reason_string: None,
+        },
+    };
+
+    Packet::UnsubAck(expected)
+}
+
+pub fn unsubscribe_case() -> Packet {
+    let expected = Unsubscribe {
+        packet_identifier: 3,
+        topics: vec!["test/topic".into()],
+        properties: UnsubscribeProperties { user_properties: vec![] },
+    };
+
+    Packet::Unsubscribe(expected)
+}
+
 #[rstest]
 #[case(create_subscribe_packet(1))]
 #[case(create_subscribe_packet(65335))]

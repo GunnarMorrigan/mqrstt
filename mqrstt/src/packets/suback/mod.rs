@@ -1,4 +1,5 @@
 mod properties;
+
 pub use properties::SubAckProperties;
 
 mod reason_code;
@@ -7,6 +8,7 @@ pub use reason_code::SubAckReasonCode;
 use super::{
     error::SerializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
+    VariableInteger, WireLength,
 };
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
@@ -23,19 +25,21 @@ pub struct SubAck {
 }
 
 impl PacketRead for SubAck {
-    fn read(_: u8, _: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
+    fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, super::error::DeserializeError> {
         let packet_identifier = u16::read(&mut buf)?;
         let properties = SubAckProperties::read(&mut buf)?;
 
         let mut reason_codes = vec![];
+
+        let mut read = 2 + properties.wire_len().variable_integer_len() + properties.wire_len();
         loop {
-            let reason_code = SubAckReasonCode::read(&mut buf)?;
-
-            reason_codes.push(reason_code);
-
-            if buf.is_empty() {
+            if read >= remaining_length {
                 break;
             }
+
+            let reason_code = SubAckReasonCode::read(&mut buf)?;
+            reason_codes.push(reason_code);
+            read += 1;
         }
 
         Ok(Self {
@@ -57,13 +61,13 @@ where
         total_read_bytes += 2 + proproperties_read_bytes;
         let mut reason_codes = vec![];
         loop {
-            let (reason_code, reason_code_read_bytes) = SubAckReasonCode::async_read(stream).await?;
-            total_read_bytes += reason_code_read_bytes;
-            reason_codes.push(reason_code);
-
             if remaining_length == total_read_bytes {
                 break;
             }
+
+            let (reason_code, reason_code_read_bytes) = SubAckReasonCode::async_read(stream).await?;
+            total_read_bytes += reason_code_read_bytes;
+            reason_codes.push(reason_code);
         }
 
         Ok((
@@ -111,6 +115,12 @@ where
     }
 }
 
+impl WireLength for SubAck {
+    fn wire_len(&self) -> usize {
+        2 + self.properties.wire_len().variable_integer_len() + self.properties.wire_len() + self.reason_codes.len()
+    }
+}
+
 #[cfg(test)]
 mod test {
     use bytes::BytesMut;
@@ -128,7 +138,7 @@ mod test {
         ];
 
         let data = BytesMut::from(&buf[..]);
-        let sub_ack = SubAck::read(0, 0, data.clone().into()).unwrap();
+        let sub_ack = SubAck::read(0, 5, data.clone().into()).unwrap();
 
         let mut result = BytesMut::new();
         sub_ack.write(&mut result).unwrap();

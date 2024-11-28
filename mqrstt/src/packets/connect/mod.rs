@@ -223,12 +223,12 @@ where
         use crate::packets::mqtt_trait::MqttAsyncWrite;
         use tokio::io::AsyncWriteExt;
         async move {
-            let mut total_writen_bytes = 6 // protocol header
+            let mut total_written_bytes = 6 // protocol header
                 + 1 // protocol version
                 + 1 // connect flags
                 + 2; // keep alive
             let protocol = [0x00, 0x04, b'M', b'Q', b'T', b'T'];
-            // We allready start with 6 as total writen bytes thus dont add anymore
+            // We allready start with 6 as total written bytes thus dont add anymore
             stream.write_all(&protocol).await?;
 
             self.protocol_version.async_write(stream).await?;
@@ -250,21 +250,21 @@ where
 
             stream.write_u16(self.keep_alive).await?;
 
-            total_writen_bytes += self.connect_properties.async_write(stream).await?;
+            total_written_bytes += self.connect_properties.async_write(stream).await?;
 
-            total_writen_bytes += self.client_id.async_write(stream).await?;
+            total_written_bytes += self.client_id.async_write(stream).await?;
 
             if let Some(last_will) = &self.last_will {
-                total_writen_bytes += last_will.async_write(stream).await?;
+                total_written_bytes += last_will.async_write(stream).await?;
             }
             if let Some(username) = &self.username {
-                total_writen_bytes += username.async_write(stream).await?;
+                total_written_bytes += username.async_write(stream).await?;
             }
             if let Some(password) = &self.password {
-                total_writen_bytes += password.async_write(stream).await?;
+                total_written_bytes += password.async_write(stream).await?;
             }
 
-            Ok(total_writen_bytes)
+            Ok(total_written_bytes)
         }
     }
 }

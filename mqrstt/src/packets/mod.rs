@@ -103,9 +103,7 @@ impl Packet {
             Packet::PubRel(_) => 0b0110_0010,
             Packet::PubComp(_) => 0b0111_0000,
             Packet::Subscribe(_) => 0b1000_0010,
-            Packet::SubAck(_) => {
-                unreachable!()
-            }
+            Packet::SubAck(_) => 0b1001_0000,
             Packet::Unsubscribe(_) => 0b1010_0010,
             Packet::UnsubAck(_) => 0b1011_0000,
             Packet::PingReq => 0b1100_0000,
@@ -168,17 +166,20 @@ impl Packet {
                 p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
-            Packet::SubAck(_) => {
-                unreachable!()
+            Packet::SubAck(p) => {
+                buf.put_u8(0b1001_0000);
+                p.wire_len().write_variable_integer(buf)?;
+                p.write(buf)?;
             }
             Packet::Unsubscribe(p) => {
                 buf.put_u8(0b1010_0010);
                 p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
-            Packet::UnsubAck(_) => {
-                unreachable!();
-                // buf.put_u8(0b1011_0000);
+            Packet::UnsubAck(p) => {
+                buf.put_u8(0b1011_0000);
+                p.wire_len().write_variable_integer(buf)?;
+                p.write(buf)?;
             }
             Packet::PingReq => {
                 buf.put_u8(0b1100_0000);
@@ -259,17 +260,20 @@ impl Packet {
                 written += p.wire_len().write_async_variable_integer(stream).await?;
                 written += p.async_write(stream).await?;
             }
-            Packet::SubAck(_) => {
-                unreachable!()
+            Packet::SubAck(p) => {
+                stream.write_u8(0b1001_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
             }
             Packet::Unsubscribe(p) => {
                 stream.write_u8(0b1010_0010).await?;
                 written += p.wire_len().write_async_variable_integer(stream).await?;
                 written += p.async_write(stream).await?;
             }
-            Packet::UnsubAck(_) => {
-                unreachable!();
-                // stream.write_u8(0b1011_0000).await?;
+            Packet::UnsubAck(p) => {
+                stream.write_u8(0b1011_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
             }
             Packet::PingReq => {
                 stream.write_u8(0b1100_0000).await?;
@@ -396,6 +400,28 @@ impl Display for Packet {
     }
 }
 
+impl WireLength for Packet {
+    fn wire_len(&self) -> usize {
+        match self {
+            Packet::Connect(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::ConnAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Publish(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubRec(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubRel(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubComp(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Subscribe(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::SubAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Unsubscribe(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::UnsubAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PingReq => 2,
+            Packet::PingResp => 2,
+            Packet::Disconnect(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Auth(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+        }
+    }
+}
+
 /// 2.1.2 MQTT Control Packet type
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
 pub enum PacketType {
@@ -447,6 +473,7 @@ impl std::fmt::Display for PacketType {
 
 #[cfg(test)]
 mod tests {
+
     use bytes::BytesMut;
 
     use crate::packets::Packet;
@@ -454,25 +481,38 @@ mod tests {
     use crate::tests::test_packets::*;
 
     #[rstest::rstest]
-    #[case(ping_req_case().1)]
-    #[case(ping_resp_case().1)]
-    #[case(connack_case().1)]
-    #[case(create_subscribe_packet(1))]
-    #[case(create_subscribe_packet(65335))]
-    #[case(create_puback_packet(1))]
-    #[case(create_puback_packet(65335))]
-    #[case(create_disconnect_packet())]
-    #[case(create_connack_packet(true))]
-    #[case(create_connack_packet(false))]
-    #[case(publish_packet_1())]
-    #[case(publish_packet_2())]
-    #[case(publish_packet_3())]
-    #[case(publish_packet_4())]
-    #[case(create_empty_publish_packet())]
+    #[case::ping_req_case(ping_req_case().1)]
+    #[case::ping_resp_case(ping_resp_case().1)]
+    #[case::connack_case(connack_case().1)]
+    #[case::create_subscribe_packet(create_subscribe_packet(1))]
+    #[case::create_subscribe_packet(create_subscribe_packet(65335))]
+    #[case::create_puback_packet(create_puback_packet(1))]
+    #[case::create_puback_packet(create_puback_packet(65335))]
+    #[case::create_disconnect_packet(create_disconnect_packet())]
+    #[case::create_connack_packet(create_connack_packet(true))]
+    #[case::create_connack_packet(create_connack_packet(false))]
+    #[case::publish_packet_1(publish_packet_1())]
+    #[case::publish_packet_2(publish_packet_2())]
+    #[case::publish_packet_3(publish_packet_3())]
+    #[case::publish_packet_4(publish_packet_4())]
+    #[case::create_empty_publish_packet(create_empty_publish_packet())]
+    #[case::subscribe(subscribe_case())]
+    #[case::suback(suback_case())]
+    #[case::unsubscribe(unsubscribe_case())]
+    #[case::unsuback(unsuback_case())]
     fn test_write_read_write_read_cases(#[case] packet: Packet) {
+        use crate::packets::WireLength;
+
         let mut buffer = BytesMut::new();
+
         packet.write(&mut buffer).unwrap();
+
+        let wire_len = packet.wire_len();
+        assert_eq!(wire_len, buffer.len());
+
         let res1 = Packet::read(&mut buffer).unwrap();
+
+        assert_eq!(packet, res1);
 
         let mut buffer = BytesMut::new();
         res1.write(&mut buffer).unwrap();
@@ -531,6 +571,43 @@ mod tests {
         packet.async_write(&mut out).await.unwrap();
 
         assert_eq!(out, input)
+    }
+
+    #[rstest::rstest]
+    #[case::ping_req_case(ping_req_case().1)]
+    #[case::ping_resp_case(ping_resp_case().1)]
+    #[case::connack_case(connack_case().1)]
+    #[case::create_subscribe_packet(create_subscribe_packet(1))]
+    #[case::create_subscribe_packet(create_subscribe_packet(65335))]
+    #[case::create_puback_packet(create_puback_packet(1))]
+    #[case::create_puback_packet(create_puback_packet(65335))]
+    #[case::create_disconnect_packet(create_disconnect_packet())]
+    #[case::create_connack_packet(create_connack_packet(true))]
+    #[case::create_connack_packet(create_connack_packet(false))]
+    #[case::publish_packet_1(publish_packet_1())]
+    #[case::publish_packet_2(publish_packet_2())]
+    #[case::publish_packet_3(publish_packet_3())]
+    #[case::publish_packet_4(publish_packet_4())]
+    #[case::create_empty_publish_packet(create_empty_publish_packet())]
+    #[case::subscribe(subscribe_case())]
+    #[case::suback(suback_case())]
+    #[case::unsubscribe(unsubscribe_case())]
+    #[case::unsuback(unsuback_case())]
+    #[tokio::test]
+    async fn test_async_write_read_write_read_cases(#[case] packet: Packet) {
+        use crate::packets::WireLength;
+
+        let mut buffer = Vec::with_capacity(1000);
+        packet.async_write(&mut buffer).await.unwrap();
+
+        let wire_len = packet.wire_len();
+        assert_eq!(wire_len, buffer.len());
+
+        let mut buf = buffer.as_slice();
+
+        let res1 = Packet::async_read(&mut buf).await.unwrap();
+
+        assert_eq!(packet, res1);
     }
 
     // #[rstest::rstest]

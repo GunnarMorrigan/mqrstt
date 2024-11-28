@@ -38,7 +38,7 @@ impl MqttRead for UnsubAckProperties {
                 e => return Err(DeserializeError::UnexpectedProperty(e, PacketType::UnsubAck)),
             }
 
-            if buf.is_empty() {
+            if properties_data.is_empty() {
                 break;
             }
         }
