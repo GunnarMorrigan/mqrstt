@@ -114,23 +114,4 @@ pub mod example_handlers {
             }
         }
     }
-
-    #[cfg(feature = "sync")]
-    impl EventHandler for PingPong {
-        fn handle(&mut self, event: Packet) {
-            match event {
-                Packet::Publish(p) => {
-                    if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
-                        if payload.to_lowercase().contains("ping") {
-                            self.client.publish_blocking(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).unwrap();
-                        }
-                    }
-                }
-                Packet::ConnAck(_) => {
-                    println!("Connected!")
-                }
-                _ => (),
-            }
-        }
-    }
 }
