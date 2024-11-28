@@ -27,8 +27,6 @@ impl EventHandler for () {
 pub mod example_handlers {
     use std::{ops::AddAssign, sync::atomic::AtomicU16};
 
-    use bytes::Bytes;
-
     use crate::{
         packets::{self, Packet},
         AsyncEventHandler, EventHandler, MqttClient,
@@ -96,7 +94,7 @@ pub mod example_handlers {
                         let max_len = payload.len().min(10);
                         let a = &payload[0..max_len];
                         if payload.to_lowercase().contains("ping") {
-                            self.client.publish(p.topic.clone(), p.qos, p.retain, Bytes::from_static(b"pong")).await.unwrap();
+                            self.client.publish(p.topic.clone(), p.qos, p.retain, b"pong").await.unwrap();
                             println!("Received publish payload: {}", a);
 
                             if !p.retain {
