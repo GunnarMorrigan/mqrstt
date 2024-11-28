@@ -2,11 +2,10 @@
 
 [licenses]
 confidence-threshold = 0.95
-allow = ["MPL-2.0", "Apache-2.0", "MIT", "BSD-3-Clause", "ISC", "Unicode-3.0"]
+allow = ["MPL-2.0", "Apache-2.0", "MIT", "Unicode-3.0"]
 
 exceptions = [
     { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
-    { allow = ["OpenSSL"], name = "ring" }
 ]
 
 [[licenses.clarify]]
