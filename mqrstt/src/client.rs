@@ -149,7 +149,7 @@ impl MqttClient {
 
     /// Creates a Publish packet which is then asynchronously transferred to the Network stack for transmission.
     ///
-    /// Can be called with any payload that can be converted into [`Bytes`]
+    /// Can be called with any payload that can be converted into [`Vec<u8>`]
     ///
     /// # Examples
     /// ```
@@ -157,16 +157,15 @@ impl MqttClient {
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
-    /// use bytes::Bytes;
     ///
     /// // publish a message with QoS 0, without a packet identifier
     /// mqtt_client.publish("test/topic", QoS::AtMostOnce, false, "Hello world").await;
     ///
     /// // publish a message with QoS 1, with a packet identifier
-    /// mqtt_client.publish("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world")).await;
+    /// mqtt_client.publish("test/topic", QoS::AtLeastOnce, false, b"Hello world").await;
     ///
     /// // publish a message with QoS 2, with a packet identifier
-    /// mqtt_client.publish("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world")).await;
+    /// mqtt_client.publish("test/topic", QoS::ExactlyOnce, false, "Hello world").await;
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload: &[u8] = "Hello World!".as_bytes();
@@ -212,7 +211,6 @@ impl MqttClient {
     ///
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::PublishProperties;
-    /// use bytes::Bytes;
     ///
     /// let properties = PublishProperties{
     ///     response_topic: Some("response/topic".into()),
@@ -223,17 +221,17 @@ impl MqttClient {
     /// # let properties_clone = properties.clone();
     ///
     /// // publish a message with QoS 0, without a packet identifier
-    /// mqtt_client.publish_with_properties("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties).await;
+    /// mqtt_client.publish_with_properties("test/topic", QoS::AtMostOnce, false, "Hello world", properties).await;
     ///
     /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier
-    /// mqtt_client.publish_with_properties("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties).await;
+    /// mqtt_client.publish_with_properties("test/topic", QoS::AtLeastOnce, false, "Hello world", properties).await;
     ///
     /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 2, with a packet identifier
-    /// mqtt_client.publish_with_properties("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties).await;
+    /// mqtt_client.publish_with_properties("test/topic", QoS::ExactlyOnce, false, "Hello world", properties).await;
     ///
     /// # let properties = properties_clone.clone();
     ///
@@ -563,16 +561,15 @@ impl MqttClient {
     /// # smol::block_on(async {
     ///
     /// use mqrstt::packets::QoS;
-    /// use bytes::Bytes;
     ///
     /// // publish a message with QoS 0, without a packet identifier
     /// mqtt_client.publish_blocking("test/topic", QoS::AtMostOnce, false, "Hello world").unwrap();
     ///
     /// // publish a message with QoS 1, with a packet identifier
-    /// mqtt_client.publish_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world")).unwrap();
+    /// mqtt_client.publish_blocking("test/topic", QoS::AtLeastOnce, false, "Hello world").unwrap();
     ///
     /// // publish a message with QoS 2, with a packet identifier
-    /// mqtt_client.publish_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world")).unwrap();
+    /// mqtt_client.publish_blocking("test/topic", QoS::ExactlyOnce, false, "Hello world").unwrap();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
     /// let payload: &[u8] = "Hello World!".as_bytes();
@@ -620,7 +617,6 @@ impl MqttClient {
     ///
     /// use mqrstt::packets::QoS;
     /// use mqrstt::packets::PublishProperties;
-    /// use bytes::Bytes;
     ///
     /// let properties = PublishProperties{
     ///     response_topic: Some("response/topic".into()),
@@ -631,28 +627,28 @@ impl MqttClient {
     /// # let properties_clone = properties.clone();
     ///
     /// // publish a message with QoS 0, without a packet identifier
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, false, Bytes::from("Hello world"), properties).unwrap();
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, false, "Hello world", properties).unwrap();
     ///
     /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, false, Bytes::from("Hello world"), properties).unwrap();
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, false, "Hello world", properties).unwrap();
     ///
     /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 2, with a packet identifier
-    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::ExactlyOnce, false, Bytes::from("Hello world"), properties).unwrap();
+    /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::ExactlyOnce, false, "Hello world", properties).unwrap();
     ///
     /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
-    /// let payload = "Hello World!".as_bytes();
+    /// let payload = b"Hello World!";
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtLeastOnce, true, payload, properties).unwrap();
     ///
     /// # let properties = properties_clone.clone();
     ///
     /// // publish a message with QoS 1, with a packet identifier, and the "retain" flag set
-    /// let payload = "Hello World!".as_bytes().to_vec();
+    /// let payload = b"Hello World!".to_vec();
     /// mqtt_client.publish_with_properties_blocking("test/topic", QoS::AtMostOnce, true, payload, properties).unwrap();
     ///
     /// # });
