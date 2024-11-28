@@ -20,7 +20,7 @@ pub enum ReadError {
     IoError(#[from] std::io::Error),
 }
 
-#[derive(Error, Clone, Debug, PartialEq, Eq)]
+#[derive(Error, Clone, Debug)]
 pub enum DeserializeError {
     #[error("Malformed packet: {0}")]
     MalformedPacketWithInfo(String),

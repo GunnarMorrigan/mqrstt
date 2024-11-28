@@ -1,6 +1,6 @@
 use mqrstt::{
     packets::{self, Packet},
-    AsyncEventHandler, ConnectOptions, MqttClient, NetworkBuilder, NetworkStatus,
+    AsyncEventHandler, MqttClient, NetworkBuilder, NetworkStatus,
 };
 pub struct PingPong {
     pub client: MqttClient,

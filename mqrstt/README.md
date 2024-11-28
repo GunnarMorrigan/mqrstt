@@ -10,8 +10,7 @@
 `MQRSTT` is an MQTTv5 client that provides sync and async (smol and tokio) implementation.
 
 Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
-For an async approach the stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWriteExt`] traits.
-For a sync approach the stream has to implement the [`std::io::Read`] and [`std::io::Write`] traits.
+The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWrite`] traits.
 
 </div>
 

@@ -15,7 +15,7 @@ use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
 
-/// [`Network`] reads and writes to the network based on tokios [`::smol::io::AsyncReadExt`] [`::smol::io::AsyncWriteExt`].
+/// [`Network`] reads and writes to the network based on tokios [`::smol::io::AsyncRead`] [`::smol::io::AsyncWrite`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
@@ -62,7 +62,7 @@ impl<H, S> Network<H, S> {
 impl<H, S> Network<H, S>
 where
     H: AsyncEventHandler,
-    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+    S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> {
