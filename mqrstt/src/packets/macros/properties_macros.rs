@@ -36,7 +36,7 @@ macro_rules! define_properties {
         impl<S> $crate::packets::mqtt_trait::MqttAsyncWrite<S> for $name where S: tokio::io::AsyncWrite + Unpin {
             async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
                 let mut bytes_written = 0;
-                $crate::packets::VariableInteger::write_async_variable_integer(&self.wire_len(), stream).await?;
+                bytes_written += $crate::packets::VariableInteger::write_async_variable_integer(&self.wire_len(), stream).await?;
                 $(
                     $crate::packets::macros::properties_write!(self, bytes_written, stream, PropertyType::$prop_variant);
                 )*

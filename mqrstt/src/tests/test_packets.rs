@@ -324,7 +324,7 @@ pub fn unsubscribe_case() -> Packet {
     let expected = Unsubscribe {
         packet_identifier: 3,
         topics: vec!["test/topic".into()],
-        properties: UnsubscribeProperties { user_properties: vec![] },
+        properties: UnsubscribeProperties { user_properties: vec![("written += 1;".into(), "value".into())] },
     };
 
     Packet::Unsubscribe(expected)

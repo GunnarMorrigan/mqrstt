@@ -278,10 +278,12 @@ impl Packet {
             Packet::PingReq => {
                 stream.write_u8(0b1100_0000).await?;
                 stream.write_u8(0).await?; // Variable header length.
+                written += 1;
             }
             Packet::PingResp => {
                 stream.write_u8(0b1101_0000).await?;
                 stream.write_u8(0).await?; // Variable header length.
+                written += 1;
             }
             Packet::Disconnect(p) => {
                 stream.write_u8(0b1110_0000).await?;
@@ -605,7 +607,7 @@ mod tests {
 
         let wire_len = packet.wire_len();
 
-        assert_eq!(res, wire_len);
+        assert_eq!(res, buffer.len());
         assert_eq!(wire_len, buffer.len());
 
         let mut buf = buffer.as_slice();
