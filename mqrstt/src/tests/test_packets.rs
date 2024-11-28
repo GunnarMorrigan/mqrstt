@@ -119,6 +119,31 @@ pub fn pubrel_smallest_case() -> (&'static [u8], Packet) {
     (packet, Packet::PubRel(expected))
 }
 
+pub fn connect_case() -> Packet {
+    let connect = Connect {
+        protocol_version: ProtocolVersion::V5,
+        clean_start: true,
+        last_will: Some(LastWill::new(QoS::ExactlyOnce, true, "will/topic", b"will payload".to_vec())),
+        username: Some("ThisIsTheUsername".into()),
+        password: Some("ThisIsThePassword".into()),
+        keep_alive: 60,
+        connect_properties: ConnectProperties {
+            session_expiry_interval: Some(5),
+            receive_maximum: Some(10),
+            maximum_packet_size: Some(100),
+            topic_alias_maximum: Some(10),
+            user_properties: vec![("test".into(), "test".into()), ("test2".into(), "test2".into())],
+            authentication_method: Some("AuthenticationMethod".into()),
+            authentication_data: Some(b"AuthenticationData".to_vec()),
+            request_response_information: Some(0),
+            request_problem_information: Some(1),
+        },
+        client_id: "ThisIsTheClientID".into(),
+    };
+
+    Packet::Connect(connect)
+}
+
 pub fn publish_packet_1() -> Packet {
     Packet::Publish(Publish {
         dup: false,
@@ -324,10 +349,71 @@ pub fn unsubscribe_case() -> Packet {
     let expected = Unsubscribe {
         packet_identifier: 3,
         topics: vec!["test/topic".into()],
-        properties: UnsubscribeProperties { user_properties: vec![("written += 1;".into(), "value".into())] },
+        properties: UnsubscribeProperties {
+            user_properties: vec![("written += 1;".into(), "value".into())],
+        },
     };
 
     Packet::Unsubscribe(expected)
+}
+
+pub fn pubrec_case() -> Packet {
+    let expected = PubRec {
+        packet_identifier: 3,
+        reason_code: PubRecReasonCode::Success,
+        properties: PubRecProperties {
+            reason_string: Some("test".into()),
+            user_properties: vec![("test5asdf".into(), "test3".into()), ("test4".into(), "test2".into())],
+        },
+    };
+
+    Packet::PubRec(expected)
+}
+
+pub fn pubcomp_case() -> Packet {
+    let expected = PubComp {
+        packet_identifier: 3,
+        reason_code: PubCompReasonCode::PacketIdentifierNotFound,
+        properties: PubCompProperties {
+            reason_string: Some("test".into()),
+            user_properties: vec![
+                ("test5asdf".into(), "test3".into()),
+                ("test⌚5asdf".into(), "test3".into()),
+                ("test5asdf".into(), "test3".into()),
+                ("test5asdf".into(), "test3".into()),
+                ("test4".into(), "test2".into()),
+            ],
+        },
+    };
+
+    Packet::PubComp(expected)
+}
+
+pub fn pubrel_case2() -> Packet {
+    let expected = PubRel {
+        packet_identifier: 3,
+        reason_code: PubRelReasonCode::Success,
+        properties: PubRelProperties {
+            reason_string: Some("test".into()),
+            user_properties: vec![("test5asdf".into(), "test3".repeat(10000).into()), ("test4".into(), "test2".into())],
+        },
+    };
+
+    Packet::PubRel(expected)
+}
+
+pub fn auth_case() -> Packet {
+    let expected = Auth {
+        reason_code: AuthReasonCode::ContinueAuthentication,
+        properties: AuthProperties {
+            authentication_method: Some("SomeRandomDataHere".into()),
+            authentication_data: Some(b"VeryRandomStuff".to_vec()),
+            reason_string: Some("⌚this_is_for_sure_a_test_⌚".into()),
+            user_properties: vec![("SureHopeThisWorks".into(), "😰".into())],
+        },
+    };
+
+    Packet::Auth(expected)
 }
 
 #[rstest]

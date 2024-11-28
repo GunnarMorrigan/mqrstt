@@ -10,6 +10,7 @@ use tokio::io::AsyncReadExt;
 use super::{
     error::{DeserializeError, ReadError},
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
+    VariableInteger,
 };
 
 /// The [`PubRel`] (Publish Release) packet acknowledges the reception of a [`crate::packets::PubRec`] Packet.
@@ -139,7 +140,8 @@ impl WireLength for PubRel {
         } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             3
         } else {
-            2 + 1 + self.properties.wire_len()
+            let prop_wire_len = self.properties.wire_len();
+            2 + 1 + prop_wire_len.variable_integer_len() + prop_wire_len
         }
     }
 }

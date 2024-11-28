@@ -11,7 +11,7 @@ use tokio::io::AsyncReadExt;
 use super::{
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-    PacketAsyncRead,
+    PacketAsyncRead, VariableInteger,
 };
 
 /// The [`PubRec`] (Publish Received) packet is part of the acknowledgment flow for a [`crate::packets::Publish`] with QoS 2.
@@ -141,7 +141,8 @@ impl WireLength for PubRec {
         } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
             3
         } else {
-            2 + 1 + self.properties.wire_len()
+            let prop_wire_len = self.properties.wire_len();
+            2 + 1 + prop_wire_len.variable_integer_len() + prop_wire_len
         }
     }
 }

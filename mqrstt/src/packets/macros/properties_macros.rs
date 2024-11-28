@@ -399,17 +399,17 @@ macro_rules! properties_read_match_branch_body {
         $properties.authentication_data = Some(prop_body);
     }};
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestResponseInformation) => {{
-        if $properties.authentication_data.is_some() {
+        if $properties.request_response_information.is_some() {
             return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
                 PropertyType::RequestResponseInformation,
             )));
         }
         let (prop_body, read_bytes) = u8::async_read($stream).await?;
         $read_property_bytes += read_bytes;
-        $properties.request_problem_information = Some(prop_body);
+        $properties.request_response_information = Some(prop_body);
     }};
     ($stream:ident, $properties:ident, $read_property_bytes:ident, PropertyType::RequestProblemInformation) => {{
-        if $properties.authentication_data.is_some() {
+        if $properties.request_problem_information.is_some() {
             return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::DuplicateProperty(
                 PropertyType::RequestProblemInformation,
             )));

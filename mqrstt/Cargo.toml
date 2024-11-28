@@ -52,6 +52,8 @@ tokio = { version = "1", features = [
 smol = { version = "2", optional = true }
 
 [dev-dependencies]
+pretty_assertions = "1.4.1"
+
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 
 smol = { version = "2.0.0" }
