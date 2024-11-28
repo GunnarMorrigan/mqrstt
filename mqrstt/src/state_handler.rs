@@ -251,9 +251,11 @@ mod handler_tests {
             Packet, PubComp, PubCompProperties, PubCompReasonCode, PubRec, PubRecProperties, PubRecReasonCode, PubRel, PubRelProperties, PubRelReasonCode, QoS, SubAck, SubAckProperties,
             SubAckReasonCode, UnsubAck, UnsubAckProperties, UnsubAckReasonCode,
         },
-        tests::test_packets::{create_connack_packet, create_puback_packet, create_publish_packet, create_subscribe_packet, create_unsubscribe_packet},
         ConnectOptions, StateHandler,
     };
+
+    use crate::tests::test_packets::*;
+
     fn handler(clean_start: bool) -> (StateHandler, Receiver<u16>) {
         let (apkids, apkids_r) = AvailablePacketIds::new(100);
 

@@ -94,7 +94,6 @@ fn main() {
         assert_eq!(result.unwrap(), NetworkStatus::OutgoingDisconnect);
     });
 }
-
 ```
 
 ### Tokio example:

@@ -5,11 +5,9 @@ pub struct Handler {
 }
 
 impl AsyncEventHandler for Handler {
-    fn handle(&mut self, incoming_packet: mqrstt::packets::Packet) -> impl std::future::Future<Output = ()> + Send + Sync {
-        async move {
-            if let mqrstt::packets::Packet::Publish(publish) = incoming_packet {
-                self.byte_count += publish.payload.len() as u64;
-            }
+    async fn handle(&mut self, incoming_packet: mqrstt::packets::Packet) {
+        if let mqrstt::packets::Packet::Publish(publish) = incoming_packet {
+            self.byte_count += publish.payload.len() as u64;
         }
     }
 }

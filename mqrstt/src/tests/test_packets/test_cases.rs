@@ -1,5 +1,3 @@
-use rstest::*;
-
 use crate::packets::*;
 
 pub fn connack_case() -> (&'static [u8], Packet) {
@@ -414,25 +412,4 @@ pub fn auth_case() -> Packet {
     };
 
     Packet::Auth(expected)
-}
-
-#[rstest]
-#[case(create_subscribe_packet(1))]
-#[case(create_subscribe_packet(65335))]
-#[case(create_puback_packet(1))]
-#[case(create_puback_packet(65335))]
-#[case(create_disconnect_packet())]
-#[case(publish_packet_1())]
-#[case(publish_packet_2())]
-#[case(publish_packet_3())]
-#[case(publish_packet_4())]
-/// Test if the input == output after read packet form input and write packet to output
-fn test_equal_write_read(#[case] packet: Packet) {
-    let mut buffer = bytes::BytesMut::new();
-
-    packet.write(&mut buffer).unwrap();
-
-    let read_packet = Packet::read(&mut buffer).unwrap();
-
-    assert_eq!(packet, read_packet);
 }

@@ -360,9 +360,7 @@ mod tests {
         ];
 
         buf.extend_from_slice(packet);
-        let c = Connect::read(0, 0, buf.into()).unwrap();
-
-        dbg!(c);
+        Connect::read(0, 0, buf.into()).unwrap();
     }
 
     #[test]
@@ -427,8 +425,6 @@ mod tests {
         c.write(&mut write_buf).unwrap();
 
         assert_eq!(packet.to_vec(), write_buf.to_vec());
-
-        dbg!(c);
     }
 
     #[tokio::test]
@@ -521,8 +517,6 @@ mod tests {
         buf.extend_from_slice(&data);
 
         let c = Connect::read(0, 0, buf.into()).unwrap();
-
-        dbg!(c.clone());
 
         let mut write_buf = bytes::BytesMut::new();
         c.write(&mut write_buf).unwrap();
