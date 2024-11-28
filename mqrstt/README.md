@@ -22,6 +22,9 @@ For a sync approach the stream has to implement the [`std::io::Read`] and [`std:
 - TLS/TCP
 - Lean
 - Keep alive depends on actual communication
+- This tokio implemention has been fuzzed using cargo-fuzz!
+
+
   
 ### To do
 - Even More testing
