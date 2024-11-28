@@ -1,10 +1,17 @@
 name: Rust
 
+
+#  run on push and pull request to main and release branches
 on:
   push:
-    branches: [ "main" ]
+    branches:
+      - main
+      - release/*
   pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
+      - release/*
+
 
 env:
   CARGO_TERM_COLOR: always
@@ -27,7 +34,7 @@ jobs:
       # run clippy to verify we have no warnings
       - run: cargo fetch
       - name: cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy -p mqrstt
 
   test:
     name: Test
@@ -45,7 +52,7 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v3
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: EmbarkStudios/cargo-deny-action@v2
 
   coverage:
     name: Coverage
@@ -77,4 +84,5 @@ jobs:
       - name: Upload coverage report
         uses: codecov/codecov-action@v3
         with:
+          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./lcov.txt

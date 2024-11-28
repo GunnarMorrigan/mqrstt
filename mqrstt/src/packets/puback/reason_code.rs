@@ -1,0 +1,12 @@
+crate::packets::macros::reason_code!(
+    PubAckReasonCode,
+    Success,
+    NoMatchingSubscribers,
+    UnspecifiedError,
+    ImplementationSpecificError,
+    NotAuthorized,
+    TopicNameInvalid,
+    PacketIdentifierInUse,
+    QuotaExceeded,
+    PayloadFormatInvalid
+);

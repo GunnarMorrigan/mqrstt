@@ -3,9 +3,8 @@ use std::io;
 use async_channel::{RecvError, SendError};
 
 use crate::packets::{
-    error::{DeserializeError, ReadBytes, SerializeError},
-    reason_codes::ConnAckReasonCode,
-    {Packet, PacketType},
+    error::{DeserializeError, ReadBytes, ReadError, SerializeError, WriteError},
+    ConnAckReasonCode, Packet, PacketType,
 };
 
 /// Critical errors that can happen during the operation of the entire client
@@ -43,7 +42,25 @@ pub enum ConnectionError {
     JoinError(#[from] tokio::task::JoinError),
 }
 
-/// Errors that the [`crate::StateHandler`] can emit
+impl From<ReadError> for ConnectionError {
+    fn from(value: ReadError) -> Self {
+        match value {
+            ReadError::DeserializeError(deserialize_error) => ConnectionError::DeserializationError(deserialize_error),
+            ReadError::IoError(error) => ConnectionError::Io(error),
+        }
+    }
+}
+
+impl From<WriteError> for ConnectionError {
+    fn from(value: WriteError) -> Self {
+        match value {
+            WriteError::SerializeError(error) => ConnectionError::SerializationError(error),
+            WriteError::IoError(error) => ConnectionError::Io(error),
+        }
+    }
+}
+
+/// Errors that the internal StateHandler can emit
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum HandlerError {
     #[error("Missing Packet ID")]
@@ -52,8 +69,8 @@ pub enum HandlerError {
     #[error("The incoming channel between network and handler is closed")]
     IncomingNetworkChannelClosed,
 
-    #[error("The outgoing channel between handler and network is closed: {0}")]
-    OutgoingNetworkChannelClosed(#[from] SendError<Packet>),
+    #[error("The outgoing channel between handler and network is closed")]
+    OutgoingNetworkChannelClosed,
 
     #[error("Channel between client and handler closed")]
     ClientChannelClosed,
@@ -69,6 +86,12 @@ pub enum HandlerError {
 
     #[error("Received an unexpected packet: {0}")]
     UnexpectedPacket(PacketType),
+}
+
+impl From<SendError<Packet>> for HandlerError {
+    fn from(_: SendError<Packet>) -> Self {
+        HandlerError::OutgoingNetworkChannelClosed
+    }
 }
 
 /// Errors producable by the [`crate::MqttClient`]

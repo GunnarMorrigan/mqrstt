@@ -1,0 +1,10 @@
+crate::packets::macros::reason_code!(
+    UnsubAckReasonCode,
+    Success,
+    NoSubscriptionExisted,
+    UnspecifiedError,
+    ImplementationSpecificError,
+    NotAuthorized,
+    TopicFilterInvalid,
+    PacketIdentifierInUse
+);

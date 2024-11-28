@@ -4,6 +4,22 @@ use thiserror::Error;
 
 use super::{PacketType, PropertyType};
 
+#[derive(Error, Debug)]
+pub enum WriteError {
+    #[error("{0}")]
+    SerializeError(#[from] SerializeError),
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
+}
+
+#[derive(Error, Debug)]
+pub enum ReadError {
+    #[error("{0}")]
+    DeserializeError(#[from] DeserializeError),
+    #[error("{0}")]
+    IoError(#[from] std::io::Error),
+}
+
 #[derive(Error, Clone, Debug)]
 pub enum DeserializeError {
     #[error("Malformed packet: {0}")]
@@ -22,10 +38,16 @@ pub enum DeserializeError {
     UnknownProtocolVersion,
 
     #[error("There is insufficient for {0} data ({1}) to take {2} bytes")]
-    InsufficientData(String, usize, usize),
+    InsufficientData(&'static str, usize, usize),
 
     #[error("There is insufficient to read the protocol version.")]
     InsufficientDataForProtocolVersion,
+
+    #[error("Read more data for the packet than indicated length")]
+    ReadTooMuchData(&'static str, usize, usize),
+
+    #[error("While reading a packet {read} bytes was read, but the packet indicated a remaining length of {remaining_length} bytes")]
+    RemainingDataError { read: usize, remaining_length: usize },
 
     #[error("Reason code {0} is not allowed for packet type {1:?}")]
     UnexpectedReasonCode(u8, PacketType),

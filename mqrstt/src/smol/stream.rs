@@ -10,8 +10,7 @@ use tracing::trace;
 use crate::packets::ConnAck;
 use crate::packets::{
     error::ReadBytes,
-    reason_codes::ConnAckReasonCode,
-    {FixedHeader, Packet},
+    ConnAckReasonCode, {FixedHeader, Packet},
 };
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 
@@ -40,7 +39,7 @@ impl<S> Stream<S> {
         self.read_buffer.advance(header_length);
 
         let buf = self.read_buffer.split_to(header.remaining_length);
-        let read_packet = Packet::read(header, buf.into())?;
+        let read_packet = Packet::read_packet(header, buf.into())?;
 
         #[cfg(feature = "logs")]
         trace!("Read packet from network {}", read_packet);
@@ -96,7 +95,7 @@ where
 
             let buf = self.read_buffer.split_to(header.remaining_length);
 
-            return Packet::read(header, buf.into()).map_err(|err| Error::new(ErrorKind::InvalidData, err));
+            return Packet::read_packet(header, buf.into()).map_err(|err| Error::new(ErrorKind::InvalidData, err));
         }
     }
 

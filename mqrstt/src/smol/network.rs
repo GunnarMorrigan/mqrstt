@@ -9,14 +9,13 @@ use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
-use crate::packets::reason_codes::DisconnectReasonCode;
-use crate::packets::{Disconnect, Packet, PacketType};
+use crate::packets::{Disconnect, DisconnectReasonCode, Packet, PacketType};
 use crate::NetworkStatus;
-use crate::{AsyncEventHandlerMut, StateHandler};
+use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;
 
-/// [`Network`] reads and writes to the network based on tokios [`::smol::io::AsyncReadExt`] [`::smol::io::AsyncWriteExt`].
+/// [`Network`] reads and writes to the network based on tokios [`::smol::io::AsyncRead`] [`::smol::io::AsyncWrite`].
 /// This way you can provide the `connect` function with a TLS and TCP stream of your choosing.
 /// The most import thing to remember is that you have to provide a new stream after the previous has failed.
 /// (i.e. you need to reconnect after any expected or unexpected disconnect).
@@ -39,7 +38,7 @@ pub struct Network<H, S> {
 }
 
 impl<H, S> Network<H, S> {
-    pub fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
+    pub(crate) fn new(options: ConnectOptions, to_network_r: Receiver<Packet>, apkids: AvailablePacketIds) -> Self {
         let state_handler = StateHandler::new(&options, apkids);
         Self {
             handler: PhantomData,
@@ -62,8 +61,8 @@ impl<H, S> Network<H, S> {
 
 impl<H, S> Network<H, S>
 where
-    H: AsyncEventHandlerMut,
-    S: smol::io::AsyncReadExt + smol::io::AsyncWriteExt + Sized + Unpin,
+    H: AsyncEventHandler,
+    S: smol::io::AsyncRead + smol::io::AsyncWrite + Sized + Unpin,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
     pub async fn connect(&mut self, stream: S, handler: &mut H) -> Result<(), ConnectionError> {

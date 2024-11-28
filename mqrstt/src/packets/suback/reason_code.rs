@@ -1,0 +1,15 @@
+crate::packets::macros::reason_code!(
+    SubAckReasonCode,
+    GrantedQoS0,
+    GrantedQoS1,
+    GrantedQoS2,
+    UnspecifiedError,
+    ImplementationSpecificError,
+    NotAuthorized,
+    TopicFilterInvalid,
+    PacketIdentifierInUse,
+    QuotaExceeded,
+    SharedSubscriptionsNotSupported,
+    SubscriptionIdentifiersNotSupported,
+    WildcardSubscriptionsNotSupported
+);

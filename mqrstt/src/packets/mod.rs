@@ -1,6 +1,7 @@
 pub mod error;
-pub mod mqtt_traits;
-pub mod reason_codes;
+pub(crate) mod mqtt_trait;
+
+mod macros;
 
 mod auth;
 mod connack;
@@ -16,6 +17,11 @@ mod subscribe;
 mod unsuback;
 mod unsubscribe;
 
+mod primitive;
+use error::{ReadError, WriteError};
+use mqtt_trait::{PacketAsyncRead, PacketAsyncWrite};
+pub use primitive::*;
+
 pub use auth::*;
 pub use connack::*;
 pub use connect::*;
@@ -30,519 +36,13 @@ pub use subscribe::*;
 pub use unsuback::*;
 pub use unsubscribe::*;
 
-use bytes::{Buf, BufMut, Bytes, BytesMut};
-use core::slice::Iter;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::fmt::Display;
 
-use self::error::{DeserializeError, ReadBytes, SerializeError};
-use self::mqtt_traits::{MqttRead, MqttWrite, VariableHeaderRead, VariableHeaderWrite, WireLength};
+use self::error::{DeserializeError, SerializeError};
+use self::mqtt_trait::{PacketRead, PacketWrite, WireLength};
 
-/// Protocol version
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub enum ProtocolVersion {
-    V5,
-}
-
-impl MqttWrite for ProtocolVersion {
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        buf.put_u8(5u8);
-        Ok(())
-    }
-}
-
-impl MqttRead for ProtocolVersion {
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientDataForProtocolVersion);
-        }
-
-        match buf.get_u8() {
-            3 => Err(DeserializeError::UnsupportedProtocolVersion),
-            4 => Err(DeserializeError::UnsupportedProtocolVersion),
-            5 => Ok(ProtocolVersion::V5),
-            _ => Err(DeserializeError::UnknownProtocolVersion),
-        }
-    }
-}
-
-/// Quality of service
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum QoS {
-    #[default]
-    AtMostOnce = 0,
-    AtLeastOnce = 1,
-    ExactlyOnce = 2,
-}
-impl QoS {
-    pub fn from_u8(value: u8) -> Result<Self, DeserializeError> {
-        match value {
-            0 => Ok(QoS::AtMostOnce),
-            1 => Ok(QoS::AtLeastOnce),
-            2 => Ok(QoS::ExactlyOnce),
-            _ => Err(DeserializeError::UnknownQoS(value)),
-        }
-    }
-    pub fn into_u8(self) -> u8 {
-        match self {
-            QoS::AtMostOnce => 0,
-            QoS::AtLeastOnce => 1,
-            QoS::ExactlyOnce => 2,
-        }
-    }
-}
-
-impl MqttRead for QoS {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("QoS".to_string(), 0, 1));
-        }
-
-        match buf.get_u8() {
-            0 => Ok(QoS::AtMostOnce),
-            1 => Ok(QoS::AtLeastOnce),
-            2 => Ok(QoS::ExactlyOnce),
-            q => Err(DeserializeError::UnknownQoS(q)),
-        }
-    }
-}
-
-impl MqttWrite for QoS {
-    #[inline]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        let val = match self {
-            QoS::AtMostOnce => 0,
-            QoS::AtLeastOnce => 1,
-            QoS::ExactlyOnce => 2,
-        };
-        buf.put_u8(val);
-        Ok(())
-    }
-}
-
-impl MqttRead for Box<str> {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        let content = Bytes::read(buf)?;
-
-        match String::from_utf8(content.to_vec()) {
-            Ok(s) => Ok(s.into()),
-            Err(e) => Err(DeserializeError::Utf8Error(e)),
-        }
-    }
-}
-
-impl MqttWrite for Box<str> {
-    #[inline(always)]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        self.as_ref().write(buf)
-    }
-}
-
-impl WireLength for Box<str> {
-    #[inline(always)]
-    fn wire_len(&self) -> usize {
-        self.as_ref().wire_len()
-    }
-}
-
-impl MqttWrite for &str {
-    #[inline]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        buf.put_u16(self.len() as u16);
-        buf.extend(self.as_bytes());
-        Ok(())
-    }
-}
-
-impl WireLength for &str {
-    #[inline(always)]
-    fn wire_len(&self) -> usize {
-        self.len() + 2
-    }
-}
-
-impl MqttRead for String {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        let content = Bytes::read(buf)?;
-
-        match String::from_utf8(content.to_vec()) {
-            Ok(s) => Ok(s),
-            Err(e) => Err(DeserializeError::Utf8Error(e)),
-        }
-    }
-}
-
-impl MqttWrite for String {
-    #[inline]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        if self.len() > 65535 {
-            return Err(SerializeError::StringTooLong(self.len()));
-        }
-
-        buf.put_u16(self.len() as u16);
-        buf.extend(self.as_bytes());
-        Ok(())
-    }
-}
-
-impl WireLength for String {
-    #[inline(always)]
-    fn wire_len(&self) -> usize {
-        self.len() + 2
-    }
-}
-
-impl MqttRead for Bytes {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        let len = buf.get_u16() as usize;
-
-        if len > buf.len() {
-            return Err(DeserializeError::InsufficientData("Bytes".to_string(), buf.len(), len));
-        }
-
-        Ok(buf.split_to(len))
-    }
-}
-
-impl MqttWrite for Bytes {
-    #[inline]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        buf.put_u16(self.len() as u16);
-        buf.extend(self);
-
-        Ok(())
-    }
-}
-
-impl WireLength for Bytes {
-    #[inline(always)]
-    fn wire_len(&self) -> usize {
-        self.len() + 2
-    }
-}
-
-impl MqttRead for bool {
-    fn read(buf: &mut Bytes) -> Result<Self, error::DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("bool".to_string(), 0, 1));
-        }
-
-        match buf.get_u8() {
-            0 => Ok(false),
-            1 => Ok(true),
-            _ => Err(error::DeserializeError::MalformedPacket),
-        }
-    }
-}
-
-impl MqttWrite for bool {
-    #[inline]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        if *self {
-            buf.put_u8(1);
-            Ok(())
-        } else {
-            buf.put_u8(0);
-            Ok(())
-        }
-    }
-}
-
-impl MqttRead for u8 {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("u8".to_string(), 0, 1));
-        }
-        Ok(buf.get_u8())
-    }
-}
-
-impl MqttRead for u16 {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.len() < 2 {
-            return Err(DeserializeError::InsufficientData("u16".to_string(), buf.len(), 2));
-        }
-        Ok(buf.get_u16())
-    }
-}
-
-impl MqttWrite for u16 {
-    #[inline]
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        buf.put_u16(*self);
-        Ok(())
-    }
-}
-
-impl MqttRead for u32 {
-    #[inline]
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.len() < 4 {
-            return Err(DeserializeError::InsufficientData("u32".to_string(), buf.len(), 4));
-        }
-        Ok(buf.get_u32())
-    }
-}
-
-impl MqttWrite for u32 {
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        buf.put_u32(*self);
-        Ok(())
-    }
-}
-
-pub fn read_fixed_header_rem_len(mut buf: Iter<u8>) -> Result<(usize, usize), ReadBytes<DeserializeError>> {
-    let mut integer = 0;
-    let mut length = 0;
-
-    for i in 0..4 {
-        if let Some(byte) = buf.next() {
-            length += 1;
-            integer += (*byte as usize & 0x7f) << (7 * i);
-
-            if (*byte & 0b1000_0000) == 0 {
-                return Ok((integer, length));
-            }
-        } else {
-            return Err(ReadBytes::InsufficientBytes(1));
-        }
-    }
-    Err(ReadBytes::Err(DeserializeError::MalformedPacket))
-}
-
-pub fn read_variable_integer(buf: &mut Bytes) -> Result<(usize, usize), DeserializeError> {
-    let mut integer = 0;
-    let mut length = 0;
-
-    for i in 0..4 {
-        if buf.is_empty() {
-            return Err(DeserializeError::MalformedPacket);
-        }
-        length += 1;
-        let byte = buf.get_u8();
-
-        integer += (byte as usize & 0x7f) << (7 * i);
-
-        if (byte & 0b1000_0000) == 0 {
-            return Ok((integer, length));
-        }
-    }
-    Err(DeserializeError::MalformedPacket)
-}
-
-pub fn write_variable_integer(buf: &mut BytesMut, integer: usize) -> Result<(), SerializeError> {
-    if integer > 268_435_455 {
-        return Err(SerializeError::VariableIntegerOverflow(integer));
-    }
-
-    let mut write = integer;
-
-    for _ in 0..4 {
-        let mut byte = (write % 128) as u8;
-        write /= 128;
-        if write > 0 {
-            byte |= 128;
-        }
-        buf.put_u8(byte);
-        if write == 0 {
-            return Ok(());
-        }
-    }
-    Err(SerializeError::VariableIntegerOverflow(integer))
-}
-
-pub fn variable_integer_len(integer: usize) -> usize {
-    if integer >= 2_097_152 {
-        4
-    } else if integer >= 16_384 {
-        3
-    } else if integer >= 128 {
-        2
-    } else {
-        1
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum PropertyType {
-    PayloadFormatIndicator = 1,
-    MessageExpiryInterval = 2,
-    ContentType = 3,
-    ResponseTopic = 8,
-    CorrelationData = 9,
-    SubscriptionIdentifier = 11,
-    SessionExpiryInterval = 17,
-    AssignedClientIdentifier = 18,
-    ServerKeepAlive = 19,
-    AuthenticationMethod = 21,
-    AuthenticationData = 22,
-    RequestProblemInformation = 23,
-    WillDelayInterval = 24,
-    RequestResponseInformation = 25,
-    ResponseInformation = 26,
-    ServerReference = 28,
-    ReasonString = 31,
-    ReceiveMaximum = 33,
-    TopicAliasMaximum = 34,
-    TopicAlias = 35,
-    MaximumQos = 36,
-    RetainAvailable = 37,
-    UserProperty = 38,
-    MaximumPacketSize = 39,
-    WildcardSubscriptionAvailable = 40,
-    SubscriptionIdentifierAvailable = 41,
-    SharedSubscriptionAvailable = 42,
-}
-
-impl MqttRead for PropertyType {
-    fn read(buf: &mut Bytes) -> Result<Self, DeserializeError> {
-        if buf.is_empty() {
-            return Err(DeserializeError::InsufficientData("PropertyType".to_string(), 0, 1));
-        }
-
-        match buf.get_u8() {
-            1 => Ok(Self::PayloadFormatIndicator),
-            2 => Ok(Self::MessageExpiryInterval),
-            3 => Ok(Self::ContentType),
-            8 => Ok(Self::ResponseTopic),
-            9 => Ok(Self::CorrelationData),
-            11 => Ok(Self::SubscriptionIdentifier),
-            17 => Ok(Self::SessionExpiryInterval),
-            18 => Ok(Self::AssignedClientIdentifier),
-            19 => Ok(Self::ServerKeepAlive),
-            21 => Ok(Self::AuthenticationMethod),
-            22 => Ok(Self::AuthenticationData),
-            23 => Ok(Self::RequestProblemInformation),
-            24 => Ok(Self::WillDelayInterval),
-            25 => Ok(Self::RequestResponseInformation),
-            26 => Ok(Self::ResponseInformation),
-            28 => Ok(Self::ServerReference),
-            31 => Ok(Self::ReasonString),
-            33 => Ok(Self::ReceiveMaximum),
-            34 => Ok(Self::TopicAliasMaximum),
-            35 => Ok(Self::TopicAlias),
-            36 => Ok(Self::MaximumQos),
-            37 => Ok(Self::RetainAvailable),
-            38 => Ok(Self::UserProperty),
-            39 => Ok(Self::MaximumPacketSize),
-            40 => Ok(Self::WildcardSubscriptionAvailable),
-            41 => Ok(Self::SubscriptionIdentifierAvailable),
-            42 => Ok(Self::SharedSubscriptionAvailable),
-            t => Err(DeserializeError::UnknownProperty(t)),
-        }
-    }
-}
-
-impl MqttWrite for PropertyType {
-    fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
-        let val = match self {
-            Self::PayloadFormatIndicator => 1,
-            Self::MessageExpiryInterval => 2,
-            Self::ContentType => 3,
-            Self::ResponseTopic => 8,
-            Self::CorrelationData => 9,
-            Self::SubscriptionIdentifier => 11,
-            Self::SessionExpiryInterval => 17,
-            Self::AssignedClientIdentifier => 18,
-            Self::ServerKeepAlive => 19,
-            Self::AuthenticationMethod => 21,
-            Self::AuthenticationData => 22,
-            Self::RequestProblemInformation => 23,
-            Self::WillDelayInterval => 24,
-            Self::RequestResponseInformation => 25,
-            Self::ResponseInformation => 26,
-            Self::ServerReference => 28,
-            Self::ReasonString => 31,
-            Self::ReceiveMaximum => 33,
-            Self::TopicAliasMaximum => 34,
-            Self::TopicAlias => 35,
-            Self::MaximumQos => 36,
-            Self::RetainAvailable => 37,
-            Self::UserProperty => 38,
-            Self::MaximumPacketSize => 39,
-            Self::WildcardSubscriptionAvailable => 40,
-            Self::SubscriptionIdentifierAvailable => 41,
-            Self::SharedSubscriptionAvailable => 42,
-        };
-
-        buf.put_u8(val);
-        Ok(())
-    }
-}
-
-impl PropertyType {
-    pub fn from_u8(value: u8) -> Result<Self, String> {
-        match value {
-            1 => Ok(Self::PayloadFormatIndicator),
-            2 => Ok(Self::MessageExpiryInterval),
-            3 => Ok(Self::ContentType),
-            8 => Ok(Self::ResponseTopic),
-            9 => Ok(Self::CorrelationData),
-            11 => Ok(Self::SubscriptionIdentifier),
-            17 => Ok(Self::SessionExpiryInterval),
-            18 => Ok(Self::AssignedClientIdentifier),
-            19 => Ok(Self::ServerKeepAlive),
-            21 => Ok(Self::AuthenticationMethod),
-            22 => Ok(Self::AuthenticationData),
-            23 => Ok(Self::RequestProblemInformation),
-            24 => Ok(Self::WillDelayInterval),
-            25 => Ok(Self::RequestResponseInformation),
-            26 => Ok(Self::ResponseInformation),
-            28 => Ok(Self::ServerReference),
-            31 => Ok(Self::ReasonString),
-            33 => Ok(Self::ReceiveMaximum),
-            34 => Ok(Self::TopicAliasMaximum),
-            35 => Ok(Self::TopicAlias),
-            36 => Ok(Self::MaximumQos),
-            37 => Ok(Self::RetainAvailable),
-            38 => Ok(Self::UserProperty),
-            39 => Ok(Self::MaximumPacketSize),
-            40 => Ok(Self::WildcardSubscriptionAvailable),
-            41 => Ok(Self::SubscriptionIdentifierAvailable),
-            42 => Ok(Self::SharedSubscriptionAvailable),
-            _ => Err("Unkown property type".to_string()),
-        }
-    }
-    pub fn to_u8(self) -> u8 {
-        match self {
-            Self::PayloadFormatIndicator => 1,
-            Self::MessageExpiryInterval => 2,
-            Self::ContentType => 3,
-            Self::ResponseTopic => 8,
-            Self::CorrelationData => 9,
-            Self::SubscriptionIdentifier => 11,
-            Self::SessionExpiryInterval => 17,
-            Self::AssignedClientIdentifier => 18,
-            Self::ServerKeepAlive => 19,
-            Self::AuthenticationMethod => 21,
-            Self::AuthenticationData => 22,
-            Self::RequestProblemInformation => 23,
-            Self::WillDelayInterval => 24,
-            Self::RequestResponseInformation => 25,
-            Self::ResponseInformation => 26,
-            Self::ServerReference => 28,
-            Self::ReasonString => 31,
-            Self::ReceiveMaximum => 33,
-            Self::TopicAliasMaximum => 34,
-            Self::TopicAlias => 35,
-            Self::MaximumQos => 36,
-            Self::RetainAvailable => 37,
-            Self::UserProperty => 38,
-            Self::MaximumPacketSize => 39,
-            Self::WildcardSubscriptionAvailable => 40,
-            Self::SubscriptionIdentifierAvailable => 41,
-            Self::SharedSubscriptionAvailable => 42,
-        }
-    }
-}
-
-// ==================== Packets ====================
-
+/// Enum to bundle the different MQTT packets.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Packet {
     Connect(Connect),
@@ -583,17 +83,17 @@ impl Packet {
         }
     }
 
-    pub fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
+    pub(crate) fn write(&self, buf: &mut BytesMut) -> Result<(), SerializeError> {
         match self {
             Packet::Connect(p) => {
                 buf.put_u8(0b0001_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
 
                 p.write(buf)?;
             }
             Packet::ConnAck(p) => {
                 buf.put_u8(0b0010_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::Publish(p) => {
@@ -608,45 +108,48 @@ impl Packet {
                     first_byte |= 0b0001;
                 }
                 buf.put_u8(first_byte);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::PubAck(p) => {
                 buf.put_u8(0b0100_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::PubRec(p) => {
                 buf.put_u8(0b0101_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::PubRel(p) => {
                 buf.put_u8(0b0110_0010);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::PubComp(p) => {
                 buf.put_u8(0b0111_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::Subscribe(p) => {
                 buf.put_u8(0b1000_0010);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
-            Packet::SubAck(_) => {
-                unreachable!()
+            Packet::SubAck(p) => {
+                buf.put_u8(0b1001_0000);
+                p.wire_len().write_variable_integer(buf)?;
+                p.write(buf)?;
             }
             Packet::Unsubscribe(p) => {
                 buf.put_u8(0b1010_0010);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
-            Packet::UnsubAck(_) => {
-                unreachable!();
+            Packet::UnsubAck(p) => {
                 buf.put_u8(0b1011_0000);
+                p.wire_len().write_variable_integer(buf)?;
+                p.write(buf)?;
             }
             Packet::PingReq => {
                 buf.put_u8(0b1100_0000);
@@ -658,19 +161,115 @@ impl Packet {
             }
             Packet::Disconnect(p) => {
                 buf.put_u8(0b1110_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
             Packet::Auth(p) => {
                 buf.put_u8(0b1111_0000);
-                write_variable_integer(buf, p.wire_len())?;
+                p.wire_len().write_variable_integer(buf)?;
                 p.write(buf)?;
             }
         }
         Ok(())
     }
 
-    pub fn read(header: FixedHeader, buf: Bytes) -> Result<Packet, DeserializeError> {
+    pub(crate) async fn async_write<S>(&self, stream: &mut S) -> Result<usize, WriteError>
+    where
+        S: tokio::io::AsyncWrite + Unpin,
+    {
+        use tokio::io::AsyncWriteExt;
+        let mut written = 1;
+        match self {
+            Packet::Connect(p) => {
+                stream.write_u8(0b0001_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::ConnAck(p) => {
+                stream.write_u8(0b0010_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Publish(p) => {
+                let mut first_byte = 0b0011_0000u8;
+                if p.dup {
+                    first_byte |= 0b1000;
+                }
+
+                first_byte |= p.qos.into_u8() << 1;
+
+                if p.retain {
+                    first_byte |= 0b0001;
+                }
+                stream.write_u8(first_byte).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubAck(p) => {
+                stream.write_u8(0b0100_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubRec(p) => {
+                stream.write_u8(0b0101_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubRel(p) => {
+                stream.write_u8(0b0110_0010).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PubComp(p) => {
+                stream.write_u8(0b0111_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Subscribe(p) => {
+                stream.write_u8(0b1000_0010).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::SubAck(p) => {
+                stream.write_u8(0b1001_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Unsubscribe(p) => {
+                stream.write_u8(0b1010_0010).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::UnsubAck(p) => {
+                stream.write_u8(0b1011_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::PingReq => {
+                stream.write_u8(0b1100_0000).await?;
+                stream.write_u8(0).await?; // Variable header length.
+                written += 1;
+            }
+            Packet::PingResp => {
+                stream.write_u8(0b1101_0000).await?;
+                stream.write_u8(0).await?; // Variable header length.
+                written += 1;
+            }
+            Packet::Disconnect(p) => {
+                stream.write_u8(0b1110_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+            Packet::Auth(p) => {
+                stream.write_u8(0b1111_0000).await?;
+                written += p.wire_len().write_async_variable_integer(stream).await?;
+                written += p.async_write(stream).await?;
+            }
+        }
+        Ok(written)
+    }
+
+    pub(crate) fn read_packet(header: FixedHeader, buf: Bytes) -> Result<Packet, DeserializeError> {
         let packet = match header.packet_type {
             PacketType::Connect => Packet::Connect(Connect::read(header.flags, header.remaining_length, buf)?),
             PacketType::ConnAck => Packet::ConnAck(ConnAck::read(header.flags, header.remaining_length, buf)?),
@@ -691,7 +290,46 @@ impl Packet {
         Ok(packet)
     }
 
-    pub fn read_from_buffer(buffer: &mut BytesMut) -> Result<Packet, ReadBytes<DeserializeError>> {
+    async fn async_read_packet<S>(header: FixedHeader, stream: &mut S) -> Result<Packet, ReadError>
+    where
+        S: tokio::io::AsyncRead + Unpin,
+    {
+        let packet = match header.packet_type {
+            PacketType::Connect => Packet::Connect(Connect::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::ConnAck => Packet::ConnAck(ConnAck::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::Publish => Packet::Publish(Publish::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::PubAck => Packet::PubAck(PubAck::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::PubRec => Packet::PubRec(PubRec::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::PubRel => Packet::PubRel(PubRel::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::PubComp => Packet::PubComp(PubComp::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::Subscribe => Packet::Subscribe(Subscribe::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::SubAck => Packet::SubAck(SubAck::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::Unsubscribe => Packet::Unsubscribe(Unsubscribe::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::UnsubAck => Packet::UnsubAck(UnsubAck::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::PingReq => Packet::PingReq,
+            PacketType::PingResp => Packet::PingResp,
+            PacketType::Disconnect => Packet::Disconnect(Disconnect::async_read(header.flags, header.remaining_length, stream).await?.0),
+            PacketType::Auth => Packet::Auth(Auth::async_read(header.flags, header.remaining_length, stream).await?.0),
+        };
+        Ok(packet)
+    }
+
+    pub async fn async_read<S>(stream: &mut S) -> Result<Packet, ReadError>
+    where
+        S: tokio::io::AsyncRead + Unpin,
+    {
+        let (header, _) = FixedHeader::async_read(stream).await?;
+
+        #[cfg(feature = "logs")]
+        tracing::trace!("Read packet header: {:?}", header);
+
+        Packet::async_read_packet(header, stream).await
+    }
+
+    pub fn read(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {
+        use bytes::Buf;
+        use error::ReadBytes;
+
         let (header, header_length) = FixedHeader::read_fixed_header(buffer.iter())?;
         if header.remaining_length + header_length > buffer.len() {
             return Err(ReadBytes::InsufficientBytes(header.remaining_length + header_length - buffer.len()));
@@ -700,7 +338,7 @@ impl Packet {
 
         let buf = buffer.split_to(header.remaining_length);
 
-        Ok(Packet::read(header, buf.into())?)
+        Ok(Packet::read_packet(header, buf.into())?)
     }
 }
 
@@ -734,39 +372,25 @@ impl Display for Packet {
     }
 }
 
-// 2.1.1 Fixed Header
-// ```
-//          7                          3                          0
-//          +--------------------------+--------------------------+
-// byte 1   | MQTT Control Packet Type | Flags for Packet type    |
-//          +--------------------------+--------------------------+
-//          |                   Remaining Length                  |
-//          +-----------------------------------------------------+
-//
-// https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901021
-// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd)]
-pub struct FixedHeader {
-    pub packet_type: PacketType,
-    pub flags: u8,
-    pub remaining_length: usize,
-}
-
-impl FixedHeader {
-    pub fn read_fixed_header(mut header: Iter<u8>) -> Result<(Self, usize), ReadBytes<DeserializeError>> {
-        if header.len() < 2 {
-            return Err(ReadBytes::InsufficientBytes(2 - header.len()));
+impl WireLength for Packet {
+    fn wire_len(&self) -> usize {
+        match self {
+            Packet::Connect(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::ConnAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Publish(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubRec(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubRel(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PubComp(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Subscribe(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::SubAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Unsubscribe(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::UnsubAck(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::PingReq => 2,
+            Packet::PingResp => 2,
+            Packet::Disconnect(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
+            Packet::Auth(p) => 1 + p.wire_len().variable_integer_len() + p.wire_len(),
         }
-
-        let mut header_length = 1;
-        let first_byte = header.next().unwrap();
-
-        let (packet_type, flags) = PacketType::from_first_byte(*first_byte).map_err(ReadBytes::Err)?;
-
-        let (remaining_length, length) = read_fixed_header_rem_len(header)?;
-        header_length += length;
-
-        Ok((Self { packet_type, flags, remaining_length }, header_length))
     }
 }
 
@@ -790,6 +414,7 @@ pub enum PacketType {
     Auth,
 }
 impl PacketType {
+    #[inline]
     const fn from_first_byte(value: u8) -> Result<(Self, u8), DeserializeError> {
         match (value >> 4, value & 0x0f) {
             (0b0001, 0) => Ok((PacketType::Connect, 0)),
@@ -820,202 +445,125 @@ impl std::fmt::Display for PacketType {
 
 #[cfg(test)]
 mod tests {
-    use bytes::{Bytes, BytesMut};
 
-    use crate::packets::connack::{ConnAck, ConnAckFlags, ConnAckProperties};
-    use crate::packets::disconnect::{Disconnect, DisconnectProperties};
-    use crate::packets::QoS;
+    use bytes::BytesMut;
 
-    use crate::packets::publish::{Publish, PublishProperties};
-    use crate::packets::pubrel::{PubRel, PubRelProperties};
-    use crate::packets::reason_codes::{ConnAckReasonCode, DisconnectReasonCode, PubRelReasonCode};
     use crate::packets::Packet;
 
-    #[test]
-    fn test_connack_read() {
-        let connack = [
-            0x20, 0x13, 0x01, 0x00, 0x10, 0x27, 0x00, 0x10, 0x00, 0x00, 0x25, 0x01, 0x2a, 0x01, 0x29, 0x01, 0x22, 0xff, 0xff, 0x28, 0x01,
-        ];
-        let mut buf = BytesMut::new();
-        buf.extend(connack);
+    use crate::tests::test_packets::*;
 
-        let res = Packet::read_from_buffer(&mut buf);
-        assert!(res.is_ok());
-        let res = res.unwrap();
+    #[rstest::rstest]
+    #[case::connect_case(connect_case())]
+    #[case::ping_req_case(ping_req_case().1)]
+    #[case::ping_resp_case(ping_resp_case().1)]
+    #[case::connack_case(connack_case().1)]
+    #[case::create_subscribe_packet(create_subscribe_packet(1))]
+    #[case::create_subscribe_packet(create_subscribe_packet(65335))]
+    #[case::create_puback_packet(create_puback_packet(1))]
+    #[case::create_puback_packet(create_puback_packet(65335))]
+    #[case::create_disconnect_packet(create_disconnect_packet())]
+    #[case::create_connack_packet(create_connack_packet(true))]
+    #[case::create_connack_packet(create_connack_packet(false))]
+    #[case::publish_packet_1(publish_packet_1())]
+    #[case::publish_packet_2(publish_packet_2())]
+    #[case::publish_packet_3(publish_packet_3())]
+    #[case::publish_packet_4(publish_packet_4())]
+    #[case::create_empty_publish_packet(create_empty_publish_packet())]
+    #[case::subscribe(subscribe_case())]
+    #[case::suback(suback_case())]
+    #[case::unsubscribe(unsubscribe_case())]
+    #[case::unsuback(unsuback_case())]
+    #[case::pubcomp_case(pubcomp_case())]
+    #[case::pubrec_case(pubrec_case())]
+    #[case::pubrec_case(pubrel_case2())]
+    #[case::auth_case(auth_case())]
+    fn test_write_read_write_read_cases(#[case] packet: Packet) {
+        use crate::packets::WireLength;
 
-        let expected = ConnAck {
-            connack_flags: ConnAckFlags { session_present: true },
-            reason_code: ConnAckReasonCode::Success,
-            connack_properties: ConnAckProperties {
-                session_expiry_interval: None,
-                receive_maximum: None,
-                maximum_qos: None,
-                retain_available: Some(true),
-                maximum_packet_size: Some(1048576),
-                assigned_client_id: None,
-                topic_alias_maximum: Some(65535),
-                reason_string: None,
-                user_properties: vec![],
-                wildcards_available: Some(true),
-                subscription_ids_available: Some(true),
-                shared_subscription_available: Some(true),
-                server_keep_alive: None,
-                response_info: None,
-                server_reference: None,
-                authentication_method: None,
-                authentication_data: None,
-            },
-        };
-
-        assert_eq!(Packet::ConnAck(expected), res);
-    }
-
-    #[test]
-    fn test_disconnect_read() {
-        let packet = [0xe0, 0x02, 0x8e, 0x00];
-        let mut buf = BytesMut::new();
-        buf.extend(packet);
-
-        let res = Packet::read_from_buffer(&mut buf);
-        assert!(res.is_ok());
-        let res = res.unwrap();
-
-        let expected = Disconnect {
-            reason_code: DisconnectReasonCode::SessionTakenOver,
-            properties: DisconnectProperties {
-                session_expiry_interval: None,
-                reason_string: None,
-                user_properties: vec![],
-                server_reference: None,
-            },
-        };
-
-        assert_eq!(Packet::Disconnect(expected), res);
-    }
-
-    #[test]
-    fn test_pingreq_read_write() {
-        let packet = [0xc0, 0x00];
-        let mut buf = BytesMut::new();
-        buf.extend(packet);
-
-        let res = Packet::read_from_buffer(&mut buf);
-        assert!(res.is_ok());
-        let res = res.unwrap();
-
-        assert_eq!(Packet::PingReq, res);
-
-        buf.clear();
-        Packet::PingReq.write(&mut buf).unwrap();
-        assert_eq!(buf.to_vec(), packet);
-    }
-
-    #[test]
-    fn test_pingresp_read_write() {
-        let packet = [0xd0, 0x00];
-        let mut buf = BytesMut::new();
-        buf.extend(packet);
-
-        let res = Packet::read_from_buffer(&mut buf);
-        assert!(res.is_ok());
-        let res = res.unwrap();
-
-        assert_eq!(Packet::PingResp, res);
-
-        buf.clear();
-        Packet::PingResp.write(&mut buf).unwrap();
-        assert_eq!(buf.to_vec(), packet);
-    }
-
-    #[test]
-    fn test_publish_read() {
-        let packet = [
-            0x35, 0x24, 0x00, 0x14, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x31, 0x32, 0x33, 0x2f, 0x74, 0x65, 0x73, 0x74, 0x2f, 0x62, 0x6c, 0x61, 0x62, 0x6c, 0x61, 0x35, 0xd3, 0x0b, 0x01, 0x01, 0x09, 0x00,
-            0x04, 0x31, 0x32, 0x31, 0x32, 0x0b, 0x01,
-        ];
-
-        let mut buf = BytesMut::new();
-        buf.extend(packet);
-
-        let res = Packet::read_from_buffer(&mut buf);
-        assert!(res.is_ok());
-        let res = res.unwrap();
-
-        let expected = Publish {
-            dup: false,
-            qos: QoS::ExactlyOnce,
-            retain: true,
-            topic: "test/123/test/blabla".into(),
-            packet_identifier: Some(13779),
-            publish_properties: PublishProperties {
-                payload_format_indicator: Some(1),
-                message_expiry_interval: None,
-                topic_alias: None,
-                response_topic: None,
-                correlation_data: Some(Bytes::from_static(b"1212")),
-                subscription_identifier: vec![1],
-                user_properties: vec![],
-                content_type: None,
-            },
-            payload: Bytes::from_static(b""),
-        };
-
-        assert_eq!(Packet::Publish(expected), res);
-    }
-
-    #[test]
-    fn test_pubrel_read_write() {
-        let bytes = [0x62, 0x03, 0x35, 0xd3, 0x00];
-
-        let mut buffer = BytesMut::from_iter(bytes);
-
-        let res = Packet::read_from_buffer(&mut buffer);
-
-        assert!(res.is_ok());
-
-        let packet = res.unwrap();
-
-        let expected = PubRel {
-            packet_identifier: 13779,
-            reason_code: PubRelReasonCode::Success,
-            properties: PubRelProperties {
-                reason_string: None,
-                user_properties: vec![],
-            },
-        };
-
-        assert_eq!(packet, Packet::PubRel(expected));
-
-        buffer.clear();
+        let mut buffer = BytesMut::new();
 
         packet.write(&mut buffer).unwrap();
 
-        // The input is not in the smallest possible format but when writing we do expect it to be in the smallest possible format.
-        assert_eq!(buffer.to_vec(), [0x62, 0x02, 0x35, 0xd3].to_vec())
+        let wire_len = packet.wire_len();
+        assert_eq!(wire_len, buffer.len());
+
+        // dbg!(wire_len);
+
+        // let a: Vec<_> = buffer.iter().map(|f| *f as u16).collect();
+        // println!("{:?}", a);
+
+        let res1 = Packet::read(&mut buffer).unwrap();
+
+        assert_eq!(packet, res1);
+
+        let mut buffer = BytesMut::new();
+        res1.write(&mut buffer).unwrap();
+        let res2 = Packet::read(&mut buffer).unwrap();
+
+        assert_eq!(res1, res2);
     }
 
-    #[test]
-    fn test_pubrel_read_smallest_format() {
-        let bytes = [0x62, 0x02, 0x35, 0xd3];
+    #[rstest::rstest]
+    #[case::connect_case(connect_case())]
+    #[case::ping_req_case(ping_req_case().1)]
+    #[case::ping_resp_case(ping_resp_case().1)]
+    #[case::connack_case(connack_case().1)]
+    #[case::create_subscribe_packet(create_subscribe_packet(1))]
+    #[case::create_subscribe_packet(create_subscribe_packet(65335))]
+    #[case::create_puback_packet(create_puback_packet(1))]
+    #[case::create_puback_packet(create_puback_packet(65335))]
+    #[case::create_disconnect_packet(create_disconnect_packet())]
+    #[case::create_connack_packet(create_connack_packet(true))]
+    #[case::create_connack_packet(create_connack_packet(false))]
+    #[case::publish_packet_1(publish_packet_1())]
+    #[case::publish_packet_2(publish_packet_2())]
+    #[case::publish_packet_3(publish_packet_3())]
+    #[case::publish_packet_4(publish_packet_4())]
+    #[case::create_empty_publish_packet(create_empty_publish_packet())]
+    #[case::subscribe(subscribe_case())]
+    #[case::suback(suback_case())]
+    #[case::unsubscribe(unsubscribe_case())]
+    #[case::unsuback(unsuback_case())]
+    #[case::pubcomp_case(pubcomp_case())]
+    #[case::pubrec_case(pubrec_case())]
+    #[case::pubrec_case(pubrel_case2())]
+    #[case::auth_case(auth_case())]
+    #[tokio::test]
+    async fn test_async_write_read_write_read_cases(#[case] packet: Packet) {
+        use crate::packets::WireLength;
 
+        let mut buffer = Vec::with_capacity(1000);
+        let res = packet.async_write(&mut buffer).await.unwrap();
+
+        let wire_len = packet.wire_len();
+
+        assert_eq!(res, buffer.len());
+        assert_eq!(wire_len, buffer.len());
+
+        let mut buf = buffer.as_slice();
+
+        let res1 = Packet::async_read(&mut buf).await.unwrap();
+
+        pretty_assertions::assert_eq!(packet, res1);
+    }
+
+    #[rstest::rstest]
+    #[case::disconnect(disconnect_case())]
+    #[case::ping_req(ping_req_case())]
+    #[case::ping_resp(ping_resp_case())]
+    #[case::publish(publish_case())]
+    #[case::pubrel(pubrel_case())]
+    #[case::pubrel_smallest(pubrel_smallest_case())]
+    fn test_read_write_cases(#[case] (bytes, expected_packet): (&[u8], Packet)) {
         let mut buffer = BytesMut::from_iter(bytes);
 
-        let res = Packet::read_from_buffer(&mut buffer);
+        let res = Packet::read(&mut buffer);
 
         assert!(res.is_ok());
 
         let packet = res.unwrap();
 
-        let expected = PubRel {
-            packet_identifier: 13779,
-            reason_code: PubRelReasonCode::Success,
-            properties: PubRelProperties {
-                reason_string: None,
-                user_properties: vec![],
-            },
-        };
-
-        assert_eq!(packet, Packet::PubRel(expected));
+        assert_eq!(packet, expected_packet);
 
         buffer.clear();
 
@@ -1023,4 +571,42 @@ mod tests {
 
         assert_eq!(buffer.to_vec(), bytes.to_vec())
     }
+
+    #[rstest::rstest]
+    #[case::disconnect(disconnect_case())]
+    #[case::ping_req(ping_req_case())]
+    #[case::ping_resp(ping_resp_case())]
+    #[case::publish(publish_case())]
+    #[case::pubrel(pubrel_case())]
+    #[case::pubrel_smallest(pubrel_smallest_case())]
+    #[tokio::test]
+    async fn test_async_read_write(#[case] (mut bytes, expected_packet): (&[u8], Packet)) {
+        let input = bytes.to_vec();
+
+        let res = Packet::async_read(&mut bytes).await;
+
+        dbg!(&res);
+        assert!(res.is_ok());
+
+        let packet = res.unwrap();
+
+        assert_eq!(packet, expected_packet);
+
+        let mut out = Vec::with_capacity(1000);
+
+        packet.async_write(&mut out).await.unwrap();
+
+        assert_eq!(out, input)
+    }
+
+    // #[rstest::rstest]
+    // #[case(&[59, 1, 0, 59])]
+    // #[case(&[16, 14, 0, 4, 77, 81, 84, 84, 5, 247, 247, 252, 1, 17, 247, 247, 247])]
+    // fn test_read_error(#[case] bytes: &[u8]) {
+    //     let mut buffer = BytesMut::from_iter(bytes);
+
+    //     let res = Packet::read_from_buffer(&mut buffer);
+
+    //     assert!(res.is_err());
+    // }
 }

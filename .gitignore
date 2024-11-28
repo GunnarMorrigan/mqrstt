@@ -3,3 +3,6 @@
 examples/tokio_tls/Cargo.lock
 examples/smol_tls/Cargo.lock
 .vscode/**
+
+Cargo.lock
+test.py

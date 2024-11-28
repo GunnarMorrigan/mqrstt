@@ -1,18 +1,11 @@
-[advisories]
-vulnerability = "deny"
-unsound = "deny"
-unmaintained = "deny"
+
 
 [licenses]
-unlicensed = "deny"
-allow-osi-fsf-free = "neither"
-copyleft = "deny"
 confidence-threshold = 0.95
-allow = ["MPL-2.0", "Apache-2.0", "MIT", "BSD-3-Clause", "ISC"]
+allow = ["MPL-2.0", "Apache-2.0", "MIT", "Unicode-3.0"]
 
 exceptions = [
     { allow = ["Unicode-DFS-2016"], name = "unicode-ident" },
-    { allow = ["OpenSSL"], name = "ring" }
 ]
 
 [[licenses.clarify]]

@@ -1,31 +1,26 @@
 //! A pure rust MQTT client which is easy to use, efficient and provides both sync and async options.
 //!
 //! Because this crate aims to be runtime agnostic the user is required to provide their own data stream.
-//! For an async approach the stream has to implement the `AsyncReadExt` and `AsyncWriteExt` traits.
-//! That is [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`] for tokio and [`::smol::io::AsyncReadExt`] and [`::smol::io::AsyncWriteExt`] for smol.
+//! For an async approach the stream has to implement the `AsyncRead` and `AsyncWrite` traits.
+//! That is [`::tokio::io::AsyncRead`] and [`::tokio::io::AsyncWrite`] for tokio and [`::smol::io::AsyncRead`] and [`::smol::io::AsyncWrite`] for smol.
 //!
 //! Features:
 //! ----------------------------
 //!  - MQTT v5
 //!  - Runtime agnostic (Smol, Tokio)
-//!  - TLS/TCP
+//!  - Packets are acknoledged after handler has processed them
+//!  - Runs on just a stream so you can use all TCP backends
 //!  - Lean
 //!  - Keep alive depends on actual communication
 //!
 //! To do
 //! ----------------------------
-//!  - Enforce size of outbound messages (e.g. Publish)
-//!  - QUIC via QUINN
 //!  - Even More testing
-//!  - More documentation
-//!  - Remove logging calls or move all to test flag
 //!
 //! Notes:
 //! ----------------------------
-//! - Your handler should not wait too long
-//! - Create a new connection when an error or disconnect is encountered
 //! - Handlers only get incoming packets
-//! - Sync mode requires a non blocking stream
+//! - Create a new connection when an error or disconnect is encountered
 //!
 //! Smol example:
 //! ----------------------------
@@ -48,7 +43,7 @@
 //!     // To reconnect after a disconnect or error
 //!     let (mut network, client) = NetworkBuilder
 //!         ::new_from_client_id("mqrsttSmolExample")
-//!         .smol_sequential_network();
+//!         .smol_network();
 //!     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
 //!         .await
 //!         .unwrap();
@@ -87,7 +82,7 @@
 //! async fn main() {
 //!     let (mut network, client) = NetworkBuilder
 //!         ::new_from_client_id("TokioTcpPingPongExample")
-//!         .tokio_sequential_network();
+//!         .tokio_network();
 //!
 //!     // Construct a no op handler
 //!     let mut nop = NOP{};
@@ -111,59 +106,6 @@
 //!     assert!(n.is_ok());
 //! }
 //! ```
-//!
-// //! Sync example:
-// //! ----------------------------
-// //! ```rust
-// //! use mqrstt::{
-// //!     MqttClient,
-// //!     example_handlers::NOP,
-// //!     ConnectOptions,
-// //!     packets::{self, Packet},
-// //!     EventHandler,
-// //!     sync::NetworkStatus,
-// //! };
-// //! use std::net::TcpStream;
-// //!
-// //! let mut client_id: String = "SyncTcppingrespTestExample".to_string();
-// //! let options = ConnectOptions::new(client_id);
-// //!
-// //! let address = "broker.emqx.io";
-// //! let port = 1883;
-// //!
-// //! let (mut network, client) = new_sync(options);
-// //!
-// //! // Construct a no op handler
-// //! let mut nop = NOP{};
-// //!
-// //! // In normal operations you would want to loop connect
-// //! // To reconnect after a disconnect or error
-// //! let stream = TcpStream::connect((address, port)).unwrap();
-// //! // IMPORTANT: Set nonblocking to true! No progression will be made when stream reads block!
-// //! stream.set_nonblocking(true).unwrap();
-// //! network.connect(stream, &mut nop).unwrap();
-// //!
-// //! let res_join_handle = std::thread::spawn(move ||
-// //!     loop {
-// //!         match network.poll(&mut nop) {
-// //!             Ok(NetworkStatus::ActivePending) => {
-// //!                 std::thread::sleep(std::time::Duration::from_millis(100));
-// //!             },
-// //!             Ok(NetworkStatus::ActiveReady) => {
-// //!                 std::thread::sleep(std::time::Duration::from_millis(100));
-// //!             },
-// //!             otherwise => return otherwise,
-// //!         }
-// //!     }
-// //! );
-// //!
-// //! std::thread::sleep(std::time::Duration::from_secs(30));
-// //! client.disconnect_blocking().unwrap();
-// //! let join_res = res_join_handle.join();
-// //! assert!(join_res.is_ok());
-// //! let res = join_res.unwrap();
-// //! assert!(res.is_ok());
-// //! ```
 
 const CHANNEL_SIZE: usize = 100;
 
@@ -173,16 +115,29 @@ mod connect_options;
 mod state_handler;
 mod util;
 
+/// Contains the reader writer parts for the smol runtime.
+///
+/// Module [`crate::smol`] only contains a synchronized approach to call the users `Handler`.
 #[cfg(feature = "smol")]
 pub mod smol;
-#[cfg(any(feature = "tokio"))]
+/// Contains the reader and writer parts for the tokio runtime.
+///
+/// Module [`crate::tokio`] contains both a synchronized and concurrent approach to call the users `Handler`.
+#[cfg(feature = "tokio")]
 pub mod tokio;
 
+/// Error types that the user can see during operation of the client.
+///
+/// Wraps all other errors that can be encountered.
 pub mod error;
+
+/// All event handler traits are defined here.
+///
+/// Event handlers are used to process incoming packets.
 mod event_handlers;
+/// All MQTT packets are defined here
 pub mod packets;
 mod state;
-use std::marker::PhantomData;
 
 pub use event_handlers::*;
 
@@ -190,6 +145,7 @@ pub use client::MqttClient;
 pub use connect_options::ConnectOptions;
 use state_handler::StateHandler;
 
+use std::marker::PhantomData;
 #[cfg(test)]
 pub mod tests;
 
@@ -237,14 +193,10 @@ impl<H, S> NetworkBuilder<H, S> {
 #[cfg(feature = "tokio")]
 impl<H, S> NetworkBuilder<H, S>
 where
-    H: AsyncEventHandlerMut,
-    S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
+    H: AsyncEventHandler,
+    S: ::tokio::io::AsyncRead + ::tokio::io::AsyncWrite + Sized + Unpin,
 {
-    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`]
-    /// This network is supposed to be ran on a single task/thread. The read and write operations happen one after the other.
-    /// This approach does not give the most speed in terms of reading and writing but provides a simple and easy to use client with low overhead for low throughput clients.
-    ///
-    /// For more throughput: [`NetworkBuilder::tokio_concurrent_network`]
+    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncRead`] and [`::tokio::io::AsyncWrite`]
     ///
     /// # Example
     /// ```
@@ -253,11 +205,11 @@ where
     /// let options = ConnectOptions::new("ExampleClient");
     /// let (mut network, client) = mqrstt::NetworkBuilder::<(), tokio::net::TcpStream>
     ///     ::new_from_options(options)
-    ///     .tokio_sequential_network();
+    ///     .tokio_network();
     /// ```
-    pub fn tokio_sequential_network(self) -> (tokio::Network<tokio::SequentialHandler, H, S>, MqttClient)
+    pub fn tokio_network(self) -> (tokio::Network<H, S>, MqttClient)
     where
-        H: AsyncEventHandlerMut,
+        H: AsyncEventHandler,
     {
         let (to_network_s, to_network_r) = async_channel::bounded(CHANNEL_SIZE);
 
@@ -273,51 +225,19 @@ where
     }
 }
 
-#[cfg(feature = "tokio")]
-impl<H, S> NetworkBuilder<H, S>
-where
-    H: AsyncEventHandler,
-    S: ::tokio::io::AsyncReadExt + ::tokio::io::AsyncWriteExt + Sized + Unpin,
-{
-    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncReadExt`] and [`::tokio::io::AsyncWriteExt`]
-    /// # Example
-    ///
-    /// ```
-    /// use mqrstt::ConnectOptions;
-    ///
-    /// let options = ConnectOptions::new("ExampleClient");
-    /// let (mut network, client) = mqrstt::NetworkBuilder::<(), tokio::net::TcpStream>
-    ///     ::new_from_options(options)
-    ///     .tokio_concurrent_network();
-    /// ```
-    pub fn tokio_concurrent_network(self) -> (tokio::Network<tokio::ConcurrentHandler, H, S>, MqttClient) {
-        let (to_network_s, to_network_r) = async_channel::bounded(CHANNEL_SIZE);
-
-        let (apkids, apkids_r) = available_packet_ids::AvailablePacketIds::new(self.options.send_maximum());
-
-        let max_packet_size = self.options.maximum_packet_size();
-
-        let client = MqttClient::new(apkids_r, to_network_s, max_packet_size);
-
-        let network = tokio::Network::new(self.options, to_network_r, apkids);
-
-        (network, client)
-    }
-}
-
 #[cfg(feature = "smol")]
 impl<H, S> NetworkBuilder<H, S>
 where
-    H: AsyncEventHandlerMut,
-    S: ::smol::io::AsyncReadExt + ::smol::io::AsyncWriteExt + Sized + Unpin,
+    H: AsyncEventHandler,
+    S: ::smol::io::AsyncRead + ::smol::io::AsyncWrite + Sized + Unpin,
 {
-    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncReadExt`]  and [`::tokio::io::AsyncWriteExt`]
+    /// Creates the needed components to run the MQTT client using a stream that implements [`::tokio::io::AsyncRead`]  and [`::tokio::io::AsyncWrite`]
     /// ```
     /// let (mut network, client) = mqrstt::NetworkBuilder::<(), smol::net::TcpStream>
     ///     ::new_from_client_id("ExampleClient")
-    ///     .smol_sequential_network();
+    ///     .smol_network();
     /// ```
-    pub fn smol_sequential_network(self) -> (smol::Network<H, S>, MqttClient) {
+    pub fn smol_network(self) -> (smol::Network<H, S>, MqttClient) {
         let (to_network_s, to_network_r) = async_channel::bounded(CHANNEL_SIZE);
 
         let (apkids, apkids_r) = available_packet_ids::AvailablePacketIds::new(self.options.send_maximum());
@@ -330,38 +250,6 @@ where
 
         (network, client)
     }
-}
-
-#[cfg(feature = "todo")]
-/// Creates a new [`sync::Network<S>`] and [`MqttClient`] that can be connected to a broker.
-/// S should implement [`std::io::Read`] and [`std::io::Write`].
-/// Additionally, S should be made non_blocking otherwise it will not progress.
-///
-/// # Example
-///
-/// ```
-/// use mqrstt::ConnectOptions;
-///
-/// let options = ConnectOptions::new("ExampleClient");
-/// let (network, client) = mqrstt::new_sync::<std::net::TcpStream>(options);
-/// ```
-pub fn new_sync<S>(options: ConnectOptions) -> (sync::Network<S>, MqttClient)
-where
-    S: std::io::Read + std::io::Write + Sized + Unpin,
-{
-    use available_packet_ids::AvailablePacketIds;
-
-    let (to_network_s, to_network_r) = async_channel::bounded(100);
-
-    let (apkids, apkids_r) = AvailablePacketIds::new(options.send_maximum());
-
-    let max_packet_size = options.maximum_packet_size();
-
-    let client = MqttClient::new(apkids_r, to_network_s, max_packet_size);
-
-    let network = sync::Network::new(options, to_network_r, apkids);
-
-    (network, client)
 }
 
 #[cfg(test)]
@@ -377,19 +265,19 @@ mod smol_lib_test {
 
     use rand::Rng;
 
-    use crate::{example_handlers::PingPong, packets::QoS, ConnectOptions, NetworkBuilder};
+    use crate::{example_handlers::PingPong, packets::QoS, random_chars, ConnectOptions, NetworkBuilder};
 
     #[test]
     fn test_smol_tcp() {
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
+            let mut client_id: String = random_chars();
             client_id += "_SmolTcpPingPong";
             let options = ConnectOptions::new(client_id);
 
             let address = "broker.emqx.io";
             let port = 1883;
 
-            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
+            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_network();
 
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
             let mut pingpong = PingPong::new(client.clone());
@@ -426,7 +314,7 @@ mod smol_lib_test {
             let address = "broker.emqx.io";
             let port = 1883;
 
-            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
+            let (mut network, client) = NetworkBuilder::new_from_options(options).smol_network();
             let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
 
             let mut pingresp = crate::example_handlers::PingResp::new(client.clone());
@@ -450,11 +338,11 @@ mod smol_lib_test {
             );
             assert!(n.is_ok());
             let pingresp = n.unwrap();
-            assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
+            assert_eq!(2, pingresp.ping_resp_received);
         });
     }
 
-    #[cfg(all(target_family = "windows"))]
+    #[cfg(target_family = "windows")]
     #[test]
     fn test_close_write_tcp_stream_smol() {
         use crate::error::ConnectionError;
@@ -472,7 +360,7 @@ mod smol_lib_test {
 
             let (n, _) = futures::join!(
                 async {
-                    let (mut network, client) = NetworkBuilder::new_from_options(options).smol_sequential_network();
+                    let (mut network, client) = NetworkBuilder::new_from_options(options).smol_network();
                     let stream = smol::net::TcpStream::connect((address, port)).await.unwrap();
                     let mut pingresp = crate::example_handlers::PingResp::new(client.clone());
                     network.connect(stream, &mut pingresp).await
@@ -496,99 +384,46 @@ mod smol_lib_test {
 #[cfg(feature = "tokio")]
 #[cfg(test)]
 mod tokio_lib_test {
-    use crate::example_handlers::PingPong;
-
-    use crate::packets::QoS;
-
-    use std::{sync::Arc, time::Duration};
-
+    use crate::example_handlers::PingResp;
+    use crate::random_chars;
     use crate::ConnectOptions;
 
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn test_tokio_tcp() {
-        use std::hint::black_box;
+    use std::time::Duration;
 
-        use crate::NetworkBuilder;
+    #[tokio::test]
+    async fn test_tokio_ping_req() {
+        let mut client_id: String = random_chars();
+        client_id += "_TokioTcppingrespTest";
+        let mut options = ConnectOptions::new(client_id);
+        let keep_alive_interval = 5;
+        options.set_keep_alive_interval(Duration::from_secs(keep_alive_interval));
 
-        let client_id: String = crate::random_chars() + "_TokioTcpPingPong";
+        let wait_duration = options.get_keep_alive_interval() * 2 + options.get_keep_alive_interval() / 2;
 
-        let (mut network, client) = NetworkBuilder::new_from_client_id(client_id).tokio_concurrent_network();
+        let (mut network, client) = crate::NetworkBuilder::new_from_options(options).tokio_network();
 
         let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 
-        let mut pingpong = Arc::new(PingPong::new(client.clone()));
+        let mut pingresp = PingResp::new(client.clone());
 
-        network.connect(stream, &mut pingpong).await.unwrap();
+        network.connect(stream, &mut pingresp).await.unwrap();
 
-        let topic = crate::random_chars() + "_mqrstt";
-
-        client.subscribe((topic.as_str(), QoS::ExactlyOnce)).await.unwrap();
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        let (read, write) = network.split(pingpong.clone()).unwrap();
-
-        let read_handle = tokio::task::spawn(read.run());
-        let write_handle = tokio::task::spawn(write.run());
-
-        let (read_result, write_result, _) = tokio::join!(read_handle, write_handle, async {
-            client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
-            client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".to_vec()).await.unwrap();
-            client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".to_vec()).await.unwrap();
-            client.publish(topic.as_str(), QoS::ExactlyOnce, false, b"ping".repeat(500)).await.unwrap();
-
-            client.unsubscribe(topic.as_str()).await.unwrap();
-
-            for _ in 0..30 {
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                if pingpong.number.load(std::sync::atomic::Ordering::SeqCst) == 4 {
-                    break;
-                }
-            }
-
-            client.disconnect().await.unwrap();
+        let network_handle = tokio::task::spawn(async move {
+            let _result = network.run(&mut pingresp).await;
+            // check result and or restart the connection
+            pingresp
         });
 
-        let write_result = write_result.unwrap();
-        assert!(write_result.is_ok());
-        assert_eq!(crate::NetworkStatus::OutgoingDisconnect, write_result.unwrap());
-        assert_eq!(4, pingpong.number.load(std::sync::atomic::Ordering::SeqCst));
-        let _ = black_box(read_result);
+        tokio::time::sleep(wait_duration).await;
+        client.disconnect().await.unwrap();
+
+        tokio::time::sleep(Duration::from_secs(1)).await;
+
+        let result = network_handle.await;
+        assert!(result.is_ok());
+        let result = result.unwrap();
+        assert_eq!(2, result.ping_resp_received);
     }
-
-    // #[tokio::test]
-    // async fn test_tokio_ping_req() {
-    //     let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
-    //     client_id += "_TokioTcppingrespTest";
-    //     let mut options = ConnectOptions::new(client_id);
-    //     let keep_alive_interval = 5;
-    //     options.set_keep_alive_interval(Duration::from_secs(keep_alive_interval));
-
-    //     let wait_duration = options.get_keep_alive_interval() * 2 + options.get_keep_alive_interval() / 2;
-
-    //     let (mut network, client) = new_tokio(options);
-
-    //     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
-
-    //     let pingresp = Arc::new(crate::test_handlers::PingResp::new(client.clone()));
-
-    //     network.connect(stream, &mut pingresp).await.unwrap();
-
-    //     let (read, write) = network.split(pingresp.clone()).unwrap();
-
-    //     let read_handle = tokio::task::spawn(read.run());
-    //     let write_handle = tokio::task::spawn(write.run());
-
-    //     tokio::time::sleep(wait_duration).await;
-    //     client.disconnect().await.unwrap();
-
-    //     tokio::time::sleep(Duration::from_secs(1)).await;
-
-    //     let (read_result, write_result) = tokio::join!(read_handle, write_handle);
-    //     let (read_result, write_result) = (read_result.unwrap(), write_result.unwrap());
-    //     assert!(write_result.is_ok());
-    //     assert_eq!(2, pingresp.ping_resp_received.load(std::sync::atomic::Ordering::Acquire));
-    // }
 
     #[cfg(all(feature = "tokio", target_family = "windows"))]
     #[tokio::test]
@@ -600,11 +435,11 @@ mod tokio_lib_test {
         let address = ("127.0.0.1", 2000);
 
         let client_id: String = crate::random_chars() + "_TokioTcppingrespTest";
-        let options = ConnectOptions::new(client_id);
+        let options = crate::ConnectOptions::new(client_id);
 
         let (n, _) = tokio::join!(
             async move {
-                let (mut network, client) = NetworkBuilder::new_from_options(options).tokio_sequential_network();
+                let (mut network, client) = NetworkBuilder::new_from_options(options).tokio_network();
 
                 let stream = tokio::net::TcpStream::connect(address).await.unwrap();
 
@@ -621,8 +456,7 @@ mod tokio_lib_test {
         );
 
         if let ConnectionError::Io(err) = n.unwrap_err() {
-            assert_eq!(ErrorKind::ConnectionReset, err.kind());
-            assert_eq!("Connection reset by peer".to_string(), err.to_string());
+            assert_eq!(ErrorKind::UnexpectedEof, err.kind());
         } else {
             panic!();
         }
