@@ -4,62 +4,57 @@
 //! For an async approach the stream has to implement the `AsyncRead` and `AsyncWrite` traits.
 //! That is [`::tokio::io::AsyncRead`] and [`::tokio::io::AsyncWrite`] for tokio and [`::smol::io::AsyncRead`] and [`::smol::io::AsyncWrite`] for smol.
 //!
+//!
+//!
 //! Features:
 //! ----------------------------
-//!  - MQTT v5
-//!  - Runtime agnostic (Smol, Tokio)
-//!  - Packets are acknoledged after handler has processed them
-//!  - Runs on just a stream so you can use all TCP backends
-//!  - Lean
-//!  - Keep alive depends on actual communication
-//!
-//! To do
+//! - MQTT v5
+//! - Runtime agnostic (Smol, Tokio)
+//! - Sync
+//! - TLS/TCP
+//! - Lean
+//! - Keep alive depends on actual communication
+//! - This tokio implemention has been fuzzed using cargo-fuzz!
+//!   
+//! To do:
 //! ----------------------------
-//!  - Even More testing
+//! - Even More testing
+//! - Add TLS examples to repository
+//!
+//! Minimum Supported Rust Version (MSRV):
+//! ----------------------------
+//! From 0.3 the tokio and smol variants will require MSRV: 1.75 due to async fn in trait feature.
 //!
 //! Notes:
 //! ----------------------------
-//! - Handlers only get incoming packets
+//! - Your handler should not wait too long
 //! - Create a new connection when an error or disconnect is encountered
+//! - Handlers only get incoming packets
 //!
 //! Smol example:
 //! ----------------------------
 //! ```rust
-//! use mqrstt::{
-//!     MqttClient,
-//!     example_handlers::NOP,
-//!     ConnectOptions,
-//!     packets::{self, Packet},
-//!     AsyncEventHandler,
-//!     NetworkStatus,
-//!     NetworkBuilder,
-//! };
+//! use mqrstt::{example_handlers::NOP, NetworkBuilder, NetworkStatus};
 //!
 //! smol::block_on(async {
 //!     // Construct a no op handler
-//!     let mut nop = NOP{};
+//!     let mut nop = NOP {};
 //!
 //!     // In normal operations you would want to loop this connection
 //!     // To reconnect after a disconnect or error
-//!     let (mut network, client) = NetworkBuilder
-//!         ::new_from_client_id("mqrsttSmolExample")
-//!         .smol_network();
-//!     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883))
-//!         .await
-//!         .unwrap();
+//!     let (mut network, client) = NetworkBuilder::new_from_client_id("mqrsttSmolExample").smol_network();
+//!     let stream = smol::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 //!     network.connect(stream, &mut nop).await.unwrap();
-//!     
+//!
 //!     // This subscribe is only processed when we run the network
 //!     client.subscribe("mqrstt").await.unwrap();
 //!
-//!     let (n, t) = futures::join!(
-//!         network.run(&mut nop),
-//!         async {
-//!             smol::Timer::after(std::time::Duration::from_secs(30)).await;
-//!             client.disconnect().await.unwrap();
-//!         }
-//!     );
-//!     assert!(n.is_ok());
+//!     let (result, _) = futures::join!(network.run(&mut nop), async {
+//!         smol::Timer::after(std::time::Duration::from_secs(30)).await;
+//!         client.disconnect().await.unwrap();
+//!     });
+//!     assert!(result.is_ok());
+//!     assert_eq!(result.unwrap(), NetworkStatus::OutgoingDisconnect);
 //! });
 //! ```
 //!
@@ -68,42 +63,31 @@
 //! ----------------------------
 //! ```rust
 //! use mqrstt::{
-//!     MqttClient,
 //!     example_handlers::NOP,
-//!     ConnectOptions,
-//!     packets::{self, Packet},
-//!     AsyncEventHandler,
-//!     NetworkStatus,
-//!     NetworkBuilder,
+//!     NetworkBuilder, NetworkStatus,
 //! };
+//!
 //! use tokio::time::Duration;
 //!
 //! #[tokio::main]
 //! async fn main() {
-//!     let (mut network, client) = NetworkBuilder
-//!         ::new_from_client_id("TokioTcpPingPongExample")
-//!         .tokio_network();
-//!
+//!     let (mut network, client) = NetworkBuilder::new_from_client_id("TokioTcpPingPongExample").tokio_network();
 //!     // Construct a no op handler
-//!     let mut nop = NOP{};
-//!
+//!     let mut nop = NOP {};
 //!     // In normal operations you would want to loop this connection
-//!     // To reconnect after a disconnect or error    
-//!     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883))
-//!         .await
-//!         .unwrap();
+//!     // To reconnect after a disconnect or error
+//!     let stream = tokio::net::TcpStream::connect(("broker.emqx.io", 1883)).await.unwrap();
 //!     network.connect(stream, &mut nop).await.unwrap();
-//!     
+//!
 //!     client.subscribe("mqrstt").await.unwrap();
-//!     
-//!     let (n, _) = futures::join!(
-//!         network.run(&mut nop),
-//!         async {
-//!             tokio::time::sleep(Duration::from_secs(30)).await;
-//!             client.disconnect().await.unwrap();
-//!         }
-//!     );
-//!     assert!(n.is_ok());
+//!     // Run the network
+//!     let network_handle = tokio::spawn(async move { network.run(&mut nop).await });
+//!
+//!     tokio::time::sleep(Duration::from_secs(30)).await;
+//!     client.disconnect().await.unwrap();
+//!     let result = network_handle.await;
+//!     assert!(result.is_ok());
+//!     assert_eq!(result.unwrap().unwrap(), NetworkStatus::OutgoingDisconnect);
 //! }
 //! ```
 
