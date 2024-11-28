@@ -21,6 +21,7 @@ async fn main() {
     let mut handler = Handler { byte_count: 0 };
 
     let stream = tokio::net::TcpStream::connect(hostname).await.unwrap();
+    let stream = tokio::io::BufStream::new(stream);
     let (mut network, client) = mqrstt::NetworkBuilder::new_from_client_id("TestClientABCDEFG").tokio_network();
 
     network.connect(stream, &mut handler).await.unwrap();

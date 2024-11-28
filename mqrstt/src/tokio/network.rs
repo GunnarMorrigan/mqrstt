@@ -55,6 +55,8 @@ where
     S: tokio::io::AsyncReadExt + tokio::io::AsyncWriteExt + Sized + Unpin + Send + 'static,
 {
     /// Initializes an MQTT connection with the provided configuration an stream
+    ///
+    /// It is recommended to use a buffered stream. [`tokio::io::BufStream`] could be used to easily buffer both read and write.
     pub async fn connect(&mut self, mut stream: S, handler: &mut H) -> Result<(), ConnectionError> {
         let conn_ack = stream.connect(&self.options).await?;
         self.last_network_action = Instant::now();

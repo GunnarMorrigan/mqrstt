@@ -6,6 +6,7 @@ license = "MIT"
 
 [dependencies]
 smol = { version = "2" }
+futures = "0.3.31"
 
 tokio = { version = "1", features = ["full"] }
 
@@ -14,6 +15,14 @@ mqrstt = { path = "../../mqrstt", features = ["logs"] }
 [[bin]]
 name = "tokio"
 path = "src/tokio.rs"
+
+[[bin]]
+name = "ping_pong"
+path = "src/ping_pong.rs"
+
+[[bin]]
+name = "ping_pong_smol"
+path = "src/ping_pong_smol.rs"
 
 [[bin]]
 name = "smol"
