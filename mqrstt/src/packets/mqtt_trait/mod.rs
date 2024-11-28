@@ -43,7 +43,7 @@ pub trait MqttWrite: Sized {
     fn write(&self, buf: &mut BytesMut) -> Result<(), crate::packets::error::SerializeError>;
 }
 
-impl<'a, T> MqttWrite for &'a T
+impl<T> MqttWrite for &T
 where
     T: MqttWrite,
 {

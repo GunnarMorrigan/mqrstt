@@ -82,14 +82,12 @@ impl<S> MqttAsyncWrite<S> for LastWill
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let properties_written = self.last_will_properties.async_write(stream).await?;
-            let topic_written = self.topic.async_write(stream).await?;
-            let payload_written = self.payload.async_write(stream).await?;
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let properties_written = self.last_will_properties.async_write(stream).await?;
+        let topic_written = self.topic.async_write(stream).await?;
+        let payload_written = self.payload.async_write(stream).await?;
 
-            Ok(properties_written + topic_written + payload_written)
-        }
+        Ok(properties_written + topic_written + payload_written)
     }
 }
 

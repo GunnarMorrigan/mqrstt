@@ -53,21 +53,19 @@ impl<S> PacketAsyncRead<S> for ConnAck
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(_: u8, _: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
-        async move {
-            let (connack_flags, read_bytes) = ConnAckFlags::async_read(stream).await?;
-            let (reason_code, reason_code_read_bytes) = ConnAckReasonCode::async_read(stream).await?;
-            let (connack_properties, connack_properties_read_bytes) = ConnAckProperties::async_read(stream).await?;
+    async fn async_read(_: u8, _: usize, stream: &mut S) -> Result<(Self, usize), super::error::ReadError> {
+        let (connack_flags, read_bytes) = ConnAckFlags::async_read(stream).await?;
+        let (reason_code, reason_code_read_bytes) = ConnAckReasonCode::async_read(stream).await?;
+        let (connack_properties, connack_properties_read_bytes) = ConnAckProperties::async_read(stream).await?;
 
-            Ok((
-                Self {
-                    connack_flags,
-                    reason_code,
-                    connack_properties,
-                },
-                read_bytes + reason_code_read_bytes + connack_properties_read_bytes,
-            ))
-        }
+        Ok((
+            Self {
+                connack_flags,
+                reason_code,
+                connack_properties,
+            },
+            read_bytes + reason_code_read_bytes + connack_properties_read_bytes,
+        ))
     }
 }
 
@@ -85,15 +83,13 @@ impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for ConnAck
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            use crate::packets::mqtt_trait::MqttAsyncWrite;
-            let connack_flags_writen = self.connack_flags.async_write(stream).await?;
-            let reason_code_writen = self.reason_code.async_write(stream).await?;
-            let connack_properties_writen = self.connack_properties.async_write(stream).await?;
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        use crate::packets::mqtt_trait::MqttAsyncWrite;
+        let connack_flags_writen = self.connack_flags.async_write(stream).await?;
+        let reason_code_writen = self.reason_code.async_write(stream).await?;
+        let connack_properties_writen = self.connack_properties.async_write(stream).await?;
 
-            Ok(connack_flags_writen + reason_code_writen + connack_properties_writen)
-        }
+        Ok(connack_flags_writen + reason_code_writen + connack_properties_writen)
     }
 }
 
@@ -114,16 +110,14 @@ impl<S> MqttAsyncRead<S> for ConnAckFlags
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), super::error::ReadError>> {
-        async move {
-            let byte = stream.read_u8().await?;
-            Ok((
-                Self {
-                    session_present: (byte & 0b00000001) == 0b00000001,
-                },
-                1,
-            ))
-        }
+    async fn async_read(stream: &mut S) -> Result<(Self, usize), super::error::ReadError> {
+        let byte = stream.read_u8().await?;
+        Ok((
+            Self {
+                session_present: (byte & 0b00000001) == 0b00000001,
+            },
+            1,
+        ))
     }
 }
 
@@ -154,14 +148,12 @@ impl<S> crate::packets::mqtt_trait::MqttAsyncWrite<S> for ConnAckFlags
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            use tokio::io::AsyncWriteExt;
-            let byte = self.session_present as u8;
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        use tokio::io::AsyncWriteExt;
+        let byte = self.session_present as u8;
 
-            stream.write_u8(byte).await?;
-            Ok(1)
-        }
+        stream.write_u8(byte).await?;
+        Ok(1)
     }
 }
 

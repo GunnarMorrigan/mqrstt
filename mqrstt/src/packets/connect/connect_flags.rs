@@ -77,11 +77,9 @@ impl<S> MqttAsyncRead<S> for ConnectFlags
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let byte = stream.read_u8().await?;
-            Ok((ConnectFlags::from_u8(byte)?, 1))
-        }
+    async fn async_read(stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let byte = stream.read_u8().await?;
+        Ok((ConnectFlags::from_u8(byte)?, 1))
     }
 }
 
@@ -96,13 +94,11 @@ impl<S> MqttAsyncWrite<S> for ConnectFlags
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            use tokio::io::AsyncWriteExt;
-            let byte = self.into_u8()?;
-            stream.write_u8(byte).await?;
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        use tokio::io::AsyncWriteExt;
+        let byte = self.into_u8()?;
+        stream.write_u8(byte).await?;
 
-            Ok(1)
-        }
+        Ok(1)
     }
 }

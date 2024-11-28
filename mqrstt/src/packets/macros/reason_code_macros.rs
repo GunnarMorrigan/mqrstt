@@ -14,7 +14,7 @@ macro_rules! reason_code {
                 } -> ())
             }
 
-            pub(crate) fn to_u8(&self) -> u8 {
+            pub(crate) fn to_u8(self) -> u8 {
                 $crate::packets::macros::reason_code_match_write!(@ $name, self, {
                     $($code,)*
                 } -> ())

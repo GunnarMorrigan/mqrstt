@@ -58,34 +58,32 @@ impl<S> PacketAsyncRead<S> for Unsubscribe
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let mut total_read_bytes = 0;
-            let packet_identifier = stream.read_u16().await?;
-            let (properties, properties_read_bytes) = UnsubscribeProperties::async_read(stream).await?;
-            total_read_bytes += 2 + properties_read_bytes;
+    async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let mut total_read_bytes = 0;
+        let packet_identifier = stream.read_u16().await?;
+        let (properties, properties_read_bytes) = UnsubscribeProperties::async_read(stream).await?;
+        total_read_bytes += 2 + properties_read_bytes;
 
-            let mut topics = vec![];
-            loop {
-                let (topic, topic_read_size) = Box::<str>::async_read(stream).await?;
-                total_read_bytes += topic_read_size;
+        let mut topics = vec![];
+        loop {
+            let (topic, topic_read_size) = Box::<str>::async_read(stream).await?;
+            total_read_bytes += topic_read_size;
 
-                topics.push(topic);
+            topics.push(topic);
 
-                if total_read_bytes >= remaining_length {
-                    break;
-                }
+            if total_read_bytes >= remaining_length {
+                break;
             }
-
-            Ok((
-                Self {
-                    packet_identifier,
-                    properties,
-                    topics,
-                },
-                total_read_bytes,
-            ))
         }
+
+        Ok((
+            Self {
+                packet_identifier,
+                properties,
+                topics,
+            },
+            total_read_bytes,
+        ))
     }
 }
 
@@ -105,19 +103,18 @@ impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Unsubscribe
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
         use tokio::io::AsyncWriteExt;
-        async move {
-            let mut total_written_bytes = 2;
-            stream.write_u16(self.packet_identifier).await?;
 
-            for topic in &self.topics {
-                total_written_bytes += topic.async_write(stream).await?;
-            }
+        let mut total_written_bytes = 2;
+        stream.write_u16(self.packet_identifier).await?;
 
-            Ok(total_written_bytes)
+        for topic in &self.topics {
+            total_written_bytes += topic.async_write(stream).await?;
         }
+
+        Ok(total_written_bytes)
     }
 }
 
@@ -206,7 +203,7 @@ where
     for<'any> &'any T: IntoUnsubscribeTopic,
 {
     fn from(value: &[T; S]) -> Self {
-        Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
+        Self(value.iter().map(IntoUnsubscribeTopic::into).collect())
     }
 }
 // -------------------- Slices --------------------
@@ -215,7 +212,7 @@ where
     for<'any> &'any T: IntoUnsubscribeTopic,
 {
     fn from(value: &[T]) -> Self {
-        Self(value.iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
+        Self(value.iter().map(IntoUnsubscribeTopic::into).collect())
     }
 }
 impl From<&[&str]> for UnsubscribeTopics {
@@ -239,7 +236,7 @@ where
     for<'any> &'any T: IntoUnsubscribeTopic,
 {
     fn from(value: Vec<T>) -> Self {
-        Self(value.into_iter().map(|val| IntoUnsubscribeTopic::into(&val)).collect())
+        Self(value.iter().map(IntoUnsubscribeTopic::into).collect())
     }
 }
 
@@ -248,7 +245,7 @@ where
     for<'any> &'any T: IntoUnsubscribeTopic,
 {
     fn from(value: &Vec<T>) -> Self {
-        Self(value.into_iter().map(|val| IntoUnsubscribeTopic::into(val)).collect())
+        Self(value.iter().map(IntoUnsubscribeTopic::into).collect())
     }
 }
 

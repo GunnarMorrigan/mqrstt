@@ -347,7 +347,7 @@ impl Packet {
         #[cfg(feature = "logs")]
         tracing::trace!("Read packet header: {:?}", header);
 
-        Ok(Packet::async_read_packet(header, stream).await?)
+        Packet::async_read_packet(header, stream).await
     }
 
     pub fn read(buffer: &mut BytesMut) -> Result<Packet, error::ReadBytes<DeserializeError>> {

@@ -34,40 +34,14 @@ macro_rules! define_properties {
         }
 
         impl<S> $crate::packets::mqtt_trait::MqttAsyncWrite<S> for $name where S: tokio::io::AsyncWrite + Unpin {
-            fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-                async move {
-                    let mut bytes_writen = 0;
-                    $crate::packets::VariableInteger::write_async_variable_integer(&self.wire_len(), stream).await?;
-                    $(
-                        $crate::packets::macros::properties_write!(self, bytes_writen, stream, PropertyType::$prop_variant);
-                    )*
+            async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+                let mut bytes_writen = 0;
+                $crate::packets::VariableInteger::write_async_variable_integer(&self.wire_len(), stream).await?;
+                $(
+                    $crate::packets::macros::properties_write!(self, bytes_writen, stream, PropertyType::$prop_variant);
+                )*
 
-                    Ok(bytes_writen)
-                }
-
-                // let (len, length_variable_integer) = <usize as crate::packets::primitive::VariableInteger>::read_async_variable_integer(stream).await?;
-                // if len == 0 {
-                //     return Ok((Self::default(), length_variable_integer));
-                // }
-
-                // let mut properties = $name::default();
-
-                // let mut read_property_bytes = 0;
-                // loop {
-                //     let (prop, read_bytes) = crate::packets::PropertyType::async_read(stream).await?;
-                //     read_property_bytes += read_bytes;
-                //     match prop {
-                //         $(
-                //             $crate::packets::macros::properties_read_match_branch_name!($prop_variant) => $crate::packets::macros::properties_read_match_branch_body!(stream, properties, read_property_bytes, PropertyType::$prop_variant),
-                //         )*
-                //         e => return Err($crate::packets::error::ReadError::DeserializeError(DeserializeError::UnexpectedProperty(e, PacketType::PubRel))),
-                //     }
-                //     if read_property_bytes == len {
-                //         break;
-                //     }
-                // }
-
-                // Ok((properties, length_variable_integer + read_property_bytes))
+                Ok(bytes_writen)
             }
         }
 

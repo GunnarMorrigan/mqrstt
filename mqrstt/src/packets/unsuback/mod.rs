@@ -49,36 +49,34 @@ impl<S> PacketAsyncRead<S> for UnsubAck
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let mut total_read_bytes = 0;
-            let packet_identifier = stream.read_u16().await?;
-            total_read_bytes += 2;
+    async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let mut total_read_bytes = 0;
+        let packet_identifier = stream.read_u16().await?;
+        total_read_bytes += 2;
 
-            let (properties, properties_read_bytes) = UnsubAckProperties::async_read(stream).await?;
-            total_read_bytes += properties_read_bytes;
+        let (properties, properties_read_bytes) = UnsubAckProperties::async_read(stream).await?;
+        total_read_bytes += properties_read_bytes;
 
-            let mut reason_codes = vec![];
-            loop {
-                let (reason_code, reason_code_read_bytes) = UnsubAckReasonCode::async_read(stream).await?;
-                total_read_bytes += reason_code_read_bytes;
+        let mut reason_codes = vec![];
+        loop {
+            let (reason_code, reason_code_read_bytes) = UnsubAckReasonCode::async_read(stream).await?;
+            total_read_bytes += reason_code_read_bytes;
 
-                reason_codes.push(reason_code);
+            reason_codes.push(reason_code);
 
-                if total_read_bytes >= remaining_length {
-                    break;
-                }
+            if total_read_bytes >= remaining_length {
+                break;
             }
-
-            Ok((
-                Self {
-                    packet_identifier,
-                    properties,
-                    reason_codes,
-                },
-                total_read_bytes,
-            ))
         }
+
+        Ok((
+            Self {
+                packet_identifier,
+                properties,
+                reason_codes,
+            },
+            total_read_bytes,
+        ))
     }
 }
 

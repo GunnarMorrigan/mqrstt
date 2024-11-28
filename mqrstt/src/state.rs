@@ -34,7 +34,7 @@ pub struct State {
 
 impl State {
     pub fn new(receive_maximum: u16, apkid: AvailablePacketIds) -> Self {
-        let state = Self {
+        Self {
             apkid,
 
             outgoing_sub: Mutex::new(BTreeSet::new()),
@@ -45,9 +45,7 @@ impl State {
             outgoing_pub_order: Mutex::new(VecDeque::new()),
             outgoing_rel: Mutex::new(BTreeSet::new()),
             incoming_pub: Mutex::new(BTreeSet::new()),
-        };
-
-        state
+        }
     }
 
     pub fn make_pkid_available(&self, pkid: u16) -> Result<(), HandlerError> {

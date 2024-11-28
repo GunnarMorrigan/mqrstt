@@ -148,11 +148,9 @@ impl<S> MqttAsyncWrite<S> for PropertyType
 where
     S: tokio::io::AsyncWrite + std::marker::Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let buf: [u8; 1] = [u8::from(self)];
-            stream.write_all(&buf).await?;
-            Ok(1)
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let buf: [u8; 1] = [u8::from(self)];
+        stream.write_all(&buf).await?;
+        Ok(1)
     }
 }

@@ -96,13 +96,10 @@ where
             return Err(ConnectionError::NoNetwork);
         }
 
-        match self.tokio_select(handler).await {
-            otherwise => {
-                self.network = None;
+        let result = self.tokio_select(handler).await;
+        self.network = None;
 
-                otherwise
-            }
-        }
+        result
     }
 
     async fn tokio_select(&mut self, handler: &mut H) -> Result<NetworkStatus, ConnectionError> {

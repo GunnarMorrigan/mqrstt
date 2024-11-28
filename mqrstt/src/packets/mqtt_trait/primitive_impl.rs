@@ -43,13 +43,11 @@ impl<S> MqttAsyncWrite<S> for Box<str>
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let size = (self.len() as u16).to_be_bytes();
-            stream.write_all(&size).await?;
-            stream.write_all(self.as_bytes()).await?;
-            Ok(2 + self.len())
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let size = (self.len() as u16).to_be_bytes();
+        stream.write_all(&size).await?;
+        stream.write_all(self.as_bytes()).await?;
+        Ok(2 + self.len())
     }
 }
 
@@ -73,13 +71,11 @@ impl<S> MqttAsyncWrite<S> for &str
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let size = (self.len() as u16).to_be_bytes();
-            stream.write_all(&size).await?;
-            stream.write_all(self.as_bytes()).await?;
-            Ok(2 + self.len())
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let size = (self.len() as u16).to_be_bytes();
+        stream.write_all(&size).await?;
+        stream.write_all(self.as_bytes()).await?;
+        Ok(2 + self.len())
     }
 }
 
@@ -131,13 +127,11 @@ impl<S> MqttAsyncWrite<S> for String
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let size = (self.len() as u16).to_be_bytes();
-            stream.write_all(&size).await?;
-            stream.write_all(self.as_bytes()).await?;
-            Ok(2 + self.len())
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let size = (self.len() as u16).to_be_bytes();
+        stream.write_all(&size).await?;
+        stream.write_all(self.as_bytes()).await?;
+        Ok(2 + self.len())
     }
 }
 
@@ -189,13 +183,11 @@ impl<S> MqttAsyncWrite<S> for Bytes
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let size = (self.len() as u16).to_be_bytes();
-            stream.write_all(&size).await?;
-            stream.write_all(self.as_ref()).await?;
-            Ok(2 + self.len())
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let size = (self.len() as u16).to_be_bytes();
+        stream.write_all(&size).await?;
+        stream.write_all(self.as_ref()).await?;
+        Ok(2 + self.len())
     }
 }
 
@@ -234,13 +226,11 @@ impl<S> MqttAsyncWrite<S> for Vec<u8>
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let size = (self.len() as u16).to_be_bytes();
-            stream.write_all(&size).await?;
-            stream.write_all(self).await?;
-            Ok(2 + self.len())
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let size = (self.len() as u16).to_be_bytes();
+        stream.write_all(&size).await?;
+        stream.write_all(self).await?;
+        Ok(2 + self.len())
     }
 }
 impl WireLength for Vec<u8> {
@@ -304,15 +294,13 @@ impl<S> MqttAsyncWrite<S> for bool
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            if *self {
-                stream.write_all(&[1]).await?;
-            } else {
-                stream.write_all(&[0]).await?;
-            }
-            Ok(1)
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        if *self {
+            stream.write_all(&[1]).await?;
+        } else {
+            stream.write_all(&[0]).await?;
         }
+        Ok(1)
     }
 }
 impl MqttRead for u8 {
@@ -336,11 +324,9 @@ impl<S> MqttAsyncWrite<S> for u8
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            stream.write_all(self.to_be_bytes().as_slice()).await?;
-            Ok(1)
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        stream.write_all(self.to_be_bytes().as_slice()).await?;
+        Ok(1)
     }
 }
 
@@ -372,11 +358,9 @@ impl<S> MqttAsyncWrite<S> for u16
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            stream.write_all(self.to_be_bytes().as_slice()).await?;
-            Ok(2)
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        stream.write_all(self.to_be_bytes().as_slice()).await?;
+        Ok(2)
     }
 }
 
@@ -407,10 +391,8 @@ impl<S> MqttAsyncWrite<S> for u32
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            stream.write_all(self.to_be_bytes().as_slice()).await?;
-            Ok(4)
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        stream.write_all(self.to_be_bytes().as_slice()).await?;
+        Ok(4)
     }
 }

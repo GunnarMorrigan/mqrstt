@@ -1,5 +1,4 @@
 mod properties;
-use std::future::Future;
 
 pub use properties::AuthProperties;
 mod reason_code;
@@ -48,12 +47,10 @@ impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Auth
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let reason_code_writen = self.reason_code.async_write(stream).await?;
-            let properties_writen = self.properties.async_write(stream).await?;
-            Ok(reason_code_writen + properties_writen)
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let reason_code_writen = self.reason_code.async_write(stream).await?;
+        let properties_writen = self.properties.async_write(stream).await?;
+        Ok(reason_code_writen + properties_writen)
     }
 }
 

@@ -69,8 +69,8 @@ pub enum HandlerError {
     #[error("The incoming channel between network and handler is closed")]
     IncomingNetworkChannelClosed,
 
-    #[error("The outgoing channel between handler and network is closed: {0}")]
-    OutgoingNetworkChannelClosed(#[from] SendError<Packet>),
+    #[error("The outgoing channel between handler and network is closed")]
+    OutgoingNetworkChannelClosed,
 
     #[error("Channel between client and handler closed")]
     ClientChannelClosed,
@@ -86,6 +86,12 @@ pub enum HandlerError {
 
     #[error("Received an unexpected packet: {0}")]
     UnexpectedPacket(PacketType),
+}
+
+impl From<SendError<Packet>> for HandlerError {
+    fn from(_: SendError<Packet>) -> Self {
+        HandlerError::OutgoingNetworkChannelClosed
+    }
 }
 
 /// Errors producable by the [`crate::MqttClient`]

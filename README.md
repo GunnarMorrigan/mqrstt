@@ -57,7 +57,7 @@ pub struct PingPong {
 }
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
-    async fn handle(&mut self, event: packets::Packet) -> () {
+    async fn handle(&mut self, event: packets::Packet {
         match event {
             Packet::Publish(p) => {
                 if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
@@ -132,7 +132,7 @@ pub struct PingPong {
 }
 impl AsyncEventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
-    async fn handle(&mut self, event: packets::Packet) -> () {
+    async fn handle(&mut self, event: packets::Packet) {
         match event {
             Packet::Publish(p) => {
                 if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {
@@ -212,7 +212,7 @@ pub struct PingPong {
 
 impl EventHandler for PingPong {
     // Handlers only get INCOMING packets. This can change later.
-    fn handle(&mut self, event: packets::Packet) -> () {
+    fn handle(&mut self, event: packets::Packet) {
         match event {
             Packet::Publish(p) => {
                 if let Ok(payload) = String::from_utf8(p.payload.to_vec()) {

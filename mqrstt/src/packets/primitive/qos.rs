@@ -76,11 +76,9 @@ impl<S> MqttAsyncWrite<S> for QoS
 where
     S: tokio::io::AsyncWrite + std::marker::Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
-        async move {
-            let buf: [u8; 1] = [self.into_u8()];
-            stream.write_all(&buf).await?;
-            Ok(1)
-        }
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
+        let buf: [u8; 1] = [self.into_u8()];
+        stream.write_all(&buf).await?;
+        Ok(1)
     }
 }

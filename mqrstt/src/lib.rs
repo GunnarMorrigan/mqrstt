@@ -123,7 +123,7 @@ pub mod smol;
 /// Contains the reader and writer parts for the tokio runtime.
 ///
 /// Module [`crate::tokio`] contains both a synchronized and concurrent approach to call the users `Handler`.
-#[cfg(any(feature = "tokio"))]
+#[cfg(feature = "tokio")]
 pub mod tokio;
 
 /// Error types that the user can see during operation of the client.
@@ -342,7 +342,7 @@ mod smol_lib_test {
         });
     }
 
-    #[cfg(all(target_family = "windows"))]
+    #[cfg(target_family = "windows")]
     #[test]
     fn test_close_write_tcp_stream_smol() {
         use crate::error::ConnectionError;
@@ -409,7 +409,8 @@ mod tokio_lib_test {
         network.connect(stream, &mut pingresp).await.unwrap();
 
         let network_handle = tokio::task::spawn(async move {
-            network.run(&mut pingresp).await;
+            let result = network.run(&mut pingresp).await;
+            // check result and or restart the connection
             pingresp
         });
 

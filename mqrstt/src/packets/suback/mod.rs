@@ -50,32 +50,30 @@ impl<S> PacketAsyncRead<S> for SubAck
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let mut total_read_bytes = 0;
-            let packet_identifier = stream.read_u16().await?;
-            let (properties, proproperties_read_bytes) = SubAckProperties::async_read(stream).await?;
-            total_read_bytes += 2 + proproperties_read_bytes;
-            let mut reason_codes = vec![];
-            loop {
-                let (reason_code, reason_code_read_bytes) = SubAckReasonCode::async_read(stream).await?;
-                total_read_bytes += reason_code_read_bytes;
-                reason_codes.push(reason_code);
+    async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let mut total_read_bytes = 0;
+        let packet_identifier = stream.read_u16().await?;
+        let (properties, proproperties_read_bytes) = SubAckProperties::async_read(stream).await?;
+        total_read_bytes += 2 + proproperties_read_bytes;
+        let mut reason_codes = vec![];
+        loop {
+            let (reason_code, reason_code_read_bytes) = SubAckReasonCode::async_read(stream).await?;
+            total_read_bytes += reason_code_read_bytes;
+            reason_codes.push(reason_code);
 
-                if remaining_length == total_read_bytes {
-                    break;
-                }
+            if remaining_length == total_read_bytes {
+                break;
             }
-
-            Ok((
-                Self {
-                    packet_identifier,
-                    properties,
-                    reason_codes,
-                },
-                total_read_bytes,
-            ))
         }
+
+        Ok((
+            Self {
+                packet_identifier,
+                properties,
+                reason_codes,
+            },
+            total_read_bytes,
+        ))
     }
 }
 
@@ -96,22 +94,20 @@ impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for SubAck
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
         use tokio::io::AsyncWriteExt;
-        async move {
-            let mut total_written_bytes = 2;
-            stream.write_u16(self.packet_identifier).await?;
+        let mut total_written_bytes = 2;
+        stream.write_u16(self.packet_identifier).await?;
 
-            total_written_bytes += self.properties.async_write(stream).await?;
+        total_written_bytes += self.properties.async_write(stream).await?;
 
-            for reason_code in &self.reason_codes {
-                reason_code.async_write(stream).await?;
-            }
-            total_written_bytes += self.reason_codes.len();
-
-            Ok(total_written_bytes)
+        for reason_code in &self.reason_codes {
+            reason_code.async_write(stream).await?;
         }
+        total_written_bytes += self.reason_codes.len();
+
+        Ok(total_written_bytes)
     }
 }
 

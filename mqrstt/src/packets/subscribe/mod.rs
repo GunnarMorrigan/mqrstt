@@ -61,34 +61,32 @@ impl<S> PacketAsyncRead<S> for Subscribe
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let mut total_read_bytes = 0;
-            let packet_identifier = stream.read_u16().await?;
-            let (properties, proproperties_read_bytes) = SubscribeProperties::async_read(stream).await?;
-            total_read_bytes += 2 + proproperties_read_bytes;
+    async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let mut total_read_bytes = 0;
+        let packet_identifier = stream.read_u16().await?;
+        let (properties, proproperties_read_bytes) = SubscribeProperties::async_read(stream).await?;
+        total_read_bytes += 2 + proproperties_read_bytes;
 
-            let mut topics = vec![];
-            loop {
-                let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
-                let (options, options_read_bytes) = SubscriptionOptions::async_read(stream).await?;
-                total_read_bytes += topic_read_bytes + options_read_bytes;
-                topics.push((topic, options));
+        let mut topics = vec![];
+        loop {
+            let (topic, topic_read_bytes) = Box::<str>::async_read(stream).await?;
+            let (options, options_read_bytes) = SubscriptionOptions::async_read(stream).await?;
+            total_read_bytes += topic_read_bytes + options_read_bytes;
+            topics.push((topic, options));
 
-                if remaining_length >= total_read_bytes {
-                    break;
-                }
+            if remaining_length >= total_read_bytes {
+                break;
             }
-
-            Ok((
-                Self {
-                    packet_identifier,
-                    properties,
-                    topics,
-                },
-                total_read_bytes,
-            ))
         }
+
+        Ok((
+            Self {
+                packet_identifier,
+                properties,
+                topics,
+            },
+            total_read_bytes,
+        ))
     }
 }
 
@@ -110,20 +108,18 @@ impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for Subscribe
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
         use tokio::io::AsyncWriteExt;
-        async move {
-            let mut total_written_bytes = 2;
-            stream.write_u16(self.packet_identifier).await?;
+        let mut total_written_bytes = 2;
+        stream.write_u16(self.packet_identifier).await?;
 
-            total_written_bytes += self.properties.async_write(stream).await?;
-            for (topic, options) in &self.topics {
-                total_written_bytes += topic.async_write(stream).await?;
-                total_written_bytes += options.async_write(stream).await?;
-            }
-            Ok(total_written_bytes)
+        total_written_bytes += self.properties.async_write(stream).await?;
+        for (topic, options) in &self.topics {
+            total_written_bytes += topic.async_write(stream).await?;
+            total_written_bytes += options.async_write(stream).await?;
         }
+        Ok(total_written_bytes)
     }
 }
 
@@ -200,24 +196,22 @@ impl<S> MqttAsyncRead<S> for SubscriptionOptions
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let byte = stream.read_u8().await?;
+    async fn async_read(stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let byte = stream.read_u8().await?;
 
-            let retain_handling_part = (byte & 0b00110000) >> 4;
-            let retain_as_publish_part = (byte & 0b00001000) >> 3;
-            let no_local_part = (byte & 0b00000100) >> 2;
-            let qos_part = byte & 0b00000011;
+        let retain_handling_part = (byte & 0b00110000) >> 4;
+        let retain_as_publish_part = (byte & 0b00001000) >> 3;
+        let no_local_part = (byte & 0b00000100) >> 2;
+        let qos_part = byte & 0b00000011;
 
-            let options = Self {
-                retain_handling: RetainHandling::from_u8(retain_handling_part)?,
-                retain_as_publish: retain_as_publish_part != 0,
-                no_local: no_local_part != 0,
-                qos: QoS::from_u8(qos_part)?,
-            };
+        let options = Self {
+            retain_handling: RetainHandling::from_u8(retain_handling_part)?,
+            retain_as_publish: retain_as_publish_part != 0,
+            no_local: no_local_part != 0,
+            qos: QoS::from_u8(qos_part)?,
+        };
 
-            Ok((options, 1))
-        }
+        Ok((options, 1))
     }
 }
 
@@ -386,7 +380,7 @@ where
     for<'any> &'any T: IntoSingleSubscription,
 {
     fn from(value: &[T; S]) -> Self {
-        Self(value.iter().map(|val| IntoSingleSubscription::into(val)).collect())
+        Self(value.iter().map(IntoSingleSubscription::into).collect())
     }
 }
 // -------------------- Slices --------------------
@@ -395,7 +389,7 @@ where
     for<'any> &'any T: IntoSingleSubscription,
 {
     fn from(value: &[T]) -> Self {
-        Self(value.iter().map(|val| IntoSingleSubscription::into(val)).collect())
+        Self(value.iter().map(IntoSingleSubscription::into).collect())
     }
 }
 // -------------------- Vecs --------------------
@@ -404,7 +398,7 @@ where
     T: IntoSingleSubscription,
 {
     fn from(value: Vec<T>) -> Self {
-        Self(value.into_iter().map(|val| IntoSingleSubscription::into(val)).collect())
+        Self(value.into_iter().map(IntoSingleSubscription::into).collect())
     }
 }
 impl<T> From<&Vec<T>> for SubscribeTopics
@@ -412,7 +406,7 @@ where
     for<'any> &'any T: IntoSingleSubscription,
 {
     fn from(value: &Vec<T>) -> Self {
-        Self(value.iter().map(|val| IntoSingleSubscription::into(val)).collect())
+        Self(value.iter().map(IntoSingleSubscription::into).collect())
     }
 }
 

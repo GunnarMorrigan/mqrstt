@@ -64,45 +64,43 @@ impl<S> PacketAsyncRead<S> for PubComp
 where
     S: tokio::io::AsyncRead + Unpin,
 {
-    fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> impl std::future::Future<Output = Result<(Self, usize), crate::packets::error::ReadError>> {
-        async move {
-            let packet_identifier = stream.read_u16().await?;
-            if remaining_length == 2 {
-                return Ok((
-                    Self {
-                        packet_identifier,
-                        reason_code: PubCompReasonCode::Success,
-                        properties: PubCompProperties::default(),
-                    },
-                    2,
-                ));
-            }
-            // Requires u16, u8 and at least 1 byte of variable integer prop length so at least 4 bytes
-            else if remaining_length < 4 {
-                return Err(ReadError::DeserializeError(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 4)));
-            }
-
-            let (reason_code, reason_code_read_bytes) = PubCompReasonCode::async_read(stream).await?;
-            let (properties, properties_read_bytes) = PubCompProperties::async_read(stream).await?;
-
-            let total_read_bytes = 2 + reason_code_read_bytes + properties_read_bytes;
-
-            if total_read_bytes != remaining_length {
-                return Err(ReadError::DeserializeError(DeserializeError::RemainingDataError {
-                    read: total_read_bytes,
-                    remaining_length: remaining_length,
-                }));
-            }
-
-            Ok((
+    async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        let packet_identifier = stream.read_u16().await?;
+        if remaining_length == 2 {
+            return Ok((
                 Self {
                     packet_identifier,
-                    reason_code,
-                    properties,
+                    reason_code: PubCompReasonCode::Success,
+                    properties: PubCompProperties::default(),
                 },
-                total_read_bytes,
-            ))
+                2,
+            ));
         }
+        // Requires u16, u8 and at least 1 byte of variable integer prop length so at least 4 bytes
+        else if remaining_length < 4 {
+            return Err(ReadError::DeserializeError(DeserializeError::InsufficientData(std::any::type_name::<Self>(), 0, 4)));
+        }
+
+        let (reason_code, reason_code_read_bytes) = PubCompReasonCode::async_read(stream).await?;
+        let (properties, properties_read_bytes) = PubCompProperties::async_read(stream).await?;
+
+        let total_read_bytes = 2 + reason_code_read_bytes + properties_read_bytes;
+
+        if total_read_bytes != remaining_length {
+            return Err(ReadError::DeserializeError(DeserializeError::RemainingDataError {
+                read: total_read_bytes,
+                remaining_length,
+            }));
+        }
+
+        Ok((
+            Self {
+                packet_identifier,
+                reason_code,
+                properties,
+            },
+            total_read_bytes,
+        ))
     }
 }
 
@@ -126,22 +124,20 @@ impl<S> crate::packets::mqtt_trait::PacketAsyncWrite<S> for PubComp
 where
     S: tokio::io::AsyncWrite + Unpin,
 {
-    fn async_write(&self, stream: &mut S) -> impl std::future::Future<Output = Result<usize, crate::packets::error::WriteError>> {
+    async fn async_write(&self, stream: &mut S) -> Result<usize, crate::packets::error::WriteError> {
         use crate::packets::mqtt_trait::MqttAsyncWrite;
-        async move {
-            let mut total_writen_bytes = 2;
-            self.packet_identifier.async_write(stream).await?;
+        let mut total_writen_bytes = 2;
+        self.packet_identifier.async_write(stream).await?;
 
-            if self.reason_code == PubCompReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
-                return Ok(total_writen_bytes);
-            } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
-                total_writen_bytes += self.reason_code.async_write(stream).await?;
-            } else {
-                total_writen_bytes += self.reason_code.async_write(stream).await?;
-                total_writen_bytes += self.properties.async_write(stream).await?;
-            }
-            Ok(total_writen_bytes)
+        if self.reason_code == PubCompReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+            return Ok(total_writen_bytes);
+        } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
+            total_writen_bytes += self.reason_code.async_write(stream).await?;
+        } else {
+            total_writen_bytes += self.reason_code.async_write(stream).await?;
+            total_writen_bytes += self.properties.async_write(stream).await?;
         }
+        Ok(total_writen_bytes)
     }
 }
 
