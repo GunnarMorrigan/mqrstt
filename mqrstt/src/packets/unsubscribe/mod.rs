@@ -110,6 +110,8 @@ where
         let mut total_written_bytes = 2;
         stream.write_u16(self.packet_identifier).await?;
 
+        total_written_bytes += self.properties.async_write(stream).await?;
+
         for topic in &self.topics {
             total_written_bytes += topic.async_write(stream).await?;
         }

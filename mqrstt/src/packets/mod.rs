@@ -509,6 +509,9 @@ mod tests {
 
         let wire_len = packet.wire_len();
         assert_eq!(wire_len, buffer.len());
+        dbg!(wire_len);
+        let a: Vec<_> = buffer.iter().map(|f| *f as u16).collect();
+        println!("{:?}", a);
 
         let res1 = Packet::read(&mut buffer).unwrap();
 
@@ -598,9 +601,11 @@ mod tests {
         use crate::packets::WireLength;
 
         let mut buffer = Vec::with_capacity(1000);
-        packet.async_write(&mut buffer).await.unwrap();
+        let res = packet.async_write(&mut buffer).await.unwrap();
 
         let wire_len = packet.wire_len();
+
+        assert_eq!(res, wire_len);
         assert_eq!(wire_len, buffer.len());
 
         let mut buf = buffer.as_slice();
