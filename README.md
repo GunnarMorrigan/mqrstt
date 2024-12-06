@@ -17,7 +17,6 @@ The stream has to implement the smol or tokio [`AsyncReadExt`] and [`AsyncWrite`
 ## Features
 - MQTT v5
 - Runtime agnostic (Smol, Tokio)
-- Sync
 - TLS/TCP
 - Lean
 - Keep alive depends on actual communication
