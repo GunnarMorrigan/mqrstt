@@ -73,7 +73,7 @@ impl PacketRead for Connect {
     fn read(_: u8, _: usize, mut buf: Bytes) -> Result<Self, DeserializeError> {
         let expected_protocol = [b'M', b'Q', b'T', b'T'];
         let received_protocol = Vec::<u8>::read(&mut buf)?;
-        if &received_protocol != &expected_protocol {
+        if received_protocol != expected_protocol {
             return Err(DeserializeError::MalformedPacketWithInfo("Protocol not MQTT".to_owned()));
         }
 

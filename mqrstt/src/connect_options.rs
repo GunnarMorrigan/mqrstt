@@ -6,7 +6,7 @@ use crate::{
     util::constants::MAXIMUM_PACKET_SIZE,
 };
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, Copy, thiserror::Error)]
 pub enum ConnectOptionsError {
     #[error("Maximum packet size is exceeded. Maximum is {MAXIMUM_PACKET_SIZE}, user provided: {0}")]
     MaximumPacketSizeExceeded(u32),

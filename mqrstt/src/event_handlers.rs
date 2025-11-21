@@ -44,6 +44,7 @@ pub mod example_handlers {
         fn handle(&mut self, _: Packet) {}
     }
 
+    #[derive(Debug)]
     pub struct PingResp {
         pub client: MqttClient,
         pub ping_resp_received: u32,

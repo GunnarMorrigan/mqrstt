@@ -6,3 +6,5 @@ examples/smol_tls/Cargo.lock
 
 Cargo.lock
 test.py
+.DS_Store
+examples/.DS_Store

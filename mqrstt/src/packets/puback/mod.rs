@@ -23,6 +23,14 @@ where
     S: tokio::io::AsyncRead + Unpin,
 {
     async fn async_read(_: u8, remaining_length: usize, stream: &mut S) -> Result<(Self, usize), crate::packets::error::ReadError> {
+        if remaining_length < 2 {
+            return Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(
+                std::any::type_name::<Self>(),
+                remaining_length,
+                2,
+            )));
+        }
+
         let packet_identifier = stream.read_u16().await?;
         if remaining_length == 2 {
             Ok((
@@ -33,26 +41,13 @@ where
                 },
                 2,
             ))
-        } else if remaining_length == 3 {
-            let (reason_code, reason_code_read_bytes) = PubAckReasonCode::async_read(stream).await?;
-
-            Ok((
-                Self {
-                    packet_identifier,
-                    reason_code,
-                    properties: PubAckProperties::default(),
-                },
-                2 + reason_code_read_bytes,
-            ))
-        } else if remaining_length < 4 {
-            Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(
-                std::any::type_name::<Self>(),
-                remaining_length,
-                4,
-            )))
         } else {
             let (reason_code, reason_code_read_bytes) = PubAckReasonCode::async_read(stream).await?;
-            let (properties, properties_read_bytes) = PubAckProperties::async_read(stream).await?;
+            let (properties, properties_read_bytes) = if remaining_length == 3 {
+                (PubAckProperties::default(), 0)
+            } else {
+                PubAckProperties::async_read(stream).await?
+            };
 
             Ok((
                 Self {
@@ -68,33 +63,24 @@ where
 
 impl PacketRead for PubAck {
     fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
+        if remaining_length < 2 {
+            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 2));
+        }
+
+        let packet_identifier = u16::read(&mut buf)?;
+
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2 {
             Ok(Self {
-                packet_identifier: u16::read(&mut buf)?,
+                packet_identifier,
                 reason_code: PubAckReasonCode::Success,
                 properties: PubAckProperties::default(),
             })
-        } else if remaining_length == 3 {
-            let reason_code = PubAckReasonCode::read(&mut buf)?;
-            Ok(Self {
-                packet_identifier: u16::read(&mut buf)?,
-                reason_code,
-                properties: PubAckProperties::default(),
-            })
-        }
-        // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
-        else if remaining_length < 4 {
-            Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 4))
         } else {
-            let packet_identifier = u16::read(&mut buf)?;
-            let reason_code = PubAckReasonCode::read(&mut buf)?;
-            let properties = PubAckProperties::read(&mut buf)?;
-
             Ok(Self {
                 packet_identifier,
-                reason_code,
-                properties,
+                reason_code: PubAckReasonCode::read(&mut buf)?,
+                properties: if remaining_length == 3 { PubAckProperties::default() } else { PubAckProperties::read(&mut buf)? },
             })
         }
     }
@@ -127,7 +113,6 @@ where
             self.packet_identifier.async_write(stream).await?;
 
             if self.reason_code == PubAckReasonCode::Success && self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
-                return Ok(total_written_bytes);
             } else if self.properties.reason_string.is_none() && self.properties.user_properties.is_empty() {
                 total_written_bytes += self.reason_code.async_write(stream).await?;
             } else {
@@ -244,6 +229,25 @@ mod tests {
 
         assert_eq!(3, puback.wire_len());
         assert_eq!(3, buf.len());
+    }
+
+    #[test]
+    fn test_read_non_success_puback() {
+        let stream = &[
+            0x00,
+            0x0C,                                  // Packet identifier = 12
+            PubAckReasonCode::NotAuthorized as u8, // Reason code success
+        ];
+        let buf = Bytes::from(&stream[..]);
+        let p_ack = PubAck::read(0, 3, buf).unwrap();
+
+        let expected = PubAck {
+            packet_identifier: 12,
+            reason_code: PubAckReasonCode::NotAuthorized,
+            properties: PubAckProperties::default(),
+        };
+
+        assert_eq!(expected, p_ack);
     }
 
     #[test]
