@@ -33,12 +33,23 @@ where
                 },
                 2,
             ))
+        } else if remaining_length == 3 {
+            let (reason_code, reason_code_read_bytes) = PubAckReasonCode::async_read(stream).await?;
+
+            Ok((
+                Self {
+                    packet_identifier,
+                    reason_code,
+                    properties: PubAckProperties::default(),
+                },
+                2 + reason_code_read_bytes,
+            ))
         } else if remaining_length < 4 {
-            return Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(
+            Err(crate::packets::error::ReadError::DeserializeError(DeserializeError::InsufficientData(
                 std::any::type_name::<Self>(),
                 remaining_length,
                 4,
-            )));
+            )))
         } else {
             let (reason_code, reason_code_read_bytes) = PubAckReasonCode::async_read(stream).await?;
             let (properties, properties_read_bytes) = PubAckProperties::async_read(stream).await?;
@@ -59,26 +70,33 @@ impl PacketRead for PubAck {
     fn read(_: u8, remaining_length: usize, mut buf: bytes::Bytes) -> Result<Self, DeserializeError> {
         // reason code and properties are optional if reasoncode is success and properties empty.
         if remaining_length == 2 {
-            return Ok(Self {
+            Ok(Self {
                 packet_identifier: u16::read(&mut buf)?,
                 reason_code: PubAckReasonCode::Success,
                 properties: PubAckProperties::default(),
-            });
+            })
+        } else if remaining_length == 3 {
+            let reason_code = PubAckReasonCode::read(&mut buf)?;
+            Ok(Self {
+                packet_identifier: u16::read(&mut buf)?,
+                reason_code,
+                properties: PubAckProperties::default(),
+            })
         }
         // Requires u16, u8 and at leasy 1 byte of variable integer prop length so at least 4 bytes
         else if remaining_length < 4 {
-            return Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 4));
+            Err(DeserializeError::InsufficientData(std::any::type_name::<Self>(), buf.len(), 4))
+        } else {
+            let packet_identifier = u16::read(&mut buf)?;
+            let reason_code = PubAckReasonCode::read(&mut buf)?;
+            let properties = PubAckProperties::read(&mut buf)?;
+
+            Ok(Self {
+                packet_identifier,
+                reason_code,
+                properties,
+            })
         }
-
-        let packet_identifier = u16::read(&mut buf)?;
-        let reason_code = PubAckReasonCode::read(&mut buf)?;
-        let properties = PubAckProperties::read(&mut buf)?;
-
-        Ok(Self {
-            packet_identifier,
-            reason_code,
-            properties,
-        })
     }
 }
 
