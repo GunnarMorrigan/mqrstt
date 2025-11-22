@@ -29,7 +29,7 @@ crate::packets::macros::define_properties!(
 
 impl MqttRead for ConnAckProperties {
     fn read(buf: &mut bytes::Bytes) -> Result<Self, DeserializeError> {
-        let (len, _) = VariableInteger::read_variable_integer(buf).map_err(DeserializeError::from)?;
+        let (len, _) = VariableInteger::read_variable_integer(buf)?;
 
         let mut properties = Self::default();
         if len == 0 {

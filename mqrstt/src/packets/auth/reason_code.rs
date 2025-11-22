@@ -1,5 +1,1 @@
-crate::packets::macros::reason_code!(AuthReasonCode,
-    Success,
-    ContinueAuthentication,
-    ReAuthenticate
-);
+crate::packets::macros::reason_code!(AuthReasonCode, Success, ContinueAuthentication, ReAuthenticate);

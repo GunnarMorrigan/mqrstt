@@ -1,5 +1,1 @@
-crate::packets::macros::reason_code!(
-    PubCompReasonCode,
-    Success,
-    PacketIdentifierNotFound
-);
+crate::packets::macros::reason_code!(PubCompReasonCode, Success, PacketIdentifierNotFound);

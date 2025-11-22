@@ -1,8 +1,9 @@
-crate::packets::macros::reason_code!(ConnAckReasonCode,
+crate::packets::macros::reason_code!(
+    ConnAckReasonCode,
     Success,
     UnspecifiedError,
     MalformedPacket,
-    ProtocolError, 
+    ProtocolError,
     ImplementationSpecificError,
     UnsupportedProtocolVersion,
     ClientIdentifierNotValid,
