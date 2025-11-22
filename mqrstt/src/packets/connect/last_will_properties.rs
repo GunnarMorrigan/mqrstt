@@ -2,9 +2,9 @@ use bytes::{BufMut, Bytes, BytesMut};
 
 use crate::packets::VariableInteger;
 use crate::packets::{
+    PacketType, PropertyType, WireLength,
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttRead, MqttWrite},
-    PacketType, PropertyType, WireLength,
 };
 
 crate::packets::macros::define_properties!(

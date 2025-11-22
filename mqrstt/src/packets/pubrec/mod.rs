@@ -9,9 +9,9 @@ use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
 use super::{
+    PacketAsyncRead, VariableInteger,
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-    PacketAsyncRead, VariableInteger,
 };
 
 /// The [`PubRec`] (Publish Received) packet is part of the acknowledgment flow for a [`crate::packets::Publish`] with QoS 2.
@@ -150,9 +150,9 @@ impl WireLength for PubRec {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
+        PropertyType, PubRecReasonCode, VariableInteger,
         mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
         pubrec::{PubRec, PubRecProperties},
-        PropertyType, PubRecReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 

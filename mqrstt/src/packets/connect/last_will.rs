@@ -1,9 +1,9 @@
 use bytes::{Bytes, BytesMut};
 
 use crate::packets::{
+    QoS, WireLength,
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
-    QoS, WireLength,
 };
 
 use super::{LastWillProperties, VariableInteger};

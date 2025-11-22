@@ -5,9 +5,9 @@ mod properties;
 pub use properties::PubCompProperties;
 
 use super::{
+    VariableInteger,
     error::{DeserializeError, ReadError},
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    VariableInteger,
 };
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
@@ -158,9 +158,9 @@ impl WireLength for PubComp {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
+        PropertyType, PubCompReasonCode, VariableInteger,
         mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
         pubcomp::{PubComp, PubCompProperties},
-        PropertyType, PubCompReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 

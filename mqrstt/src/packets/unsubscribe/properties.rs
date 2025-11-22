@@ -1,9 +1,9 @@
 use crate::packets::VariableInteger;
 
 use crate::packets::{
+    PacketType, PropertyType,
     error::DeserializeError,
     mqtt_trait::{MqttRead, MqttWrite, WireLength},
-    PacketType, PropertyType,
 };
 
 crate::packets::macros::define_properties!(

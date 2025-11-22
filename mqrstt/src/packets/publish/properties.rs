@@ -4,8 +4,8 @@ use crate::packets::VariableInteger;
 
 use crate::packets::mqtt_trait::{MqttRead, MqttWrite, WireLength};
 use crate::packets::{
-    error::{DeserializeError, SerializeError},
     PacketType, PropertyType,
+    error::{DeserializeError, SerializeError},
 };
 
 crate::packets::macros::define_properties!(

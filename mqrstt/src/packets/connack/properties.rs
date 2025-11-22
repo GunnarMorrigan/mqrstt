@@ -1,7 +1,7 @@
 use crate::packets::{
+    PacketType, PropertyType, QoS, VariableInteger,
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttRead, MqttWrite, WireLength},
-    PacketType, PropertyType, QoS, VariableInteger,
 };
 use bytes::BufMut;
 

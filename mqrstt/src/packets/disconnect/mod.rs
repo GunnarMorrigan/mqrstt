@@ -5,8 +5,8 @@ mod reason_code;
 pub use reason_code::DisconnectReasonCode;
 
 use super::{
-    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
     VariableInteger,
+    mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
 };
 
 /// The DISCONNECT Packet is the final packet.

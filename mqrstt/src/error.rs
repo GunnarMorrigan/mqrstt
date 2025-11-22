@@ -3,8 +3,8 @@ use std::io;
 use async_channel::{RecvError, SendError};
 
 use crate::packets::{
-    error::{DeserializeError, ReadBytes, ReadError, SerializeError, WriteError},
     ConnAckReasonCode, Packet, PacketType,
+    error::{DeserializeError, ReadBytes, ReadError, SerializeError, WriteError},
 };
 
 /// Critical errors that can happen during the operation of the entire client

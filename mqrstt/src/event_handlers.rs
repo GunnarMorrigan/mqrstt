@@ -28,8 +28,8 @@ pub mod example_handlers {
     use std::{ops::AddAssign, sync::atomic::AtomicU16};
 
     use crate::{
-        packets::{self, Packet},
         AsyncEventHandler, EventHandler, MqttClient,
+        packets::{self, Packet},
     };
 
     /// Most basic no op handler

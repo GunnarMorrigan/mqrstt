@@ -9,8 +9,9 @@ use tracing::trace;
 
 use crate::packets::ConnAck;
 use crate::packets::{
+    ConnAckReasonCode,
     error::ReadBytes,
-    ConnAckReasonCode, {FixedHeader, Packet},
+    {FixedHeader, Packet},
 };
 use crate::{connect_options::ConnectOptions, error::ConnectionError};
 

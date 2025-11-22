@@ -3,8 +3,8 @@ use core::slice::Iter;
 use tokio::io::AsyncReadExt;
 
 use crate::packets::{
-    error::{DeserializeError, ReadBytes},
     PacketType,
+    error::{DeserializeError, ReadBytes},
 };
 
 use super::read_fixed_header_rem_len;

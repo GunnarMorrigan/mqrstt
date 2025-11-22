@@ -238,7 +238,8 @@ where
 
 #[cfg(test)]
 fn random_chars() -> String {
-    rand::Rng::sample_iter(rand::thread_rng(), &rand::distributions::Alphanumeric).take(7).map(char::from).collect()
+    use rand::Rng;
+    rand::rng().sample_iter(&rand::distr::Alphanumeric).take(7).map(char::from).collect()
 }
 
 #[cfg(feature = "smol")]
@@ -247,9 +248,7 @@ mod smol_lib_test {
 
     use std::time::Duration;
 
-    use rand::Rng;
-
-    use crate::{example_handlers::PingPong, packets::QoS, random_chars, ConnectOptions, NetworkBuilder};
+    use crate::{ConnectOptions, NetworkBuilder, example_handlers::PingPong, packets::QoS, random_chars};
 
     #[test]
     fn test_smol_tcp() {
@@ -288,7 +287,7 @@ mod smol_lib_test {
     #[test]
     fn test_smol_ping_req() {
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
+            let mut client_id: String = random_chars();
             client_id += "_SmolTcppingrespTest";
             let mut options = ConnectOptions::new(client_id);
             options.set_keep_alive_interval(Duration::from_secs(5));
@@ -333,7 +332,7 @@ mod smol_lib_test {
         use std::io::ErrorKind;
 
         smol::block_on(async {
-            let mut client_id: String = rand::thread_rng().sample_iter(&rand::distributions::Alphanumeric).take(7).map(char::from).collect();
+            let mut client_id: String = random_chars();
             client_id += "_SmolTcppingrespTest";
             let options = ConnectOptions::new(client_id);
 
@@ -368,9 +367,9 @@ mod smol_lib_test {
 #[cfg(feature = "tokio")]
 #[cfg(test)]
 mod tokio_lib_test {
+    use crate::ConnectOptions;
     use crate::example_handlers::PingResp;
     use crate::random_chars;
-    use crate::ConnectOptions;
 
     use std::time::Duration;
 
@@ -412,7 +411,7 @@ mod tokio_lib_test {
     #[cfg(all(feature = "tokio", target_family = "windows"))]
     #[tokio::test]
     async fn test_close_write_tcp_stream_tokio() {
-        use crate::{error::ConnectionError, NetworkBuilder};
+        use crate::{NetworkBuilder, error::ConnectionError};
         use core::panic;
         use std::io::ErrorKind;
 

@@ -3,9 +3,9 @@ use bytes::{Buf, BufMut};
 use tokio::io::AsyncReadExt;
 
 use crate::packets::{
+    QoS,
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite},
-    QoS,
 };
 
 /// The connect flags describe some information related the session.

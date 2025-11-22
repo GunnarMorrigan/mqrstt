@@ -5,8 +5,8 @@ use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use crate::packets::mqtt_trait::MqttAsyncRead;
 
-use super::mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use super::VariableInteger;
+use super::mqtt_trait::{MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 

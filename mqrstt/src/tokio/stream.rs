@@ -49,7 +49,7 @@ where
                 return match err {
                     crate::packets::error::WriteError::SerializeError(serialize_error) => Err(ConnectionError::SerializationError(serialize_error)),
                     crate::packets::error::WriteError::IoError(error) => Err(ConnectionError::Io(error)),
-                }
+                };
             }
         }
 

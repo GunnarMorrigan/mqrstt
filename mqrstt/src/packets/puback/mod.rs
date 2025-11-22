@@ -2,9 +2,9 @@ mod reason_code;
 pub use reason_code::PubAckReasonCode;
 
 use super::{
+    PacketType, PropertyType, VariableInteger,
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    PacketType, PropertyType, VariableInteger,
 };
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;
@@ -202,9 +202,9 @@ impl MqttWrite for PubAckProperties {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
+        PropertyType, PubAckReasonCode, VariableInteger,
         mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
         puback::{PubAck, PubAckProperties},
-        PropertyType, PubAckReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 

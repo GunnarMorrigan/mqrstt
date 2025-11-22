@@ -6,9 +6,9 @@ use tokio::io::AsyncReadExt;
 use crate::{error::PacketValidationError, util::constants::MAXIMUM_TOPIC_SIZE};
 
 use super::{
+    QoS, VariableInteger,
     error::DeserializeError,
     mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength},
-    QoS, VariableInteger,
 };
 use bytes::{Buf, BufMut};
 
@@ -415,8 +415,8 @@ mod tests {
     use bytes::{Bytes, BytesMut};
 
     use crate::packets::{
-        mqtt_trait::{MqttRead, PacketRead, PacketWrite},
         Packet,
+        mqtt_trait::{MqttRead, PacketRead, PacketWrite},
     };
 
     use super::WireLength;

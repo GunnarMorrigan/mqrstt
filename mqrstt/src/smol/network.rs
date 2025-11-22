@@ -5,12 +5,12 @@ use futures::FutureExt;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
+use crate::NetworkStatus;
 use crate::available_packet_ids::AvailablePacketIds;
 use crate::connect_options::ConnectOptions;
 use crate::error::ConnectionError;
 use crate::packets::error::ReadBytes;
 use crate::packets::{Disconnect, DisconnectReasonCode, Packet, PacketType};
-use crate::NetworkStatus;
 use crate::{AsyncEventHandler, StateHandler};
 
 use super::stream::Stream;

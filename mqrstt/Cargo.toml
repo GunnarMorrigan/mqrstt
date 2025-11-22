@@ -6,19 +6,16 @@ repository = "https://github.com/GunnarMorrigan/mqrstt"
 documentation = "https://docs.rs/mqrstt"
 categories = ["network-programming"]
 readme = "../README.md"
-edition = "2021"
+edition = "2024"
 license = "MPL-2.0"
 keywords = ["MQTT", "IoT", "MQTTv5", "messaging", "client"]
 description = "Pure rust MQTTv5 client implementation Smol and Tokio"
-rust-version = "1.75"
+
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = [
-    "smol",
-    "tokio"
-]
+default = ["smol", "tokio"]
 sync = []
 tokio = ["dep:tokio", "tokio/rt"]
 smol = ["dep:smol"]
@@ -39,7 +36,6 @@ futures = { version = "0.3", default-features = false, features = [
     "async-await",
 ] }
 
-
 # tokio feature flag
 tokio = { version = "1", features = [
     "macros",
@@ -54,10 +50,10 @@ smol = { version = "2", optional = true }
 [dev-dependencies]
 pretty_assertions = "1.4.1"
 
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.20", features = ["env-filter"] }
 
 smol = { version = "2.0.0" }
-tokio = { version = "1.33.0", features = [
+tokio = { version = "1", features = [
     "rt-multi-thread",
     "rt",
     "macros",
@@ -67,10 +63,5 @@ tokio = { version = "1.33.0", features = [
     "time",
 ] }
 
-rustls = { version = "0.21.7" }
-rustls-pemfile = { version = "1.0.3" }
-webpki = { version = "0.22.4" }
-async-rustls = { version = "0.4.1" }
-tokio-rustls = "0.24.1"
-rstest = "0.23.0"
-rand = "0.8.5"
+rstest = "0.26.1"
+rand = "0.9.2"

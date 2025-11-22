@@ -9,11 +9,11 @@ use crate::error::PacketValidationError;
 use crate::packets::error::ReadError;
 use crate::util::constants::MAXIMUM_TOPIC_SIZE;
 
-use super::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use super::VariableInteger;
+use super::mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketValidation, PacketWrite, WireLength};
 use super::{
-    error::{DeserializeError, SerializeError},
     QoS,
+    error::{DeserializeError, SerializeError},
 };
 
 /// The PUBLISH Packet is used to send data from either side of the connection.
@@ -212,8 +212,8 @@ mod tests {
     use bytes::{BufMut, BytesMut};
 
     use crate::packets::{
-        mqtt_trait::{PacketRead, PacketWrite},
         VariableInteger,
+        mqtt_trait::{PacketRead, PacketWrite},
     };
 
     use super::Publish;

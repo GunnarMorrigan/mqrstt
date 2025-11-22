@@ -7,8 +7,8 @@ pub use reason_code::AuthReasonCode;
 use bytes::Bytes;
 
 use super::{
-    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
     VariableInteger,
+    mqtt_trait::{MqttAsyncRead, MqttAsyncWrite, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]

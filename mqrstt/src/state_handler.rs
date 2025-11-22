@@ -246,12 +246,12 @@ mod handler_tests {
     use async_channel::Receiver;
 
     use crate::{
+        ConnectOptions, StateHandler,
         available_packet_ids::AvailablePacketIds,
         packets::{
             Packet, PubComp, PubCompProperties, PubCompReasonCode, PubRec, PubRecProperties, PubRecReasonCode, PubRel, PubRelProperties, PubRelReasonCode, QoS, SubAck, SubAckProperties,
             SubAckReasonCode, UnsubAck, UnsubAckProperties, UnsubAckReasonCode,
         },
-        ConnectOptions, StateHandler,
     };
 
     use crate::tests::test_packets::*;

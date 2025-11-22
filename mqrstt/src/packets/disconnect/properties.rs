@@ -1,9 +1,9 @@
 use bytes::BufMut;
 
 use crate::packets::{
+    PacketType, PropertyType, VariableInteger,
     error::DeserializeError,
     mqtt_trait::{MqttRead, MqttWrite, WireLength},
-    PacketType, PropertyType, VariableInteger,
 };
 
 crate::packets::macros::define_properties!(DisconnectProperties, SessionExpiryInterval, ReasonString, UserProperty, ServerReference);

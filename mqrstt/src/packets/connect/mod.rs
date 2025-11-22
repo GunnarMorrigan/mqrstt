@@ -13,9 +13,9 @@ pub use last_will::LastWill;
 use crate::packets::error::ReadError;
 
 use super::{
+    ProtocolVersion, VariableInteger, WireLength,
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
-    ProtocolVersion, VariableInteger, WireLength,
 };
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use tokio::io::AsyncReadExt;
@@ -297,8 +297,8 @@ impl WireLength for Connect {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
-        mqtt_trait::{MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
         QoS,
+        mqtt_trait::{MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
     };
 
     use super::{Connect, ConnectFlags, LastWill};

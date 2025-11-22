@@ -8,9 +8,9 @@ use bytes::BufMut;
 use tokio::io::AsyncReadExt;
 
 use super::{
+    VariableInteger,
     error::{DeserializeError, ReadError},
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    VariableInteger,
 };
 
 /// The [`PubRel`] (Publish Release) packet acknowledges the reception of a [`crate::packets::PubRec`] Packet.
@@ -149,9 +149,9 @@ impl WireLength for PubRel {
 #[cfg(test)]
 mod tests {
     use crate::packets::{
+        PropertyType, PubRelReasonCode, VariableInteger,
         mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
         pubrel::{PubRel, PubRelProperties},
-        PropertyType, PubRelReasonCode, VariableInteger,
     };
     use bytes::{BufMut, Bytes, BytesMut};
 

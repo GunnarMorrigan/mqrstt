@@ -6,9 +6,9 @@ use tracing::info;
 use crate::{
     error::ClientError,
     packets::{
+        DisconnectReasonCode, Packet, QoS,
         mqtt_trait::PacketValidation,
-        DisconnectReasonCode, Packet, QoS, {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, SubscribeTopics},
-        {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
+        {Disconnect, DisconnectProperties}, {Publish, PublishProperties}, {Subscribe, SubscribeProperties, SubscribeTopics}, {Unsubscribe, UnsubscribeProperties, UnsubscribeTopics},
     },
 };
 

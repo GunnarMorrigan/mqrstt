@@ -6,9 +6,9 @@ mod reason_code;
 pub use reason_code::SubAckReasonCode;
 
 use super::{
+    VariableInteger, WireLength,
     error::SerializeError,
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite},
-    VariableInteger, WireLength,
 };
 use bytes::BufMut;
 use tokio::io::AsyncReadExt;

@@ -1,9 +1,9 @@
 use bytes::Bytes;
 
 use crate::packets::{
+    PacketType, PropertyType, VariableInteger,
     error::DeserializeError,
     mqtt_trait::{MqttRead, MqttWrite, WireLength},
-    PacketType, PropertyType, VariableInteger,
 };
 
 crate::packets::macros::define_properties!(
@@ -70,11 +70,12 @@ impl MqttWrite for AuthProperties {
             PropertyType::AuthenticationMethod.write(buf)?;
             authentication_method.write(buf)?;
         }
-        if let Some(authentication_data) = &self.authentication_data {
-            if !authentication_data.is_empty() && self.authentication_method.is_some() {
-                PropertyType::AuthenticationData.write(buf)?;
-                authentication_data.write(buf)?;
-            }
+        if let Some(authentication_data) = &self.authentication_data
+            && !authentication_data.is_empty()
+            && self.authentication_method.is_some()
+        {
+            PropertyType::AuthenticationData.write(buf)?;
+            authentication_data.write(buf)?;
         }
         if let Some(reason_string) = &self.reason_string {
             PropertyType::ReasonString.write(buf)?;

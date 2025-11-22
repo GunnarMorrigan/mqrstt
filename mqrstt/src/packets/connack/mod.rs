@@ -5,9 +5,9 @@ mod reason_code;
 pub use reason_code::ConnAckReasonCode;
 
 use super::{
+    VariableInteger,
     error::{DeserializeError, SerializeError},
     mqtt_trait::{MqttAsyncRead, MqttRead, MqttWrite, PacketAsyncRead, PacketRead, PacketWrite, WireLength},
-    VariableInteger,
 };
 use bytes::{Buf, BufMut};
 use tokio::io::AsyncReadExt;
@@ -161,9 +161,9 @@ where
 mod tests {
 
     use crate::packets::{
+        ConnAckReasonCode, Packet, VariableInteger,
         connack::{ConnAck, ConnAckProperties},
         mqtt_trait::{MqttRead, MqttWrite, PacketRead, PacketWrite, WireLength},
-        ConnAckReasonCode, Packet, VariableInteger,
     };
 
     #[test]
